@@ -1,0 +1,35 @@
+`%||%` <- function(x, y) {
+    if (is.null(x)) y else x
+}
+
+run_command <- function(args = character(), cmd, name = NULL, sys_args = list()) {
+    if (!is.null(cmd)) {
+        cmd <- normalizePath(cmd)
+    } else if (!is.null(name)) {
+        cmd <- Sys.which(name)
+        if (nzchar(cmd) == 0L) {
+            cli::cli_abort("Cannot find {.fn {name}}")
+        }
+    }
+    sys_args <- c(list(command = cmd, args = args), sys_args)
+    do.call(system2, sys_args)
+}
+
+file_path <- function(..., ext = NULL) {
+    dots <- list(...)
+    dots_len <- length(dots)
+    if (dots_len > 0L && !is.null(ext)) {
+        dots[[dots_len]] <- paste(dots[[dots_len]], ext, sep = ".")
+    }
+    do.call(file.path, dots)
+}
+
+handle_arg <- function(arg, name, format = "%s", sep = " ") {
+    if (is.null(arg)) {
+        return(NULL)
+    } else if (isTRUE(arg)) {
+        return(name)
+    } else {
+        return(sprintf(paste(name, format, sep = sep), arg))
+    }
+}
