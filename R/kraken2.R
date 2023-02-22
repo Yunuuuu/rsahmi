@@ -3,7 +3,7 @@ run_kraken2 <- function(
     ncbi_blast_path = NULL, kraken2_db = NULL,
     report_mpa = TRUE, cores = parallel::detectCores(),
     ..., cmd = NULL, sys_args = list()) {
-    name <- name %||% sub("_1[.fastq]*$", "", basename(fq1), perl = TRUE)
+    sample <- sample %||% sub("_1[.fastq]*$", "", basename(fq1), perl = TRUE)
     args <- handle_arg(cores, "--threads", "%d")
     args <- c(args, handle_arg(kraken2_db, "--db", "%s"))
     args <- c(args, handle_arg(!is.null(fq2), "--paired"))
@@ -22,7 +22,12 @@ run_kraken2 <- function(
         kraken2_sys_args$wait <- TRUE
     }
     if (!is.null(ncbi_blast_path)) {
-        Sys.setenv(PATH = paste(Sys.getenv("PATH"), ncbi_blast_path, sep = ":"))
+        old_path <- Sys.getenv("PATH")
+        on.exit(Sys.setenv(PATH = old_path))
+        Sys.setenv(PATH = paste(old_path,
+            normalizePath(ncbi_blast_path),
+            sep = ":"
+        ))
     }
     status <- run_command(
         args,
