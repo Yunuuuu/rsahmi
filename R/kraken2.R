@@ -14,7 +14,7 @@ run_kraken2 <- function(
         "--output",
         file_path(out_dir, sample, ext = "kraken.output.txt"),
         "--report",
-        file_path(out_dir, sample, "kraken.report.txt")
+        file_path(out_dir, sample, ext = "kraken.report.txt")
     )
     args <- c(args, ..., fq1, fq2)
     if (report_mpa) {
@@ -31,7 +31,7 @@ run_kraken2 <- function(
     )
     if (report_mpa) {
         mpa_status <- report_mpa(
-            file_path(out_dir, sample, "kraken.report.txt"),
+            file_path(out_dir, sample, ext = "kraken.report.txt"),
             sample = sample, out_dir = out_dir,
             sys_args = sys_args
         )
@@ -49,7 +49,7 @@ report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list
     data <- data[, c(1:3, 6:8)]
     data.table::fwrite(
         data,
-        file = file_path(out_dir, sample, ".kraken.report.std.txt"),
+        file = file_path(out_dir, sample, ext = "kraken.report.std.txt"),
         sep = "\t", col.names = FALSE
     )
     mpa_cmd <- system.file(
@@ -58,9 +58,9 @@ report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list
     )
     args <- c(
         "-r",
-        file_path(out_dir, sample, ".kraken.report.std.txt"),
+        file_path(out_dir, sample, ext = "kraken.report.std.txt"),
         "-o",
-        file_path(out_dir, sample, ".kraken.report.mpa.txt"),
+        file_path(out_dir, sample, ext = "kraken.report.mpa.txt"),
         "--intermediate-ranks"
     )
     run_command(
