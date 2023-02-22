@@ -1,2 +1,11 @@
 ^rsahmi\.Rproj$
 ^\.Rproj\.user$
+^\.vscode$
+^\.radian_history$
+^\.gitignore$
+^Scratch\.RConsole$
+^\.Rhistory$
+^data-raw$
+^README_cache$
+^README\.html$
+^README\.md$
