@@ -8,7 +8,7 @@ run_command <- function(args = character(), cmd, name = NULL, sys_args = list())
     } else if (!is.null(name)) {
         cmd <- Sys.which(name)
         if (nzchar(cmd) == 0L) {
-            cli::cli_abort("Cannot find {.fn {name}}")
+            cli::cli_abort("Cannot find {.fun {name}}")
         }
     }
     sys_args <- c(list(command = cmd, args = args), sys_args)
