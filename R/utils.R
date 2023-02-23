@@ -12,7 +12,7 @@ run_command <- function(args = character(), cmd, name = NULL, sys_args = list())
         }
     }
     sys_args <- c(list(command = cmd, args = args), sys_args)
-    cli::cli_alert("Running {.code {cmd} {paste0(args, collapse = \" \")}}")
+    cli::cli_alert("Running command {.field {cmd}}")
     do.call(system2, sys_args)
 }
 
