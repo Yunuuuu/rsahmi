@@ -68,6 +68,9 @@ report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list
         "extdata", "kreport2mpa.py",
         package = "rsahmi", mustWork = TRUE
     )
+    if (file.access(mpa_cmd, mode = 1L) != 0L) {
+        Sys.chmod(mpa_cmd, "555")
+    }
     out_dir <- normalizePath(out_dir, mustWork = TRUE)
     args <- c(
         "-r",
