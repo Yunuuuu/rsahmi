@@ -12,7 +12,11 @@ run_command <- function(args = character(), cmd, name = NULL, sys_args = list())
         }
     }
     sys_args <- c(list(command = cmd, args = args), sys_args)
-    cli::cli_alert("Running command {.field {cmd}}")
+    cli_args <- cli::cli_vec( # nolint
+        args, 
+        list("vec-trunc" = 3L, "vec-sep" = " ", "vec-last" = " ")
+    )
+    cli::cli_alert("Running command {.field {cmd} {cli_args}}")
     do.call(system2, sys_args)
 }
 
