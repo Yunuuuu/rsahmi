@@ -1,22 +1,29 @@
-run_kraken2 <- function(
-    fq1, fq2 = NULL, sample = NULL, out_dir = getwd(),
-    ncbi_blast_path = NULL, kraken2_db = NULL,
-    report_mpa = TRUE, cores = parallel::detectCores(),
-    ..., cmd = NULL, sys_args = list()) {
-    sample <- sample %||% sub("_1[.fastq]*$", "", basename(fq1), perl = TRUE)
+run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
+                        ncbi_blast_path = NULL, kraken2_db = NULL,
+                        report_mpa = TRUE, cores = parallel::detectCores(),
+                        cmd = NULL, sys_args = list()) {
+    sample <- sample %||% sub("_0*1\\.(fastq|fq)(\\.gz)?$", "",
+        basename(fq1),
+        perl = TRUE
+    )
     args <- handle_arg(cores, "--threads", "%d")
     args <- c(args, handle_arg(kraken2_db, "--db", "%s"))
     args <- c(args, handle_arg(!is.null(fq2), "--paired"))
-    args <- c(args, "--use-names", "--report-minimizer-data")
+    if (!dir.exists(out_dir)) {
+        dir.create(out_dir, recursive = TRUE)
+    }
+    out_dir <- normalizePath(out_dir, mustWork = TRUE)
     args <- c(
         args,
-        "--classified-out", normalizePath(file_path(out_dir, sample)), "#.fq",
+        "--classified-out", file_path(out_dir, sample),
         "--output",
-        normalizePath(file_path(out_dir, sample, ext = "kraken.output.txt")),
+        file_path(out_dir, sample, ext = "kraken.output.txt"),
         "--report",
-        normalizePath(file_path(out_dir, sample, ext = "kraken.report.txt"))
+        file_path(out_dir, sample, ext = "kraken.report.txt"),
+        "--use-names", "--report-minimizer-data"
     )
-    args <- c(args, ..., fq1, fq2)
+    if (!is.null(fq2)) fq2 <- normalizePath(fq2, mustWork = TRUE)
+    args <- c(args, ..., normalizePath(fq1, mustWork = TRUE), fq2)
     if (report_mpa) {
         kraken2_sys_args <- sys_args
         kraken2_sys_args$wait <- TRUE
@@ -28,9 +35,6 @@ run_kraken2 <- function(
             normalizePath(ncbi_blast_path),
             sep = ":"
         ))
-    }
-    if (!dir.exists(out_dir)) {
-        dir.create(out_dir)
     }
     status <- run_command(
         args,
@@ -64,15 +68,12 @@ report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list
         "extdata", "kreport2mpa.py",
         package = "rsahmi", mustWork = TRUE
     )
+    out_dir <- normalizePath(out_dir, mustWork = TRUE)
     args <- c(
         "-r",
-        normalizePath(
-            file_path(out_dir, sample, ext = "kraken.report.std.txt")
-        ),
+        file_path(out_dir, sample, ext = "kraken.report.std.txt"),
         "-o",
-        normalizePath(
-            file_path(out_dir, sample, ext = "kraken.report.mpa.txt")
-        ),
+        file_path(out_dir, sample, ext = "kraken.report.mpa.txt"),
         "--intermediate-ranks"
     )
     run_command(
