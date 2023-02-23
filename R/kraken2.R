@@ -1,7 +1,7 @@
 run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
                         ncbi_blast_path = NULL, kraken2_db = NULL,
                         report_mpa = TRUE, cores = parallel::detectCores(),
-                        cmd = NULL, sys_args = list()) {
+                        cmd = NULL, python_cmd = NULL, sys_args = list()) {
     sample <- sample %||% sub("_0*1\\.(fastq|fq)(\\.gz)?$", "",
         basename(fq1),
         perl = TRUE
@@ -53,6 +53,7 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
     if (report_mpa) {
         mpa_status <- report_mpa(
             file_path(out_dir, sample, ext = "kraken.report.txt"),
+            cmd = python_cmd,
             sample = sample, out_dir = out_dir,
             sys_args = sys_args
         )
@@ -61,7 +62,7 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
     status
 }
 
-report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list()) {
+report_mpa <- function(report, cmd = NULL, sample = NULL, out_dir = getwd(), sys_args = list()) {
     sample <- sample %||% sub(
         "\\.kraken\\.report\\.txt$", "", basename(report),
         perl = TRUE
@@ -85,15 +86,22 @@ report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list
     }
     out_dir <- normalizePath(out_dir, mustWork = TRUE)
     args <- c(
+        mpa_cmd,
         "-r",
         file_path(out_dir, sample, ext = "kraken.report.std.txt"),
         "-o",
         file_path(out_dir, sample, ext = "kraken.report.mpa.txt"),
         "--intermediate-ranks"
     )
+    if (nzchar(Sys.which("python2")) == 1L && nzchar(Sys.which("python3")) == 0L) {
+        name <- "python2"
+    } else {
+        name <- "python3"
+    }
     run_command(
         args = args,
-        cmd = mpa_cmd,
+        cmd = cmd,
+        name = name,
         sys_args = sys_args
     )
 }
