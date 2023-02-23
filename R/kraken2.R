@@ -10,11 +10,11 @@ run_kraken2 <- function(
     args <- c(args, "--use-names", "--report-minimizer-data")
     args <- c(
         args,
-        "--classified-out", file_path(out_dir, sample), "#.fq",
+        "--classified-out", normalizePath(file_path(out_dir, sample)), "#.fq",
         "--output",
-        file_path(out_dir, sample, ext = "kraken.output.txt"),
+        normalizePath(file_path(out_dir, sample, ext = "kraken.output.txt")),
         "--report",
-        file_path(out_dir, sample, ext = "kraken.report.txt")
+        normalizePath(file_path(out_dir, sample, ext = "kraken.report.txt"))
     )
     args <- c(args, ..., fq1, fq2)
     if (report_mpa) {
@@ -28,6 +28,9 @@ run_kraken2 <- function(
             normalizePath(ncbi_blast_path),
             sep = ":"
         ))
+    }
+    if (!dir.exists(out_dir)) {
+        dir.create(out_dir)
     }
     status <- run_command(
         args,
@@ -63,9 +66,13 @@ report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list
     )
     args <- c(
         "-r",
-        file_path(out_dir, sample, ext = "kraken.report.std.txt"),
+        normalizePath(
+            file_path(out_dir, sample, ext = "kraken.report.std.txt")
+        ),
         "-o",
-        file_path(out_dir, sample, ext = "kraken.report.mpa.txt"),
+        normalizePath(
+            file_path(out_dir, sample, ext = "kraken.report.mpa.txt")
+        ),
         "--intermediate-ranks"
     )
     run_command(
