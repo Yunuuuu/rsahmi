@@ -12,6 +12,8 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
     if (!dir.exists(out_dir)) {
         dir.create(out_dir, recursive = TRUE)
     }
+    fq1 <- normalizePath(fq1, mustWork = TRUE)
+    if (!is.null(fq2)) fq2 <- normalizePath(fq2, mustWork = TRUE)
     out_dir <- normalizePath(out_dir, mustWork = TRUE)
     args <- c(
         args,
@@ -20,10 +22,17 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
         file_path(out_dir, sample, ext = "kraken.output.txt"),
         "--report",
         file_path(out_dir, sample, ext = "kraken.report.txt"),
-        "--use-names", "--report-minimizer-data"
+        "--use-names", "--report-minimizer-data",
+        handle_arg(
+            grepl("\\.gz$", fq1, perl = TRUE),
+            name = "--gzip-compressed"
+        ),
+        handle_arg(
+            grepl("\\.bz2$", fq1, perl = TRUE),
+            name = "--bzip2-compressed"
+        )
     )
-    if (!is.null(fq2)) fq2 <- normalizePath(fq2, mustWork = TRUE)
-    args <- c(args, ..., normalizePath(fq1, mustWork = TRUE), fq2)
+    args <- c(args, ..., fq1, fq2)
     if (report_mpa) {
         kraken2_sys_args <- sys_args
         kraken2_sys_args$wait <- TRUE
