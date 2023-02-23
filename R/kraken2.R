@@ -17,7 +17,11 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
     out_dir <- normalizePath(out_dir, mustWork = TRUE)
     args <- c(
         args,
-        "--classified-out", file_path(out_dir, sample),
+        "--classified-out",
+        file_path(out_dir,
+            if (is.null(fq2)) sample else sprintf("%s#", sample),
+            ext = "fq"
+        ),
         "--output",
         file_path(out_dir, sample, ext = "kraken.output.txt"),
         "--report",
