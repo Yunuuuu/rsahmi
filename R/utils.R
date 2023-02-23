@@ -4,6 +4,10 @@
 
 run_command <- function(args = character(), cmd, name = NULL, sys_args = list()) {
     if (!is.null(cmd)) {
+        if (!file.exists(cmd) &&
+            nzchar(Sys.which(cmd)) > 0L) {
+            cmd <- Sys.which(cmd)
+        }
         cmd <- normalizePath(cmd, mustWork = TRUE)
     } else if (!is.null(name)) {
         cmd <- Sys.which(name)
@@ -13,7 +17,7 @@ run_command <- function(args = character(), cmd, name = NULL, sys_args = list())
     }
     sys_args <- c(list(command = cmd, args = args), sys_args)
     cli_args <- cli::cli_vec( # nolint
-        args, 
+        args,
         list("vec-trunc" = 3L, "vec-sep" = " ", "vec-last" = " ")
     )
     cli::cli_alert("Running command {.field {cmd} {cli_args}}")
