@@ -68,6 +68,9 @@ report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list
     )
     data <- data.table::fread(report, sep = "\t", header = FALSE)
     data <- data[, c(1:3, 6:8)]
+    if (!dir.exists(out_dir)) {
+        dir.create(out_dir, recursive = TRUE)
+    }
     data.table::fwrite(
         data,
         file = file_path(out_dir, sample, ext = "kraken.report.std.txt"),

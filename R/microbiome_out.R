@@ -6,7 +6,7 @@ extract_microbiome <- function(kraken_out, kraken_report, mpa_report, out_dir = 
         ...
     )
     if (!dir.exists(out_dir)) {
-        dir.create(out_dir)
+        dir.create(out_dir, recursive = TRUE)
     }
     microbiome_out(
         kraken_out = kraken_out, taxid = taxid,
@@ -23,7 +23,7 @@ microbiome_out <- function(kraken_out, taxid, out_dir, sample = NULL, sys_args =
 
     # extract microbiomme output -----------------------------------
     kraken_out <- normalizePath(kraken_out, mustWork = TRUE)
-    out_file <- normalizePath(out_file, mustWork = TRUE)
+    out_file <- normalizePath(out_file, mustWork = FALSE)
     sys_args$wait <- TRUE
     cli::cli_alert("Extracting microbiome kraken2 output")
     cli::cli_progress_bar(
