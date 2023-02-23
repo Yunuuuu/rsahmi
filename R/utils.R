@@ -4,7 +4,7 @@
 
 run_command <- function(args = character(), cmd, name = NULL, sys_args = list()) {
     if (!is.null(cmd)) {
-        cmd <- normalizePath(cmd)
+        cmd <- normalizePath(cmd, mustWork = TRUE)
     } else if (!is.null(name)) {
         cmd <- Sys.which(name)
         if (nzchar(cmd) == 0L) {
@@ -12,6 +12,7 @@ run_command <- function(args = character(), cmd, name = NULL, sys_args = list())
         }
     }
     sys_args <- c(list(command = cmd, args = args), sys_args)
+    cli::cli_alert("Running {.code {cmd} {paste0(args, collapse = \" \")}}")
     do.call(system2, sys_args)
 }
 
@@ -25,7 +26,7 @@ file_path <- function(..., ext = NULL) {
 }
 
 handle_arg <- function(arg, name, format = "%s", sep = " ") {
-    if (is.null(arg)) {
+    if (is.null(arg) || isFALSE(arg)) {
         return(NULL)
     } else if (isTRUE(arg)) {
         return(name)
