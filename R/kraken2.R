@@ -47,7 +47,7 @@ run_kraken2 <- function(
 
 report_mpa <- function(report, sample = NULL, out_dir = getwd(), sys_args = list()) {
     sample <- sample %||% sub(
-        "\\.kraken\\.report\\.txt$", "", report,
+        "\\.kraken\\.report\\.txt$", "", basename(report),
         perl = TRUE
     )
     data <- data.table::fread(report, sep = "\t", header = FALSE)
