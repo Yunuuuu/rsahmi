@@ -32,7 +32,7 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
         old_path <- Sys.getenv("PATH")
         on.exit(Sys.setenv(PATH = old_path))
         Sys.setenv(PATH = paste(old_path,
-            normalizePath(ncbi_blast_path),
+            normalizePath(ncbi_blast_path, mustWork = TRUE),
             sep = ":"
         ))
     }
