@@ -2,7 +2,8 @@ extract_microbiome <- function(kraken_out, kraken_report, mpa_report, out_dir = 
     taxid <- get_taxid(
         kraken_report = kraken_report,
         mpa_report = mpa_report,
-        microbiome_pattern = microbiome_pattern
+        microbiome_pattern = microbiome_pattern,
+        ...
     )
     if (!dir.exists(out_dir)) {
         dir.create(out_dir)
@@ -14,24 +15,27 @@ extract_microbiome <- function(kraken_out, kraken_report, mpa_report, out_dir = 
     )
 }
 
-microbiome_out <- function(kraken_out, taxid, out_dir, sample = NULL, ..., sys_args = list()) {
+microbiome_out <- function(kraken_out, taxid, out_dir, sample = NULL, sys_args = list()) {
     taxid_list <- split(taxid, ceiling(seq_along(taxid) / 8000L))
 
     out_file <- file_path(out_dir, sample, ext = "microbiome.output.txt")
     if (file.exists(out_file)) file.remove(out_file)
 
     # extract microbiomme output -----------------------------------
-    kraken_out <- normalizePath(kraken_out)
-    out_file <- normalizePath(out_file)
+    kraken_out <- normalizePath(kraken_out, mustWork = TRUE)
+    out_file <- normalizePath(out_file, mustWork = TRUE)
     sys_args$wait <- TRUE
+    cli::cli_alert("Extracting microbiome kraken2 output")
+    cli::cli_progress_bar(
+        total = length(taxid_list),
+        format = "{cli::pb_spin} Extracting | {cli::pb_current}/{cli::pb_total}",
+        format_done = "Total time: {cli::pb_elapsed_clock}"
+    )
     for (i in seq_along(taxid_list)) {
-        print(paste("Extracting output data", i, "/", length(taxid_list)))
-
         taxid <- paste0("(taxid ", taxid_list[[i]], ")", collapse = "\\|")
         run_command(
             args = c(
                 sprintf("-w %s", shQuote(taxid)),
-                ...,
                 kraken_out, ">>",
                 out_file
             ),
@@ -39,11 +43,16 @@ microbiome_out <- function(kraken_out, taxid, out_dir, sample = NULL, ..., sys_a
             name = "grep",
             sys_args = sys_args
         )
+        cli::cli_progress_update()
     }
-    cli::cat_line("Done!")
+    cli::cli_process_done()
 }
 
-get_taxid <- function(kraken_report, mpa_report, microbiome_pattern) {
+microbiome_reads <- function() {
+    
+}
+
+get_taxid <- function(kraken_report, mpa_report, microbiome_pattern, ...) {
     kr <- data.table::fread(
         kraken_report,
         sep = "\t",
@@ -58,7 +67,7 @@ get_taxid <- function(kraken_report, mpa_report, microbiome_pattern) {
 
     # get taxid
     taxid <- kr[[7L]][
-        grepl(microbiome_pattern, mpa[[1L]], perl = TRUE)
+        grepl(microbiome_pattern, mpa[[1L]], perl = TRUE, ...)
     ]
     taxid[!is.na(taxid)]
 }
