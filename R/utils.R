@@ -2,7 +2,7 @@
     if (is.null(x)) y else x
 }
 
-run_command <- function(args = character(), cmd, name = NULL, sys_args = list()) {
+run_command <- function(args = character(), cmd, name = NULL, sys_args = list(), verbose = TRUE) {
     if (!is.null(cmd)) {
         if (!file.exists(cmd) &&
             nzchar(Sys.which(cmd)) > 0L) {
@@ -16,11 +16,13 @@ run_command <- function(args = character(), cmd, name = NULL, sys_args = list())
         }
     }
     sys_args <- c(list(command = cmd, args = args), sys_args)
-    cli_args <- cli::cli_vec( # nolint
-        args,
-        list("vec-trunc" = 3L, "vec-sep" = " ", "vec-last" = " ")
-    )
-    cli::cli_alert("Running command {.field {cmd} {cli_args}}")
+    if (verbose) {
+        cli_args <- cli::cli_vec( # nolint
+            args,
+            list("vec-trunc" = 3L, "vec-sep" = " ", "vec-last" = " ")
+        )
+        cli::cli_alert("Running command {.field {cmd} {cli_args}}")
+    }
     do.call(system2, sys_args)
 }
 
