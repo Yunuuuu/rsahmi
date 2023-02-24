@@ -19,7 +19,7 @@ run_command <- function(args = character(), cmd, name = NULL, sys_args = list(),
     if (verbose) {
         cli_args <- cli::cli_vec( # nolint
             args,
-            list("vec-trunc" = 3L, "vec-sep" = " ", "vec-last" = " ")
+            list("vec-sep" = " ", "vec-last" = " ")
         )
         cli::cli_alert("Running command {.field {cmd} {cli_args}}")
     }
