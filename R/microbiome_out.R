@@ -134,7 +134,7 @@ microbiome_reads <- function(fq, taxid, out_dir, sample = NULL, ntaxid = 8000L, 
         c("-i", shQuote("s/@/>/g"), file_path(out_dir, sample, ext = "fa")),
         cmd = NULL, name = "sed"
     )
-    cli::cli_alert("Done")
+    cli::cli_alert_success("Extracting reads Done")
 }
 
 get_taxid <- function(kraken_report, mpa_report, microbiome_pattern, ...) {
