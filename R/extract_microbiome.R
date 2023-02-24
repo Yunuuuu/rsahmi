@@ -51,7 +51,7 @@ microbiome_kraken_out <- function(kraken_out, taxid, out_dir, sample = NULL, nta
     cli::cli_alert("Extracting microbiome kraken2 output")
     cli::cli_progress_bar(
         total = length(taxid_list),
-        format = "{cli::pb_spin} Extracting | {cli::pb_current}/{cli::pb_total}",
+        format = "{cli::pb_spin} Extracting kraken2 output | {cli::pb_current}/{cli::pb_total}",
         format_done = "Total time: {cli::pb_elapsed_clock}",
         clear = FALSE, auto_terminate = FALSE
     )
@@ -122,8 +122,10 @@ microbiome_reads <- function(fq, taxid, out_dir, ntaxid = 8000L, sys_args = list
         id.vars = "row_ids",
         measure.vars = c("h", "r"),
         variable.name = "name",
-        value.name = "value"
+        value.name = "value",
+        variable.factor = FALSE
     )
+    data.table::setorderv(data, c("row_ids", "name"), na.last = TRUE)
     data.table::fwrite(data[, "value"],
         file = line_number_file,
         sep = "\t",
