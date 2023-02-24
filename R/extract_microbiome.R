@@ -25,17 +25,13 @@ extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_r
         sample = sample,
         sys_args = sys_args
     )
-    cli::cli_alert("Extracting microbiome reads for {.arg fq1}")
-    microbiome_reads(
-        fq = fq1, taxid = taxid,
-        ntaxid = ntaxid,
-        out_dir = out_dir,
-        sys_args = sys_args
-    )
-    if (!is.null(fq2)) {
-        cli::cli_alert("Extracting microbiome reads for {.arg fq2}")
+    fq_files <- list(fq1 = fq1, fq2 = fq2)
+    for (i in names(fq_files)) {
+        fq <- fq_files[[i]]
+        if (is.null(fq)) next
+        cli::cli_alert("Extracting microbiome reads for {.arg {i}}")
         microbiome_reads(
-            fq = fq2, taxid = taxid,
+            fq = fq, taxid = taxid,
             ntaxid = ntaxid,
             out_dir = out_dir,
             sys_args = sys_args
