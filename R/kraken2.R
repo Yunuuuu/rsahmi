@@ -1,7 +1,7 @@
-run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
+run_kraken2 <- function(fq1, fq2 = NULL, sample = NULL, out_dir = getwd(),
                         ncbi_blast_path = NULL, kraken2_db = NULL,
                         mpa_report = TRUE, cores = parallel::detectCores(),
-                        cmd = NULL, python_cmd = NULL, sys_args = list()) {
+                        cmd = NULL, kraken2_args = character(), python_cmd = NULL, sys_args = list()) {
     sample <- sample %||% sub("_0*1\\.(fastq|fq)(\\.gz)?$", "",
         basename(fq1),
         perl = TRUE
@@ -15,13 +15,21 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
     fq1 <- normalizePath(fq1, mustWork = TRUE)
     if (!is.null(fq2)) fq2 <- normalizePath(fq2, mustWork = TRUE)
     out_dir <- normalizePath(out_dir, mustWork = TRUE)
+    # https://github.com/DerrickWood/kraken2/wiki/Manual
+    # Usage of --paired also affects the --classified-out and
+    # --unclassified-out options; users should provide a # character in the
+    # filenames provided to those options, which will be replaced by kraken2
+    # with "_1" and "_2" with mates spread across the two files
+    # appropriately. For example:
+    if (is.null(fq2)) {
+        classified_out_file <- sample
+    } else {
+        classified_out_file <- sprintf("%s#", sample)
+    }
     args <- c(
         args,
         "--classified-out",
-        file_path(out_dir,
-            if (is.null(fq2)) sample else sprintf("%s#", sample),
-            ext = "fq"
-        ),
+        file_path(out_dir, classified_out_file, ext = "fq"),
         "--output",
         file_path(out_dir, sample, ext = "kraken.output.txt"),
         "--report",
@@ -36,7 +44,7 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
             name = "--bzip2-compressed"
         )
     )
-    args <- c(args, ..., fq1, fq2)
+    args <- c(args, kraken2_args, fq1, fq2)
     if (mpa_report) {
         kraken2_sys_args <- sys_args
         kraken2_sys_args$wait <- TRUE
