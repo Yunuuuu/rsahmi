@@ -30,7 +30,6 @@ extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_r
         fq = fq1, taxid = taxid,
         ntaxid = ntaxid,
         out_dir = out_dir,
-        sample = sample,
         sys_args = sys_args
     )
     if (!is.null(fq2)) {
@@ -39,7 +38,6 @@ extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_r
             fq = fq2, taxid = taxid,
             ntaxid = ntaxid,
             out_dir = out_dir,
-            sample = sample,
             sys_args = sys_args
         )
     }
@@ -81,7 +79,7 @@ microbiome_kraken_out <- function(kraken_out, taxid, out_dir, sample = NULL, nta
 
 #' @param fq Path to the classified microbiome fastq file
 #' @noRd
-microbiome_reads <- function(fq, taxid, out_dir, sample = NULL, ntaxid = 8000L, sys_args = list()) {
+microbiome_reads <- function(fq, taxid, out_dir, ntaxid = 8000L, sys_args = list()) {
     taxid_list <- split(taxid, ceiling(seq_along(taxid) / ntaxid))
     line_number_file <- tempfile("line_number_", fileext = ".txt")
     if (file.exists(line_number_file)) {
