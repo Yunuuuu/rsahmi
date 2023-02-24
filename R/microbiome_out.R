@@ -1,7 +1,13 @@
-extract_microbiome <- function(fq, kraken_out, kraken_report, mpa_report, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ..., ntaxid = 8000L, sys_args = list()) {
+extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_report, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ..., ntaxid = 8000L, sys_args = list()) {
     sample <- sample %||% sub("_0*[12]?\\.(fastq|fq)(\\.gz)?$", "",
-        basename(fq), perl = TRUE
+        basename(fq1),
+        perl = TRUE
     )
+    if (!is.null(fq2)) {
+        if (fq1 == fq2) {
+            cli::cli_abort("{.arg fq1} and {.arg fq2} must be different.")
+        }
+    }
     taxid <- get_taxid(
         kraken_report = kraken_report,
         mpa_report = mpa_report,
@@ -19,13 +25,24 @@ extract_microbiome <- function(fq, kraken_out, kraken_report, mpa_report, out_di
         sample = sample,
         sys_args = sys_args
     )
+    cli::cli_alert("Extracting microbiome reads for {.arg fq1}")
     microbiome_reads(
-        fq = fq, taxid = taxid,
+        fq = fq1, taxid = taxid,
         ntaxid = ntaxid,
         out_dir = out_dir,
         sample = sample,
         sys_args = sys_args
     )
+    if (!is.null(fq2)) {
+        cli::cli_alert("Extracting microbiome reads for {.arg fq2}")
+        microbiome_reads(
+            fq = fq2, taxid = taxid,
+            ntaxid = ntaxid,
+            out_dir = out_dir,
+            sample = sample,
+            sys_args = sys_args
+        )
+    }
 }
 
 microbiome_kraken_out <- function(kraken_out, taxid, out_dir, sample = NULL, ntaxid = 8000L, sys_args = list()) {
@@ -121,17 +138,19 @@ microbiome_reads <- function(fq, taxid, out_dir, sample = NULL, ntaxid = 8000L, 
     )
 
     cli::cli_alert("Extracting reads")
+    out_file <- sub("\\.fq$", "", basename(fq), perl = TRUE)
+    out_file <- file_path(out_dir, out_file, ext = "fa")
     run_command(
         c(
             shQuote("NR==FNR{ a[$1]; next }FNR in a"),
             line_number_file,
-            fq, ">", file_path(out_dir, sample, ext = "fa")
+            fq, ">", out_file
         ),
         cmd = NULL,
         name = "awk"
     )
     run_command(
-        c("-i", shQuote("s/@/>/g"), file_path(out_dir, sample, ext = "fa")),
+        c("-i", shQuote("s/@/>/g"), out_file),
         cmd = NULL, name = "sed"
     )
     cli::cli_alert_success("Extracting reads Done")
