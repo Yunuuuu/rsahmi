@@ -17,7 +17,7 @@ extract_microbiome <- function(fq, kraken_out, kraken_report, mpa_report, out_di
         taxid = taxid, ntaxid = ntaxid,
         out_dir = out_dir,
         sample = sample,
-        sys_args = sys_args,
+        sys_args = sys_args
     )
     microbiome_reads(
         fq = fq, taxid = taxid,
