@@ -1,6 +1,6 @@
 run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
                         ncbi_blast_path = NULL, kraken2_db = NULL,
-                        report_mpa = TRUE, cores = parallel::detectCores(),
+                        mpa_report = TRUE, cores = parallel::detectCores(),
                         cmd = NULL, python_cmd = NULL, sys_args = list()) {
     sample <- sample %||% sub("_0*1\\.(fastq|fq)(\\.gz)?$", "",
         basename(fq1),
@@ -37,7 +37,7 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
         )
     )
     args <- c(args, ..., fq1, fq2)
-    if (report_mpa) {
+    if (mpa_report) {
         kraken2_sys_args <- sys_args
         kraken2_sys_args$wait <- TRUE
     }
@@ -54,7 +54,7 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
         cmd = cmd, name = "kraken2",
         sys_args = kraken2_sys_args
     )
-    if (report_mpa) {
+    if (mpa_report) {
         mpa_status <- report_mpa(
             file_path(out_dir, sample, ext = "kraken.report.txt"),
             cmd = python_cmd,
@@ -71,15 +71,18 @@ report_mpa <- function(report, cmd = NULL, sample = NULL, out_dir = getwd(), sys
         "\\.kraken\\.report\\.txt$", "", basename(report),
         perl = TRUE
     )
-    data <- data.table::fread(report, sep = "\t", header = FALSE)
-    data <- data[, c(1:3, 6:8)]
     if (!dir.exists(out_dir)) {
         dir.create(out_dir, recursive = TRUE)
     }
-    data.table::fwrite(
-        data,
-        file = file_path(out_dir, sample, ext = "kraken.report.std.txt"),
-        sep = "\t", col.names = FALSE
+    run_command(
+        args = c(
+            "-f1-3,6-8",
+            report, ">",
+            file_path(out_dir, sample, ext = "kraken.report.std.txt")
+        ),
+        cmd = NULL,
+        name = "cut",
+        sys_args = sys_args
     )
     mpa_cmd <- system.file(
         "extdata", "kreport2mpa.py",
