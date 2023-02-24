@@ -8,7 +8,7 @@ extract_microbiome <- function(fq, kraken_out, kraken_report, mpa_report, out_di
     if (!dir.exists(out_dir)) {
         dir.create(out_dir, recursive = TRUE)
     }
-    microbiome_out(
+    microbiome_kraken_out(
         kraken_out = kraken_out,
         taxid = taxid, ntaxid = ntaxid,
         out_dir = out_dir,
@@ -24,7 +24,7 @@ extract_microbiome <- function(fq, kraken_out, kraken_report, mpa_report, out_di
     )
 }
 
-microbiome_out <- function(kraken_out, taxid, out_dir, sample = NULL, ntaxid = 8000L, sys_args = list()) {
+microbiome_kraken_out <- function(kraken_out, taxid, out_dir, sample = NULL, ntaxid = 8000L, sys_args = list()) {
     taxid_list <- split(taxid, ceiling(seq_along(taxid) / ntaxid))
 
     out_file <- file_path(out_dir, sample, ext = "microbiome.output.txt")
