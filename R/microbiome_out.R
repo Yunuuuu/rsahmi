@@ -1,4 +1,7 @@
 extract_microbiome <- function(fq, kraken_out, kraken_report, mpa_report, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ..., ntaxid = 8000L, sys_args = list()) {
+    sample <- sample %||% sub("_0*[12]?\\.(fastq|fq)(\\.gz)?$", "",
+        basename(fq), perl = TRUE
+    )
     taxid <- get_taxid(
         kraken_report = kraken_report,
         mpa_report = mpa_report,
@@ -8,6 +11,7 @@ extract_microbiome <- function(fq, kraken_out, kraken_report, mpa_report, out_di
     if (!dir.exists(out_dir)) {
         dir.create(out_dir, recursive = TRUE)
     }
+    out_dir <- normalizePath(out_dir, mustWork = TRUE)
     microbiome_kraken_out(
         kraken_out = kraken_out,
         taxid = taxid, ntaxid = ntaxid,
@@ -33,9 +37,10 @@ microbiome_kraken_out <- function(kraken_out, taxid, out_dir, sample = NULL, nta
     # extract microbiomme output -----------------------------------
     kraken_out <- normalizePath(kraken_out, mustWork = TRUE)
     out_file <- normalizePath(out_file, mustWork = FALSE)
+    cli::cli_alert("Extracting microbiome kraken2 output")
     cli::cli_progress_bar(
         total = length(taxid_list),
-        format = "{cli::pb_spin} Extracting microbiome kraken2 output | {cli::pb_current}/{cli::pb_total}",
+        format = "{cli::pb_spin} Extracting | {cli::pb_current}/{cli::pb_total}",
         format_done = "Total time: {cli::pb_elapsed_clock}",
         clear = FALSE, auto_terminate = FALSE
     )
@@ -78,7 +83,6 @@ microbiome_reads <- function(fq, taxid, out_dir, sample = NULL, ntaxid = 8000L, 
         clear = FALSE, auto_terminate = FALSE
     )
     for (i in seq_along(taxid_list)) {
-        cli::cli_progress_update()
         taxid <- paste0("taxid|", taxid_list[[i]], collapse = "\\|")
         run_command(
             args = c(
@@ -90,6 +94,7 @@ microbiome_reads <- function(fq, taxid, out_dir, sample = NULL, ntaxid = 8000L, 
             sys_args = sys_args,
             verbose = FALSE
         )
+        cli::cli_progress_update()
     }
     cli::cli_process_done()
 
@@ -120,13 +125,13 @@ microbiome_reads <- function(fq, taxid, out_dir, sample = NULL, ntaxid = 8000L, 
         c(
             shQuote("NR==FNR{ a[$1]; next }FNR in a"),
             line_number_file,
-            fq, ">", file_path(out_dir, sample, ".fa")
+            fq, ">", file_path(out_dir, sample, ext = "fa")
         ),
         cmd = NULL,
         name = "awk"
     )
     run_command(
-        c("-i", shQuote("s/@/>/g"), file_path(out_dir, sample, ".fa")),
+        c("-i", shQuote("s/@/>/g"), file_path(out_dir, sample, ext = "fa")),
         cmd = NULL, name = "sed"
     )
     cli::cli_alert("Done")
