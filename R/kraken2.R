@@ -42,6 +42,7 @@ run_kraken2 <- function(fq1, ..., fq2 = NULL, sample = NULL, out_dir = getwd(),
         kraken2_sys_args$wait <- TRUE
     }
     if (!is.null(ncbi_blast_path)) {
+        cli::cli_alert("Adding {.field blast} into {.var PATH}")
         old_path <- Sys.getenv("PATH")
         on.exit(Sys.setenv(PATH = old_path))
         Sys.setenv(PATH = paste(old_path,
