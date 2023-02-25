@@ -44,3 +44,37 @@ handle_arg <- function(arg, name, format = "%s", sep = " ") {
         return(sprintf(paste(name, format, sep = sep), arg))
     }
 }
+
+column_to_rownames <- function(.data, var) {
+    rownames(.data) <- as.character(.data[[var]])
+    .data[[var]] <- NULL
+    .data
+}
+
+str_match <- function(string, pattern, ignore.case = FALSE) {
+    out <- regmatches(
+        string,
+        regexec(pattern, string,
+            perl = TRUE, fixed = FALSE,
+            ignore.case = ignore.case
+        ),
+        invert = FALSE
+    )
+    out <- lapply(out, function(x) {
+        if (!length(x)) "" else x
+    })
+    out <- do.call("rbind", out)
+    out[out == ""] <- NA_character_
+    out
+}
+
+str_extract <- function(string, pattern, ignore.case = FALSE) {
+    matches <- regexpr(pattern, string,
+        perl = TRUE, fixed = FALSE,
+        ignore.case = ignore.case
+    )
+    start <- as.vector(matches)
+    end <- start + attr(matches, "match.length") - 1L
+    start[start == -1L] <- NA_integer_
+    substr(string, start, end)
+}
