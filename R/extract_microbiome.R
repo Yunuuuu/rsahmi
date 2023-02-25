@@ -138,12 +138,11 @@ microbiome_reads <- function(fq, taxid, out_dir, ntaxid = 8000L, sys_args = list
     out_file <- file_path(out_dir, out_file, ext = "fa")
     run_command(
         c(
-            shQuote("NR==FNR{ a[$1]; next }FNR in a"),
-            line_number_file,
-            fq, ">", out_file
+            shQuote("NR==FNR { lines[$1]; next } (FNR in lines)"),
+            line_number_file, fq, ">", out_file
         ),
         cmd = NULL,
-        name = "awk"
+        name = "gawk"
     )
     run_command(
         c("-i", shQuote("s/@/>/g"), out_file),
