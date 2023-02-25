@@ -54,7 +54,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
 
     # define kmer for each tx --------------------------------------------
     define_kmer(
-        taxas = tx, mpa_report = mpa,
+        taxa_vec = tx, mpa_report = mpa,
         microbiome_output = microbiome_output,
         host = host, id = id, barcode = barcode, umi = umi,
         sequences1 = sequences1, sequences2 = sequences2,
@@ -62,8 +62,15 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
     )
 }
 
-define_kmer <- function(taxas, mpa_report, microbiome_output, host, id, barcode, umi, sequences1, sequences2, nsample, kmer_len, min_frac) {
-    barcode_kmer_list <- lapply(taxas, function(taxa) {
+define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barcode, umi, sequences1, sequences2, nsample, kmer_len, min_frac) {
+    cli::cli_alert("Defining kmer for {.val {length(taxa_vec)}} taxa")
+    bar_id <- cli::cli_progress_bar(
+        total = length(taxa_vec),
+        format = "{cli::pb_spin} taxa processing | {cli::pb_current}/{cli::pb_total}",
+        format_done = "Total time: {cli::pb_elapsed_clock}",
+        clear = FALSE, auto_terminate = FALSE
+    )
+    barcode_kmer_list <- lapply(taxa_vec, function(taxa) {
         full_taxa <- grep(paste0("\\*", taxa, "\\*"),
             mpa_report$taxid, # nolint
             perl = TRUE, value = TRUE
@@ -182,6 +189,9 @@ define_kmer <- function(taxas, mpa_report, microbiome_output, host, id, barcode,
         out_data[, list(kmer = length(k), uniq = length(unique(k))), # nolint
             by = c("barcode", "taxid")
         ]
+        cli::cli_progress_update(id = bar_id)
+        out_data
     })
+    cli::cli_process_done(id = bar_id)
     data.table::rbindlist(barcode_kmer_list)
 }
