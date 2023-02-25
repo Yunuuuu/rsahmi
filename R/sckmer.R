@@ -75,8 +75,14 @@ define_kmer <- function(taxas, mpa_report, microbiome_output, host, id, barcode,
         down_taxa <- lapply(full_taxa, function(x) {
             x[cumsum(x == taxa) > 0L]
         })
-        full_taxa <- unique(unlist(full_taxa, recursive = FALSE, use.names = FALSE))
-        down_taxa <- unique(unlist(down_taxa, recursive = FALSE, use.names = FALSE))
+        full_taxa <- unique(unlist(
+            full_taxa,
+            recursive = FALSE, use.names = FALSE
+        ))
+        down_taxa <- unique(unlist(
+            down_taxa,
+            recursive = FALSE, use.names = FALSE
+        ))
 
         # extract output data ------------------------------------------
         taxa_out <- microbiome_output[taxid %in% down_taxa] # nolint
@@ -85,13 +91,13 @@ define_kmer <- function(taxas, mpa_report, microbiome_output, host, id, barcode,
         )]
 
         taxa_out <- taxa_out[{
-            idx <- sapply(list(r1, r2), function(.x) { # nolint
+            .idx <- sapply(list(r1, r2), function(.x) { # nolint
                 !(grepl(paste0(" ", host, ":"), .x, fixed = TRUE) | .x == "")
             })
-            if (is.matrix(idx)) {
-                rowSums(idx, na.rm = TRUE) > 0L
+            if (is.matrix(.idx)) {
+                rowSums(.idx, na.rm = TRUE) > 0L
             } else {
-                sum(idx, na.rm = TRUE) > 0L
+                sum(.idx, na.rm = TRUE) > 0L
             }
         }]
         taxa_out[, c("r1", "r2") := lapply(.SD, trimws, # nolint
