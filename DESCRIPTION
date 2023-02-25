@@ -14,4 +14,5 @@ RoxygenNote: 7.2.2
 SystemRequirements: kraken2, Python2(or 3)
 Imports: 
     cli,
-    data.table
+    data.table,
+    ShortRead
