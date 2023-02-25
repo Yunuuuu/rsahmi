@@ -1,4 +1,4 @@
-run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = 1000L, kmer_len = 35L, min_frac = 0.5) {
+run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5) {
     # read in fasta data -----------------------------------------------
     reads1 <- ShortRead::readFasta(fa1)
     sequences1 <- ShortRead::sread(reads1)
@@ -40,8 +40,6 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
     microbiome_output <- data.table::fread(microbiome_output,
         header = FALSE, drop = 1L
     )
-
-    # extract all necessary taxa -------------------------------------------
     microbiome_output[
         , c("name", "taxid") := {
             x <- str_match(V3, "\\s*(.+)\\s*\\(taxid\\s*(\\d+)\\s*\\)") # nolint
@@ -49,6 +47,8 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
         }
     ]
     microbiome_output[, taxid := as.integer(taxid)] # nolint
+
+    # extract all necessary taxa -------------------------------------------
     tx <- setdiff(kr$V7[kr$V6 %in% ranks], host) # nolint
     tx <- intersect(tx, microbiome_output$taxid)
 
@@ -183,15 +183,16 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                 sequence = mate_seq,
                 barcode = taxa_barcode
             ), NULL)
-            data.table::rbindlist(barcode_data)
+            data.table::rbindlist(barcode_data, use.names = FALSE)
         })
-        out_data <- data.table::rbindlist(out_list)
+        out_data <- data.table::rbindlist(out_list, use.names = FALSE)
         out_data[, list(kmer = length(k), uniq = length(unique(k))), # nolint
             by = c("barcode", "taxid")
         ]
         cli::cli_progress_update(id = bar_id)
         out_data
     })
+    barcode_kmer <- data.table::rbindlist(barcode_kmer_list, use.names = FALSE)
     cli::cli_process_done(id = bar_id)
-    data.table::rbindlist(barcode_kmer_list)
+    barcode_kmer
 }
