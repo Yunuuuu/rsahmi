@@ -151,7 +151,7 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
         by = "main_id"
     ][!is.na(name)] # nolint
     out <- merge(out, barcode_umi,
-        by = c(main_id = "taxid"),
+        by.x = "main_id", by.y = "taxid",
         allow.cartesian = TRUE
     )
     out[, main_id := NULL] # nolint
