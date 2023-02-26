@@ -1,3 +1,26 @@
+#' Tabulating k-mer statistics
+#' @description The function count the number of k-mers and unique k-mers
+#' assigned to a taxon across barcodes. The cell barcode and unique molecular
+#' identifier (UMI) are used to identify unique barcodes and reads. Data is
+#' reported for taxa of pre-specified ranks (default genus + species) taking
+#' into account all subsequently higher resolution ranks. Reads with any k-mers
+#' mapped to the host (e.g. human) are discarded. Reads with >50% of the k-mers
+#' map outside the taxon's lineage are also discarded. The output is a table of
+#' barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers. 
+#' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
+#'   `extract_microbiome`).
+#' @param ranks Taxa ranks to analyze.
+#' @param cb_len Nucleutide length of cell barcodes
+#' @param umi_len Nucleutide length of umis
+#' @param host Host taxid to exclude
+#' @param nsample Max number of barcodes to sample per taxa.
+#' @param kmer_len Kraken kmer length.
+#' @param min_frac Minimum fraction of kmers directly assigned to taxid to use
+#'   read.
+#' @inheritParams run_kraken2
+#' @inheritParams extract_microbiome
+#' @seealso <https://github.com/sjdlabgroup/SAHMI>
+#' @export 
 run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
     # read in fasta data -----------------------------------------------
     reads1 <- ShortRead::readFasta(fa1)
