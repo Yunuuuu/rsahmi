@@ -70,9 +70,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
     cli::cli_alert("Defining kmer for {.val {length(taxa_vec)}} taxa")
     old_handlers <- new_handlers()
     on.exit(progressr::handlers(old_handlers))
-    p <- progressr::progressor(along = taxa_vec, auto_finish = TRUE)
     old_plan <- future::plan("multicore", workers = cores)
     on.exit(future::plan(old_plan), add = TRUE)
+    p <- progressr::progressor(along = taxa_vec, auto_finish = TRUE)
     barcode_kmer_list <- future.apply::future_lapply(taxa_vec, function(taxa) {
         full_taxa <- grep(paste0("\\*", taxa, "\\*"),
             mpa_report$taxid, # nolint
