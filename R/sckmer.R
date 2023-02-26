@@ -91,6 +91,9 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, s
         nsample = nsample, kmer_len = kmer_len, min_frac = min_frac,
         cores = cores
     )
+    if (!dir.exists(out_dir)) {
+        dir.create(out_dir, recursive = TRUE)
+    }
     data.table::fwrite(out,
         file = file_path(out_dir, sample, ext = "sckmer.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE

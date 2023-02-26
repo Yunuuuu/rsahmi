@@ -41,7 +41,6 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
     barcode <- substr(sequences, 1L, cb_len)
     umi <- substr(sequences, cb_len + 1L, cb_len + umi_len)
     taxid <- gsub(".*taxid\\|", "", headers, perl = TRUE)
-    length(barcode)
 
     # prepare kraken report and mpa report data ------------------
     kr <- data.table::fread(kraken_report, header = FALSE, sep = "\t")[-c(1:2)]
@@ -97,7 +96,9 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
         , list(umi = sum(umi)),
         by = c("barcode", "taxid")
     ][order(-umi)]
-
+    if (!dir.exists(out_dir)) {
+        dir.create(out_dir, recursive = TRUE)
+    }
     data.table::fwrite(barcode_umi,
         file = file_path(out_dir, sample, ext = "all.barcodes.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE
