@@ -6,7 +6,7 @@
 \usage{
 run_sckmer(
   fa1,
-  fa2,
+  fa2 = NULL,
   kraken_report,
   mpa_report,
   microbiome_output,

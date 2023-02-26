@@ -23,31 +23,33 @@
 #' @inheritParams extract_microbiome
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
+run_sckmer <- function(fa1, fa2 = NULL, kraken_report, mpa_report, microbiome_output, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
     sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
 
     # read in fasta data -----------------------------------------------
     reads1 <- ShortRead::readFasta(fa1)
     sequences1 <- ShortRead::sread(reads1)
-    reads2 <- ShortRead::readFasta(fa2)
-    sequences2 <- ShortRead::sread(reads2)
 
-    headers <- ShortRead::id(reads1)
     barcode <- substr(sequences1, 1L, cb_len)
     umi <- substr(sequences1, cb_len + 1L, cb_len + umi_len)
-    id <- gsub("\\s.*", "", headers, perl = TRUE)
-
-    headers2 <- ShortRead::id(reads2)
-    id2 <- gsub("\\s.*", "", headers2, perl = TRUE)
+    # we use id to match data
+    id <- gsub("\\s.*", "", ShortRead::id(reads1), perl = TRUE)
 
     # only keep data in both sequence ----------------------------------
-    inter_id <- intersect(id, id2)
-    idx <- id %in% inter_id
-    sequences1 <- sequences1[idx]
-    sequences2 <- sequences2[id2 %in% inter_id]
-    barcode <- barcode[idx]
-    umi <- umi[idx]
-    id <- id[idx] # we use id to match data
+    if (!is.null(fa2)) {
+        reads2 <- ShortRead::readFasta(fa2)
+        sequences2 <- ShortRead::sread(reads2)
+        id2 <- gsub("\\s.*", "", ShortRead::id(reads2), perl = TRUE)
+        inter_id <- intersect(id, id2)
+        idx <- id %in% inter_id
+        sequences1 <- sequences1[idx]
+        barcode <- barcode[idx]
+        umi <- umi[idx]
+        id <- id[idx]
+        sequences2 <- sequences2[id2 %in% inter_id]
+    } else {
+        sequences2 <- NULL
+    }
 
     # prepare kr, mpa and microbiome_output data ---------------------------
     kr <- data.table::fread(kraken_report, header = FALSE, sep = "\t")[-c(1:2)]
@@ -110,6 +112,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
     on.exit(future::plan(old_plan), add = TRUE)
     p <- progressr::progressor(along = taxa_vec, auto_finish = TRUE)
     barcode_kmer_list <- future.apply::future_lapply(taxa_vec, function(taxa) {
+        # we will exit this function in the median of the process 
+        # so we update progress in the beginning
+        p() 
         full_taxa <- grep(paste0("\\*", taxa, "\\*"),
             mpa_report$taxid, # nolint
             perl = TRUE, value = TRUE
@@ -181,6 +186,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                 r1 = taxa_sequences1,
                 r2 = taxa_sequences2
             )
+            if (all(is.na(mate_seq)) || is.null(mate_seq)) {
+                return(NULL)
+            }
             barcode_data <- .mapply(function(pair, sequence, barcode) {
                 if (length(pair) == 0L) {
                     return(NULL)
@@ -199,7 +207,7 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                 )]
                 res[, nt_len := nt_end - nt_start + 1L] # nolint
                 res <- res[taxid %in% c(0L, full_taxa)] # nolint
-                if (nrow(res) == 0L || sum(res$fkmer, na.rm = TRUE) < min_frac) {
+                if (nrow(res) == 0L || is.na(sequence) || sum(res$fkmer, na.rm = TRUE) < min_frac) {
                     return(NULL)
                 }
                 # calculate kmer
@@ -225,11 +233,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
             data.table::rbindlist(barcode_data, use.names = FALSE)
         })
         out_data <- data.table::rbindlist(out_list, use.names = FALSE)
-        out_data <- out_data[, list(
+        out_data[, list(
             kmer = length(k), uniq = length(unique(k)) # nolint
         ), by = c("barcode", "taxid")]
-        p()
-        out_data
     })
     data.table::rbindlist(barcode_kmer_list, use.names = FALSE)
 }
