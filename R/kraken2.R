@@ -33,7 +33,7 @@ run_kraken2 <- function(fq1, fq2 = NULL, sample = NULL, out_dir = getwd(),
                         mpa_report = TRUE, cores = availableCores(),
                         cmd = NULL, kraken2_args = character(),
                         python_cmd = NULL, sys_args = list()) {
-    sample <- sample %||% sub("_0*1\\.(fastq|fq)(\\.gz)?$", "",
+    sample <- sample %||% sub("_0*[12]?\\.(fastq|fq)(\\.gz)?$", "",
         basename(fq1),
         perl = TRUE
     )

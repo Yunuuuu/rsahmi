@@ -12,6 +12,8 @@
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
 taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL, out_dir = getwd(), cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
+    sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
+
     # read in Fasta data -----------------------------------------
     reads <- ShortRead::readFasta(fa1)
 
