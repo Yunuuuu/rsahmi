@@ -20,3 +20,5 @@ Imports:
     parallelly,
     progressr,
     ShortRead
+Config/build/copy-method: link
+
