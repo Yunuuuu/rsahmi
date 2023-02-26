@@ -1,4 +1,12 @@
+#' Quantitation of microbes
+#' @description After identifying true taxa, reads assigned to those taxa are
+#' extracted and then undergo a series of filters. The cell barcode and UMI are
+#' used to demultiplex the reads and create a barcode x taxa counts matrix. The
+#' full taxonomic classification of all resulting barcodes and the number of
+#' counts assigned to each clade are tabulated.  
+#' @inheritParams run_sckmer
 #' @importFrom parallelly availableCores
+#' @export 
 taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
     # read in Fasta data -----------------------------------------
     reads <- ShortRead::readFasta(fa1)

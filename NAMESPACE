@@ -3,6 +3,7 @@
 export(extract_microbiome)
 export(run_kraken2)
 export(run_sckmer)
+export(taxa_counts)
 importFrom(data.table,":=")
 importFrom(data.table,.BY)
 importFrom(data.table,.EACHI)
