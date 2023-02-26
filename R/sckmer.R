@@ -24,8 +24,8 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
 
     # prepare kr, mpa and microbiome_output data ---------------------------
     kr <- data.table::fread(kraken_report, header = FALSE, sep = "\t")[-c(1:2)]
-    kr[, V8 := gsub("[^[:alnum:]]", "_", V8, perl = TRUE)] # nolint
-    data.table::setDF(kr)
+    kr[, V8 := gsub("[^[:alnum:]]+", "_", V8, perl = TRUE)] # nolint
+
     mpa <- data.table::fread(mpa_report, header = FALSE, sep = "\t")
     mpa[, taxid := vapply(strsplit(V1, "|", fixed = TRUE), function(x) { # nolint
         str <- sub(
@@ -33,7 +33,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
             unlist(x, recursive = FALSE, use.names = FALSE),
             perl = TRUE
         )
-        str <- gsub("[^[:alnum:]]", "_", str, perl = TRUE)
+        str <- gsub("[^[:alnum:]]+", "_", str, perl = TRUE)
         paste0("*", paste0(kr$V7[match(str, kr$V8)], collapse = "*"), "*")
     }, character(1L))]
     mpa$taxid[1L] <- NA_character_
@@ -79,20 +79,20 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
             x <- x[x != "NA" & x != "" & !is.na(x)]
             as.integer(x)
         })
-        down_taxa <- lapply(full_taxa, function(x) {
+        child_taxa <- lapply(full_taxa, function(x) {
             x[cumsum(x == taxa) > 0L]
         })
         full_taxa <- unique(unlist(
             full_taxa,
             recursive = FALSE, use.names = FALSE
         ))
-        down_taxa <- unique(unlist(
-            down_taxa,
+        child_taxa <- unique(unlist(
+            child_taxa,
             recursive = FALSE, use.names = FALSE
         ))
 
         # extract output data ------------------------------------------
-        taxa_out <- microbiome_output[taxid %in% down_taxa] # nolint
+        taxa_out <- microbiome_output[taxid %in% child_taxa] # nolint
         taxa_out[, c("r1", "r2") := data.table::tstrsplit(V5, # nolint
             split = "|:|", fixed = TRUE
         )]
@@ -176,7 +176,7 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                     barcode = barcode,
                     taxid = taxa,
                     k = unlist(kmer, recursive = FALSE, use.names = FALSE),
-                    n = sum(res$nt_len[res$taxid %in% down_taxa], na.rm = TRUE)
+                    n = sum(res$nt_len[res$taxid %in% child_taxa], na.rm = TRUE)
                 )
             }, list(
                 pair = taxid_nkmer_pair_list,
