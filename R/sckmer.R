@@ -1,5 +1,4 @@
 run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
-
     # read in fasta data -----------------------------------------------
     reads1 <- ShortRead::readFasta(fa1)
     sequences1 <- ShortRead::sread(reads1)
@@ -69,14 +68,11 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
 
 define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barcode, umi, sequences1, sequences2, nsample, kmer_len, min_frac, cores) {
     cli::cli_alert("Defining kmer for {.val {length(taxa_vec)}} taxa")
-    old_handlers <- progressr::handlers(progressr::handler_cli(
-        format = "{cli::pb_spin} taxa processing | {cli::pb_current}/{cli::pb_total}",
-        format_done = "Total time: {cli::pb_elapsed_clock}",
-        clear = FALSE
-    ))
+    old_handlers <- new_handlers()
     on.exit(progressr::handlers(old_handlers))
     p <- progressr::progressor(along = taxa_vec, auto_finish = TRUE)
-    future::plan("multicore", workers = cores)
+    old_plan <- future::plan("multicore", workers = cores)
+    on.exit(future::plan(old_plan), add = TRUE)
     barcode_kmer_list <- future.apply::future_lapply(taxa_vec, function(taxa) {
         full_taxa <- grep(paste0("\\*", taxa, "\\*"),
             mpa_report$taxid, # nolint
@@ -199,6 +195,5 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
         p()
         out_data
     })
-    future::plan("sequential")
     data.table::rbindlist(barcode_kmer_list, use.names = FALSE)
 }
