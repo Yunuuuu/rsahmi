@@ -78,3 +78,13 @@ str_extract <- function(string, pattern, ignore.case = FALSE) {
     start[start == -1L] <- NA_integer_
     substr(string, start, end)
 }
+
+new_handlers <- function(message = "taxa processing") {
+    progressr::handlers(progressr::handler_cli(
+        format = sprintf(
+            "{cli::pb_spin} %s | {cli::pb_current}/{cli::pb_total}", message
+        ),
+        format_done = "Total time: {cli::pb_elapsed_clock}",
+        clear = FALSE
+    ))
+}
