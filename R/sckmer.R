@@ -225,9 +225,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
             data.table::rbindlist(barcode_data, use.names = FALSE)
         })
         out_data <- data.table::rbindlist(out_list, use.names = FALSE)
-        out_data[, list(kmer = length(k), uniq = length(unique(k))), # nolint
-            by = c("barcode", "taxid")
-        ]
+        out_data <- out_data[, list(
+            kmer = length(k), uniq = length(unique(k)) # nolint
+        ), by = c("barcode", "taxid")]
         p()
         out_data
     })
