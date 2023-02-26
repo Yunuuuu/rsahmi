@@ -53,6 +53,7 @@ extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_r
         )
     }
 }
+utils::globalVariables(c("r", "V1", "row_ids", "h"))
 
 microbiome_kraken_out <- function(kraken_out, taxid, out_dir, sample = NULL, ntaxid = 8000L, sys_args = list()) {
     taxid_list <- split(taxid, ceiling(seq_along(taxid) / ntaxid))

@@ -26,9 +26,14 @@ taxa_counts(
 \item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
 results.}
 
+\item{taxa}{Taxa ids to extracted, can be a file, in which, the first column
+will be extracted.}
+
 \item{cb_len}{Nucleutide length of cell barcodes}
 
 \item{umi_len}{Nucleutide length of umis}
+
+\item{n_filter}{Filter reads with \verb{> n_filter} of one nucleotide.}
 
 \item{cores}{The number of cores to use.}
 }

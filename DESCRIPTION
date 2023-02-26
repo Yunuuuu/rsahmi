@@ -18,7 +18,6 @@ Imports:
     future,
     future.apply,
     parallelly,
-    progressr,
+    progressr (>= 0.12.0),
     ShortRead
 Config/build/copy-method: link
-

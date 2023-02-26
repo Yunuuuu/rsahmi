@@ -3,10 +3,13 @@
 #' extracted and then undergo a series of filters. The cell barcode and UMI are
 #' used to demultiplex the reads and create a barcode x taxa counts matrix. The
 #' full taxonomic classification of all resulting barcodes and the number of
-#' counts assigned to each clade are tabulated.  
+#' counts assigned to each clade are tabulated.
+#' @param taxa Taxa ids to extracted, can be a file, in which, the first column
+#'   will be extracted.
+#' @param n_filter Filter reads with `> n_filter` of one nucleotide.
 #' @inheritParams run_sckmer
 #' @importFrom parallelly availableCores
-#' @export 
+#' @export
 taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
     # read in Fasta data -----------------------------------------
     reads <- ShortRead::readFasta(fa1)
@@ -165,3 +168,6 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, cb_len = 16L,
         )
     )
 }
+utils::globalVariables(c(
+    "V8", "V1", "main_id", "rank_name_pairs", "name", "tax_data", "counts"
+))
