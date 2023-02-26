@@ -15,4 +15,7 @@ SystemRequirements: kraken2, Python2(or 3)
 Imports: 
     cli,
     data.table,
+    future,
+    parallelly,
+    progressr,
     ShortRead
