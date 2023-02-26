@@ -112,9 +112,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
     on.exit(future::plan(old_plan), add = TRUE)
     p <- progressr::progressor(along = taxa_vec, auto_finish = TRUE)
     barcode_kmer_list <- future.apply::future_lapply(taxa_vec, function(taxa) {
-        # we will exit this function in the median of the process 
+        # we will exit this function in the median of the process
         # so we update progress in the beginning
-        p() 
+        p()
         full_taxa <- grep(paste0("\\*", taxa, "\\*"),
             mpa_report$taxid, # nolint
             perl = TRUE, value = TRUE
@@ -151,9 +151,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                 sum(.idx, na.rm = TRUE) > 0L
             }
         }]
-        taxa_out[, c("r1", "r2") := lapply(.SD, trimws, # nolint
-            which = "both", whitespace = "[\\h\\v]"
-        ), .SDcols = c("r1", "r2")]
+        taxa_out[, c("r1", "r2") := lapply(.SD, str_trim), # nolint
+            .SDcols = c("r1", "r2")
+        ]
 
         if (nrow(taxa_out) == 0L) {
             return(NULL)
