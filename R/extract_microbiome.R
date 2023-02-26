@@ -1,3 +1,18 @@
+#' Extract Microbiome reads and Kraken output 
+#' @param fq1,fq2 The path to the classified microbiome fastq file (returned by
+#' `run_kraken2`).
+#' @param kraken_out The path to kraken output file (_sample.output.txt_).
+#' @param kraken_report The path to kraken2uniq report
+#' (_sample.kraken.report.txt_).
+#' @param mpa_report The path to mpa style report
+#' (_sample.kraken.report.mpa.txt_).
+#' @param microbiome_pattern Perl regex patterns to match the bacteria
+#' microbiome.
+#' @param ntaxid Number of taxids to extract at a time.
+#' @inheritParams run_kraken2
+#' @param ... Other arguments passed to [grepl].
+#' @seealso <https://github.com/sjdlabgroup/SAHMI>
+#' @export 
 extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_report, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ..., ntaxid = 8000L, sys_args = list()) {
     sample <- sample %||% sub("_0*[12]?\\.(fastq|fq)(\\.gz)?$", "",
         basename(fq1),
