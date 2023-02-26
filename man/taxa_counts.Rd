@@ -10,6 +10,8 @@ taxa_counts(
   kraken_report,
   mpa_report,
   taxa,
+  sample = NULL,
+  out_dir = getwd(),
   cb_len = 16L,
   umi_len = 10L,
   n_filter = 130L,
@@ -28,6 +30,10 @@ results.}
 
 \item{taxa}{Taxa ids to extracted, can be a file, in which, the first column
 will be extracted.}
+
+\item{sample}{A string, sample name, will be used to create output file name.}
+
+\item{out_dir}{The path of output directory.}
 
 \item{cb_len}{Nucleutide length of cell barcodes}
 

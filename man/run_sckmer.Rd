@@ -10,6 +10,8 @@ run_sckmer(
   kraken_report,
   mpa_report,
   microbiome_output,
+  sample = NULL,
+  out_dir = getwd(),
   ranks = c("G", "S"),
   cb_len = 16L,
   umi_len = 10L,
@@ -32,6 +34,10 @@ results.}
 
 \item{microbiome_output}{The path of microbiome output file (returned by
 \code{extract_microbiome}).}
+
+\item{sample}{A string, sample name, will be used to create output file name.}
+
+\item{out_dir}{The path of output directory.}
 
 \item{ranks}{Taxa ranks to analyze.}
 

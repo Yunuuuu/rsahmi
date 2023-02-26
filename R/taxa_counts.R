@@ -11,7 +11,7 @@
 #' @importFrom parallelly availableCores
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
+taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL, out_dir = getwd(), cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
     # read in Fasta data -----------------------------------------
     reads <- ShortRead::readFasta(fa1)
 
@@ -96,10 +96,10 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, cb_len = 16L,
         by = c("barcode", "taxid")
     ][order(-umi)]
 
-    # data.table::fwrite(barcode_umi,
-    #     file = paste0(out_path, sample_name, ".all.barcodes.txt"),
-    #     row.names = FALSE, col.names = TRUE
-    # )
+    data.table::fwrite(barcode_umi,
+        file = file_path(out_dir, sample, ext = "all.barcodes.txt"),
+        sep = "\t", row.names = FALSE, col.names = TRUE
+    )
 
     # create taxa counts data -----------------------------------
     ## use main id to match the umi data
@@ -168,6 +168,11 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, cb_len = 16L,
             "order", "family", "genus", "species"
         )
     )
+    data.table::fwrite(out,
+        file = file_path(out_dir, sample, ext = "counts.txt"),
+        sep = "\t", row.names = FALSE, col.names = TRUE
+    )
+    out
 }
 utils::globalVariables(c(
     "V8", "V1", "main_id", "rank_name_pairs", "name", "tax_data", "counts"

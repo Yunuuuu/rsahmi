@@ -6,11 +6,11 @@
 #' into account all subsequently higher resolution ranks. Reads with any k-mers
 #' mapped to the host (e.g. human) are discarded. Reads with >50% of the k-mers
 #' map outside the taxon's lineage are also discarded. The output is a table of
-#' barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers. 
+#' barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers.
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
 #'   `extract_microbiome`).
 #' @param microbiome_output The path of microbiome output file (returned by
-#'   `extract_microbiome`). 
+#'   `extract_microbiome`).
 #' @param ranks Taxa ranks to analyze.
 #' @param cb_len Nucleutide length of cell barcodes
 #' @param umi_len Nucleutide length of umis
@@ -22,8 +22,8 @@
 #' @inheritParams run_kraken2
 #' @inheritParams extract_microbiome
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
-#' @export 
-run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
+#' @export
+run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
     # read in fasta data -----------------------------------------------
     reads1 <- ShortRead::readFasta(fa1)
     sequences1 <- ShortRead::sread(reads1)
@@ -81,7 +81,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
     tx <- intersect(tx, microbiome_output$taxid)
 
     # define kmer for each tx --------------------------------------------
-    define_kmer(
+    out <- define_kmer(
         taxa_vec = tx, mpa_report = mpa,
         microbiome_output = microbiome_output,
         host = host, id = id, barcode = barcode, umi = umi,
@@ -89,6 +89,11 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
         nsample = nsample, kmer_len = kmer_len, min_frac = min_frac,
         cores = cores
     )
+    data.table::fwrite(out,
+        file = file_path(out_dir, sample, ext = "sckmer.txt"),
+        sep = "\t", row.names = FALSE, col.names = TRUE
+    )
+    out
 }
 utils::globalVariables(c("V8", "taxid", "V1", "V3"))
 
