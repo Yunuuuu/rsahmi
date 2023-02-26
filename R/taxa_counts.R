@@ -43,7 +43,7 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
 
     # prepare kraken report and mpa report data ------------------
     kr <- data.table::fread(kraken_report, header = FALSE, sep = "\t")[-c(1:2)]
-    kr[, V8 := gsub("[^[:alnum:]]+", "_", V8, perl = TRUE)] # nolint
+    kr[, V8 := str_trim(gsub("[^[:alnum:]]+", " ", V8, perl = TRUE))] # nolint
 
     mpa <- data.table::fread(mpa_report, header = FALSE, sep = "\t")
     mpa[, taxid := vapply(strsplit(V1, "|", fixed = TRUE), function(x) { # nolint
@@ -52,7 +52,7 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
             unlist(x, recursive = FALSE, use.names = FALSE),
             perl = TRUE
         )
-        str <- gsub("[^[:alnum:]]+", "_", str, perl = TRUE)
+        str <- str_trim(gsub("[^[:alnum:]]+", " ", str, perl = TRUE))
         paste0("*", paste0(
             kr$V7[data.table::chmatch(str, kr$V8)],
             collapse = "*"
@@ -123,7 +123,9 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
             tax <- data.table::tstrsplit(x, split = "__", fixed = TRUE)
             data.table::setDT(tax)
             data.table::setnames(tax, c("rank", "name"))
-            tax[, name := gsub("[^[:alnum:]]+", "_", name, perl = TRUE)] # nolint
+            tax[, name := str_trim( # nolint
+                gsub("[^[:alnum:]]+", " ", name, perl = TRUE)
+            )]
             tax <- tax[c("k", "p", "c", "o", "f", "g", "s"), on = "rank"]
             n <- nrow(tax)
             for (i in seq_len(n)) {
@@ -168,6 +170,7 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
             "order", "family", "genus", "species"
         )
     )
+    data.table::setorderv(out, c("taxid", "rank"))
     data.table::fwrite(out,
         file = file_path(out_dir, sample, ext = "counts.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE

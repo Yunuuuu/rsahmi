@@ -79,6 +79,10 @@ str_extract <- function(string, pattern, ignore.case = FALSE) {
     substr(string, start, end)
 }
 
+str_trim <- function(x, which = "both") {
+    trimws(x, which = which, whitespace = "[\\h\\v]")
+}
+
 new_handlers <- function(message = "taxa processing") {
     progressr::handlers(progressr::handler_cli(
         format = sprintf(

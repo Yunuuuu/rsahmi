@@ -49,7 +49,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, s
 
     # prepare kr, mpa and microbiome_output data ---------------------------
     kr <- data.table::fread(kraken_report, header = FALSE, sep = "\t")[-c(1:2)]
-    kr[, V8 := gsub("[^[:alnum:]]+", "_", V8, perl = TRUE)] # nolint
+    kr[, V8 := str_trim(gsub("[^[:alnum:]]+", " ", V8, perl = TRUE))] # nolint
 
     mpa <- data.table::fread(mpa_report, header = FALSE, sep = "\t")
     mpa[, taxid := vapply(strsplit(V1, "|", fixed = TRUE), function(x) { # nolint
@@ -58,7 +58,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, s
             unlist(x, recursive = FALSE, use.names = FALSE),
             perl = TRUE
         )
-        str <- gsub("[^[:alnum:]]+", "_", str, perl = TRUE)
+        str <- str_trim(gsub("[^[:alnum:]]+", " ", str, perl = TRUE))
         paste0("*", paste0(
             kr$V7[data.table::chmatch(str, kr$V8)],
             collapse = "*"
