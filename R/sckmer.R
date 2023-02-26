@@ -93,7 +93,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, s
         file = file_path(out_dir, sample, ext = "sckmer.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE
     )
-    out
+    invisible(out)
 }
 utils::globalVariables(c("V8", "taxid", "V1", "V3"))
 

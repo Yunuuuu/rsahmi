@@ -172,7 +172,7 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
         file = file_path(out_dir, sample, ext = "counts.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE
     )
-    out
+    invisible(out)
 }
 utils::globalVariables(c(
     "V8", "V1", "main_id", "rank_name_pairs", "name", "tax_data", "counts"
