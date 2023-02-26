@@ -30,6 +30,9 @@ run_sckmer(
 \item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
 results.}
 
+\item{microbiome_output}{The path of microbiome output file (returned by
+\code{extract_microbiome}).}
+
 \item{ranks}{Taxa ranks to analyze.}
 
 \item{cb_len}{Nucleutide length of cell barcodes}

@@ -9,6 +9,8 @@
 #' barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers. 
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
 #'   `extract_microbiome`).
+#' @param microbiome_output The path of microbiome output file (returned by
+#'   `extract_microbiome`). 
 #' @param ranks Taxa ranks to analyze.
 #' @param cb_len Nucleutide length of cell barcodes
 #' @param umi_len Nucleutide length of umis
@@ -88,6 +90,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, r
         cores = cores
     )
 }
+utils::globalVariables(c("V8", "taxid", "V1", "V3"))
 
 define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barcode, umi, sequences1, sequences2, nsample, kmer_len, min_frac, cores) {
     cli::cli_alert("Defining kmer for {.val {length(taxa_vec)}} taxa")
@@ -220,3 +223,6 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
     })
     data.table::rbindlist(barcode_kmer_list, use.names = FALSE)
 }
+utils::globalVariables(
+    c("taxid", "V5", "r1", "r2", "nkmer", "nt_len", "nt_end", "nt_start", "k")
+)
