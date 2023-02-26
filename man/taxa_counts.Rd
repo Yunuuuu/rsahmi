@@ -44,3 +44,6 @@ used to demultiplex the reads and create a barcode x taxa counts matrix. The
 full taxonomic classification of all resulting barcodes and the number of
 counts assigned to each clade are tabulated.
 }
+\seealso{
+\url{https://github.com/sjdlabgroup/SAHMI}
+}

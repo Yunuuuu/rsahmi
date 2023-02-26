@@ -9,6 +9,7 @@
 #' @param n_filter Filter reads with `> n_filter` of one nucleotide.
 #' @inheritParams run_sckmer
 #' @importFrom parallelly availableCores
+#' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
 taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
     # read in Fasta data -----------------------------------------
