@@ -1,4 +1,7 @@
 #' Read kraken report
+#' @param kraken_report The path to kraken2uniq report, often in the form of
+#'   __sample.kraken.report.txt__.
+#' @param sample A string, sample name.
 #' @param min_reads Minimal number of reads.
 #' @param min_uniq Minimal unique number.
 #' @inheritParams taxa_counts

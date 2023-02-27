@@ -26,7 +26,7 @@ run_sckmer(
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
 \code{extract_microbiome}).}
 
-\item{kraken_report}{The path to kraken2uniq report if \code{NULL},
+\item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
 \strong{sample.kraken.report.txt} in \code{out_dir}.}
 
 \item{mpa_report}{A scalar logical indicates whethter reporting mpa-style

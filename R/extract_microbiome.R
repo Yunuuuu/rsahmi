@@ -1,11 +1,11 @@
 #' Extract Microbiome reads and Kraken output
 #' @param fq1,fq2 The path to the classified microbiome fastq file (returned by
 #' `run_kraken2`).
-#' @param kraken_out The path to kraken output file if `NULL`, will locate
+#' @param kraken_out The path to kraken output file, if `NULL`, will locate
 #'   __sample.kraken.output.txt__ in `out_dir`.
-#' @param kraken_report The path to kraken2uniq report if `NULL`,
+#' @param kraken_report The path to kraken2uniq report, if `NULL`,
 #'   __sample.kraken.report.txt__ in `out_dir`.
-#' @param mpa_report The path to mpa style report if `NULL`,
+#' @param mpa_report The path to mpa style report, if `NULL`,
 #'   __sample.kraken.report.mpa.txt__ in `out_dir`.
 #' @param microbiome_pattern Perl regex patterns to match the bacteria
 #'   microbiome.

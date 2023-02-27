@@ -22,13 +22,13 @@ extract_microbiome(
 \item{fq1, fq2}{The path to the classified microbiome fastq file (returned by
 \code{run_kraken2}).}
 
-\item{kraken_out}{The path to kraken output file if \code{NULL}, will locate
+\item{kraken_out}{The path to kraken output file, if \code{NULL}, will locate
 \strong{sample.kraken.output.txt} in \code{out_dir}.}
 
-\item{kraken_report}{The path to kraken2uniq report if \code{NULL},
+\item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
 \strong{sample.kraken.report.txt} in \code{out_dir}.}
 
-\item{mpa_report}{The path to mpa style report if \code{NULL},
+\item{mpa_report}{The path to mpa style report, if \code{NULL},
 \strong{sample.kraken.report.mpa.txt} in \code{out_dir}.}
 
 \item{out_dir}{The path of output directory.}

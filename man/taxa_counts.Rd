@@ -25,7 +25,7 @@ taxa_counts(
 \item{taxa}{Taxa ids to extracted, can be a file, where the first column will
 be extracted.}
 
-\item{kraken_report}{The path to kraken2uniq report if \code{NULL},
+\item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
 \strong{sample.kraken.report.txt} in \code{out_dir}.}
 
 \item{mpa_report}{A scalar logical indicates whethter reporting mpa-style

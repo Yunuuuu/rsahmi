@@ -7,10 +7,10 @@
 read_kr(kraken_report, sample = NULL, min_reads = 2L, min_uniq = 2L)
 }
 \arguments{
-\item{kraken_report}{The path to kraken2uniq report if \code{NULL},
-\strong{sample.kraken.report.txt} in \code{out_dir}.}
+\item{kraken_report}{The path to kraken2uniq report, often in the form of
+\strong{sample.kraken.report.txt}.}
 
-\item{sample}{A string, sample name, will be used to create output file name.}
+\item{sample}{A string, sample name.}
 
 \item{min_reads}{Minimal number of reads.}
 
