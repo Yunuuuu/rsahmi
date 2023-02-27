@@ -4,15 +4,23 @@
 #' used to demultiplex the reads and create a barcode x taxa counts matrix. The
 #' full taxonomic classification of all resulting barcodes and the number of
 #' counts assigned to each clade are tabulated.
-#' @param taxa Taxa ids to extracted, can be a file, in which, the first column
-#'   will be extracted.
+#' @param taxa Taxa ids to extracted, can be a file, where the first column will
+#'   be extracted.
 #' @param n_filter Filter reads with `> n_filter` of one nucleotide.
 #' @inheritParams run_sckmer
 #' @importFrom parallelly availableCores
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL, out_dir = getwd(), cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
+taxa_counts <- function(fa1, fa2, taxa, kraken_report = NULL, mpa_report = NULL, sample = NULL, out_dir = getwd(), cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
     sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
+    kraken_report <- define_path(kraken_report,
+        sample = sample,
+        out_dir = out_dir
+    )
+    mpa_report <- define_path(mpa_report,
+        sample = sample,
+        out_dir = out_dir
+    )
 
     # read in Fasta data -----------------------------------------
     reads <- ShortRead::readFasta(fa1)

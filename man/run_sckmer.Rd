@@ -7,9 +7,9 @@
 run_sckmer(
   fa1,
   fa2 = NULL,
-  kraken_report,
-  mpa_report,
-  microbiome_out,
+  kraken_report = NULL,
+  mpa_report = NULL,
+  microbiome_out = NULL,
   sample = NULL,
   out_dir = getwd(),
   ranks = c("G", "S"),
@@ -26,14 +26,15 @@ run_sckmer(
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
 \code{extract_microbiome}).}
 
-\item{kraken_report}{The path to kraken2uniq report
-(\strong{sample.kraken.report.txt}).}
+\item{kraken_report}{The path to kraken2uniq report if \code{NULL},
+\strong{sample.kraken.report.txt} in \code{out_dir}.}
 
 \item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
 results.}
 
 \item{microbiome_out}{The path of microbiome output file (returned by
-\code{extract_microbiome}).}
+\link{extract_microbiome}). if \code{NULL}, will locate
+\strong{sample.microbiome.output.txt} in \code{out_dir}.}
 
 \item{sample}{A string, sample name, will be used to create output file name.}
 

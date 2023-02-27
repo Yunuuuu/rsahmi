@@ -10,7 +10,8 @@
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
 #'   `extract_microbiome`).
 #' @param microbiome_out The path of microbiome output file (returned by
-#'   `extract_microbiome`).
+#'   [extract_microbiome]). if `NULL`, will locate
+#'   __sample.microbiome.output.txt__ in `out_dir`.
 #' @param ranks Taxa ranks to analyze.
 #' @param cb_len Nucleutide length of cell barcodes
 #' @param umi_len Nucleutide length of umis
@@ -23,8 +24,17 @@
 #' @inheritParams extract_microbiome
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-run_sckmer <- function(fa1, fa2 = NULL, kraken_report, mpa_report, microbiome_out, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = 1000L, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
+run_sckmer <- function(fa1, fa2 = NULL, kraken_report = NULL, mpa_report = NULL, microbiome_out = NULL, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = 1000L, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
     sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
+    kraken_report <- define_path(kraken_report,
+        sample = sample,
+        out_dir = out_dir
+    )
+    mpa_report <- define_path(mpa_report, sample = sample, out_dir = out_dir)
+    microbiome_out <- define_path(microbiome_out,
+        sample = sample,
+        out_dir = out_dir
+    )
 
     # read in fasta data -----------------------------------------------
     reads1 <- ShortRead::readFasta(fa1)

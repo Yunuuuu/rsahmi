@@ -1,23 +1,32 @@
-#' Extract Microbiome reads and Kraken output 
+#' Extract Microbiome reads and Kraken output
 #' @param fq1,fq2 The path to the classified microbiome fastq file (returned by
 #' `run_kraken2`).
-#' @param kraken_out The path to kraken output file
-#'   (__sample.kraken.output.txt__). 
-#' @param kraken_report The path to kraken2uniq report
-#'   (__sample.kraken.report.txt__).
-#' @param mpa_report The path to mpa style report
-#'   (__sample.kraken.report.mpa.txt__).
+#' @param kraken_out The path to kraken output file if `NULL`, will locate
+#'   __sample.kraken.output.txt__ in `out_dir`.
+#' @param kraken_report The path to kraken2uniq report if `NULL`,
+#'   __sample.kraken.report.txt__ in `out_dir`.
+#' @param mpa_report The path to mpa style report if `NULL`,
+#'   __sample.kraken.report.mpa.txt__ in `out_dir`.
 #' @param microbiome_pattern Perl regex patterns to match the bacteria
-#' microbiome.
+#'   microbiome.
 #' @param ntaxid Number of taxids to extract at a time.
 #' @inheritParams run_kraken2
 #' @param ... Other arguments passed to [grepl].
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
-#' @export 
-extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_report, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ntaxid = 8000L, ..., sys_args = list()) {
+#' @export
+extract_microbiome <- function(fq1, fq2 = NULL, kraken_out = NULL, kraken_report = NULL, mpa_report = NULL, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ntaxid = 8000L, ..., sys_args = list()) {
     sample <- sample %||% sub("_0*[12]?\\.(fastq|fq)(\\.gz)?$", "",
         basename(fq1),
         perl = TRUE
+    )
+    kraken_out <- define_path(kraken_out, sample = sample, out_dir = out_dir)
+    kraken_report <- define_path(kraken_report,
+        sample = sample,
+        out_dir = out_dir
+    )
+    mpa_report <- define_path(mpa_report,
+        sample = sample,
+        out_dir = out_dir
     )
     if (!is.null(fq2)) {
         if (fq1 == fq2) {

@@ -92,3 +92,24 @@ new_handlers <- function(message = "taxa processing") {
         clear = FALSE
     ))
 }
+
+define_path <- function(x, sample, out_dir = getwd()) {
+    x %||% locate_path(deparse(substitute(x)),
+        sample = sample, out_dir = out_dir
+    )
+}
+
+locate_path <- function(x, sample, out_dir = getwd()) {
+    x <- match.arg(x, c("kraken_report", "mpa_report", "kraken_out", "microbiome_out", "sckmer"))
+    file_path(out_dir, sample, ext = switch_ext(x))
+}
+
+switch_ext <- function(x) {
+    switch(x,
+        kraken_report = "kraken.report.txt",
+        mpa_report = "kraken.report.mpa.txt",
+        kraken_out = "kraken.output.txt",
+        microbiome_out = "microbiome.output.txt",
+        sckmer = "sckmer.txt"
+    )
+}
