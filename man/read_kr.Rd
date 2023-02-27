@@ -8,7 +8,7 @@ read_kr(kraken_report, sample = NULL, min_reads = 2L, min_uniq = 2L)
 }
 \arguments{
 \item{kraken_report}{The path to kraken2uniq report
-(\emph{sample.kraken.report.txt}).}
+(\strong{sample.kraken.report.txt}).}
 
 \item{sample}{A string, sample name, will be used to create output file name.}
 

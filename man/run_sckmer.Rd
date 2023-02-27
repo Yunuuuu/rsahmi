@@ -27,7 +27,7 @@ run_sckmer(
 \code{extract_microbiome}).}
 
 \item{kraken_report}{The path to kraken2uniq report
-(\emph{sample.kraken.report.txt}).}
+(\strong{sample.kraken.report.txt}).}
 
 \item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
 results.}
