@@ -23,7 +23,7 @@
 #' @inheritParams extract_microbiome
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-run_sckmer <- function(fa1, fa2 = NULL, kraken_report, mpa_report, microbiome_output, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
+run_sckmer <- function(fa1, fa2 = NULL, kraken_report, mpa_report, microbiome_output, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = 1000L, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
     sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
 
     # read in fasta data -----------------------------------------------

@@ -16,7 +16,7 @@ run_sckmer(
   cb_len = 16L,
   umi_len = 10L,
   host = 9606L,
-  nsample = Inf,
+  nsample = 1000L,
   kmer_len = 35L,
   min_frac = 0.5,
   cores = availableCores()
