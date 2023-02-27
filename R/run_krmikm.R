@@ -73,7 +73,7 @@ run_krmikm <- function(fq1, fq2 = NULL, sample = NULL, out_dir = getwd(),
         mpa_report = file_path(out_dir, sample,
             ext = "kraken.report.mpa.txt"
         ),
-        microbiome_output = file_path(out_dir, sample,
+        microbiome_out = file_path(out_dir, sample,
             ext = "microbiome.output.txt"
         ),
         sample = sample, out_dir = out_dir,
@@ -93,7 +93,7 @@ run_krmikm <- function(fq1, fq2 = NULL, sample = NULL, out_dir = getwd(),
         kraken_out = file_path(out_dir, sample,
             ext = "kraken.output.txt"
         ),
-        microbiome_output = file_path(out_dir, sample,
+        microbiome_out = file_path(out_dir, sample,
             ext = "microbiome.output.txt"
         ),
         kmer = file_path(out_dir, sample, ext = "sckmer.txt")

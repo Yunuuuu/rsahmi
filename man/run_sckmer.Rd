@@ -9,7 +9,7 @@ run_sckmer(
   fa2 = NULL,
   kraken_report,
   mpa_report,
-  microbiome_output,
+  microbiome_out,
   sample = NULL,
   out_dir = getwd(),
   ranks = c("G", "S"),
@@ -32,7 +32,7 @@ run_sckmer(
 \item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
 results.}
 
-\item{microbiome_output}{The path of microbiome output file (returned by
+\item{microbiome_out}{The path of microbiome output file (returned by
 \code{extract_microbiome}).}
 
 \item{sample}{A string, sample name, will be used to create output file name.}
