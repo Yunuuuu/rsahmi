@@ -13,8 +13,8 @@ extract_microbiome(
   out_dir = getwd(),
   sample = NULL,
   microbiome_pattern = "(?i)Bacteria|Fungi|Viruses",
-  ...,
   ntaxid = 8000L,
+  ...,
   sys_args = list()
 )
 }
@@ -38,9 +38,9 @@ extract_microbiome(
 \item{microbiome_pattern}{Perl regex patterns to match the bacteria
 microbiome.}
 
-\item{...}{Other arguments passed to \link{grepl}.}
-
 \item{ntaxid}{Number of taxids to extract at a time.}
+
+\item{...}{Other arguments passed to \link{grepl}.}
 
 \item{sys_args}{Other arguments passed to \link{system2}.}
 }

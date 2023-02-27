@@ -14,7 +14,7 @@
 #' @param ... Other arguments passed to [grepl].
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export 
-extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_report, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ..., ntaxid = 8000L, sys_args = list()) {
+extract_microbiome <- function(fq1, fq2 = NULL, kraken_out, kraken_report, mpa_report, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ntaxid = 8000L, ..., sys_args = list()) {
     sample <- sample %||% sub("_0*[12]?\\.(fastq|fq)(\\.gz)?$", "",
         basename(fq1),
         perl = TRUE
