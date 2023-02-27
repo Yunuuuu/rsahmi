@@ -150,6 +150,8 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
         data.table::rbindlist(tax_data, use.names = TRUE), # nolint
         by = "main_id"
     ][!is.na(name)] # nolint
+
+    cli::cli_alert("Quantifying of microbes and creating the barcode-metagenome counts matrix")
     out <- merge(out, barcode_umi,
         by.x = "main_id", by.y = "taxid",
         allow.cartesian = TRUE
