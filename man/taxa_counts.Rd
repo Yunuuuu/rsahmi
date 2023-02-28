@@ -26,10 +26,10 @@ taxa_counts(
 be extracted.}
 
 \item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
-\strong{sample.kraken.report.txt} in \code{out_dir}.}
+will locate \strong{sample.kraken.report.txt} in \code{out_dir}.}
 
-\item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
-results.}
+\item{mpa_report}{The path to mpa style report, if \code{NULL},
+will locate \strong{sample.kraken.report.mpa.txt} in \code{out_dir}.}
 
 \item{sample}{A string, sample name, will be used to create output file name.}
 

@@ -4,7 +4,6 @@
 #' @param sample A string, sample name.
 #' @param min_reads Minimal number of reads.
 #' @param min_uniq Minimal unique number.
-#' @inheritParams taxa_counts
 #' @return A [data.table][data.table::data.table] object
 #' @export 
 read_kr <- function(kraken_report, sample = NULL, min_reads = 2L, min_uniq = 2L) {

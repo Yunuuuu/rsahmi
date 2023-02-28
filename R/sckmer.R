@@ -20,8 +20,8 @@
 #' @param kmer_len Kraken kmer length.
 #' @param min_frac Minimum fraction of kmers directly assigned to taxid to use
 #'   read.
-#' @inheritParams run_kraken2
 #' @inheritParams extract_microbiome
+#' @inheritParams run_kraken2
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
 run_sckmer <- function(fa1, fa2 = NULL, kraken_report = NULL, mpa_report = NULL, microbiome_out = NULL, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = 1000L, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {

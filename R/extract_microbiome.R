@@ -4,9 +4,9 @@
 #' @param kraken_out The path to kraken output file, if `NULL`, will locate
 #'   __sample.kraken.output.txt__ in `out_dir`.
 #' @param kraken_report The path to kraken2uniq report, if `NULL`,
-#'   __sample.kraken.report.txt__ in `out_dir`.
+#'   will locate __sample.kraken.report.txt__ in `out_dir`.
 #' @param mpa_report The path to mpa style report, if `NULL`,
-#'   __sample.kraken.report.mpa.txt__ in `out_dir`.
+#'   will locate __sample.kraken.report.mpa.txt__ in `out_dir`.
 #' @param microbiome_pattern Perl regex patterns to match the bacteria
 #'   microbiome.
 #' @param ntaxid Number of taxids to extract at a time.
