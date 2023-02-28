@@ -159,7 +159,7 @@ taxa_counts <- function(fa1, fa2, taxa, kraken_report = NULL, mpa_report = NULL,
         by = "main_id"
     ][!is.na(name)] # nolint
 
-    cli::cli_alert("Quantifying of microbes and creating the barcode-metagenome counts matrix")
+    cli::cli_alert("Quantifying microbes and creating the barcode-metagenome counts matrix")
     out <- merge(out, barcode_umi,
         by.x = "main_id", by.y = "taxid",
         allow.cartesian = TRUE
@@ -184,6 +184,7 @@ taxa_counts <- function(fa1, fa2, taxa, kraken_report = NULL, mpa_report = NULL,
         )
     )
     data.table::setorderv(out, c("taxid", "rank"))
+    cli::cli_alert_success("Quantifying done")
     data.table::fwrite(out,
         file = file_path(out_dir, sample, ext = "counts.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE
