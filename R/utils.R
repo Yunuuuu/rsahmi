@@ -95,16 +95,13 @@ new_handlers <- function(message = "taxa processing") {
 
 #' Locate the output file
 #' @param x One of "kraken_report", "mpa_report", "kraken_out",
-#' "microbiome_out", "sckmer".
-#' @param sample A string, sample name, will be used to locate file since
-#' `SAHMI` use this to create output file name.
+#'   "microbiome_out", "sckmer".
+#' @param sample An atomic character specifying sample names, will be used to
+#'   locate file since `SAHMI` use this to create output file name.
 #' @param dir Path to retuls directory.
 #' @return The path of x.
 #' @export 
 locate_path <- function(x, sample, dir = getwd()) {
-    if (!(is.character(sample) && length(sample) == 1L)) {
-        cli::cli_abort("{.arg sample} must be scalar string.")
-    }
     locate_path_core(x, sample = sample, dir = dir)
 }
 

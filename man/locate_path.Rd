@@ -10,8 +10,8 @@ locate_path(x, sample, dir = getwd())
 \item{x}{One of "kraken_report", "mpa_report", "kraken_out",
 "microbiome_out", "sckmer".}
 
-\item{sample}{A string, sample name, will be used to locate file since
-\code{SAHMI} use this to create output file name.}
+\item{sample}{An atomic character specifying sample names, will be used to
+locate file since \code{SAHMI} use this to create output file name.}
 
 \item{dir}{Path to retuls directory.}
 }
