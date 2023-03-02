@@ -140,12 +140,11 @@ taxa_counts <- function(fa1, fa2, taxa, kraken_report = NULL, mpa_report = NULL,
             tax <- tax[c("k", "p", "c", "o", "f", "g", "s"), on = "rank"]
             n <- nrow(tax)
             for (i in seq_len(n)) {
-                rank_i <- tax$rank[i]
                 .value. <- c(
                     rep_len(NA_character_, i - 1L),
                     rep_len(tax$name[i], n - i + 1L)
                 )
-                tax[, c(rank_i) := .value.]
+                tax[, (tax$rank[i]) := .value.]
             }
             p2()
             tax
