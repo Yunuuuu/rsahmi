@@ -1,13 +1,19 @@
 #' Read kraken report
 #' @param kraken_report The path to kraken2uniq report, often in the form of
 #'   __sample.kraken.report.txt__. It's easy to use [locate_path] to create the
-#'   path. 
+#'   path.
 #' @param sample A string, sample name.
 #' @param min_reads Minimal number of reads.
 #' @param min_uniq Minimal unique number.
 #' @return A [data.table][data.table::data.table] object
-#' @export 
+#' @export
 read_kr <- function(kraken_report, sample = NULL, min_reads = 2L, min_uniq = 2L) {
+    if (is.null(sample)) {
+        sample <- sub("\\.kraken\\.report\\.txt$", "",
+            basename(kraken_report),
+            perl = TRUE
+        )
+    }
     x <- data.table::fread(kraken_report, header = FALSE, sep = "\t")
     x[, V8 := str_trim(V8)] # nolint
     total_reads <- x$V2[1L] + x$V2[2L]
