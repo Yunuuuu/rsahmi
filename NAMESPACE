@@ -3,6 +3,7 @@
 export(extract_microbiome)
 export(locate_path)
 export(read_kr)
+export(run_blsd)
 export(run_kraken2)
 export(run_krmikm)
 export(run_sckmer)
