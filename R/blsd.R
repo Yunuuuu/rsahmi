@@ -34,6 +34,7 @@ run_blsd <- function(kraken_report, sckmer, min_number = 3L, method = "spearman"
     ]
     out[, padj := stats::p.adjust(pvalue, p.adjust)] # nolint
     out[, name := kr_data$V8[match(taxid, kr_data$V7)]]
+    data.table::setcolorder(out, "name", after = "taxid")
     out[]
 }
 utils::globalVariables(c("kmer", "padj", "pvalue"))
