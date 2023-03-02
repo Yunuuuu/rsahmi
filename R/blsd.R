@@ -9,16 +9,16 @@
 #'   path. 
 #' @param sckmer The path to sckmer results, often in the form of
 #'   __sample.sckmer.txt__. It's easy to use [locate_path] to create the path. 
-#' @param min_number An integer, the minimal number of items per taxid
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be
 #'   abbreviated.
 #' @param ... Other arguments passed to [cor.test][stats::cor.test].
 #' @param p.adjust Pvalue correction method, a character string. Can be
-#'   abbreviated. Details see [p.adjust][stats::p.adjust].
+#'   abbreviated. Details see [p.adjust][stats::p.adjust]. 
+#' @param min_number An integer, the minimal number of items per taxid.
 #' @return A [data.table][data.table::data.table]
 #' @export 
-run_blsd <- function(kraken_report, sckmer, min_number = 3L, method = "spearman", ..., p.adjust = "BH") {
+run_blsd <- function(kraken_report, sckmer, method = "spearman", ..., p.adjust = "BH", min_number = 3L) {
     kr_data <- data.table::fread(kraken_report, sep = "\t", header = FALSE)
     sckmer <- data.table::fread(sckmer, sep = "\t", header = TRUE)
     out <- sckmer[kmer > 1L, .SD[.N > min_number], by = "taxid"][, # nolint

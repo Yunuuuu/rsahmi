@@ -7,10 +7,10 @@
 run_blsd(
   kraken_report,
   sckmer,
-  min_number = 3L,
   method = "spearman",
   ...,
-  p.adjust = "BH"
+  p.adjust = "BH",
+  min_number = 3L
 )
 }
 \arguments{
@@ -21,8 +21,6 @@ path.}
 \item{sckmer}{The path to sckmer results, often in the form of
 \strong{sample.sckmer.txt}. It's easy to use \link{locate_path} to create the path.}
 
-\item{min_number}{An integer, the minimal number of items per taxid}
-
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
 abbreviated.}
@@ -31,6 +29,8 @@ abbreviated.}
 
 \item{p.adjust}{Pvalue correction method, a character string. Can be
 abbreviated. Details see \link[stats:p.adjust]{p.adjust}.}
+
+\item{min_number}{An integer, the minimal number of items per taxid.}
 }
 \value{
 A \link[data.table:data.table]{data.table}
