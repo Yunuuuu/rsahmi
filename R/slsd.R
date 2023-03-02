@@ -18,7 +18,9 @@
 #'   #reads)` (r2 and p2) and `cor(#reads, #unique k-mers)` (r3 and p3).
 #' @export 
 run_slsd <- function(kraken_reports, samples = NULL, method = "spearman", ..., min_number = 3L, min_reads = 2L, min_uniq = 2L) {
-    if (!is.null(samples) && length(samples) != length(kraken_reports)) {
+    if (is.null(samples)) {
+        samples <- rep_len(list(NULL), length(kraken_reports))
+    } else if (length(samples) != length(kraken_reports)) {
         cli::cli_abort("{.arg kraken_reports} and {.arg samples} must have the same length.")
     }
     kr_data <- .mapply(
