@@ -93,15 +93,30 @@ new_handlers <- function(message = "taxa processing") {
     ))
 }
 
-define_path <- function(x, sample, out_dir = getwd()) {
-    x %||% locate_path(deparse(substitute(x)),
-        sample = sample, out_dir = out_dir
+#' Locate the output file
+#' @param x One of "kraken_report", "mpa_report", "kraken_out",
+#' "microbiome_out", "sckmer".
+#' @param sample A string, sample name, will be used to locate file since
+#' `SAHMI` use this to create output file name.
+#' @param dir Path to retuls directory.
+#' @return The path of x.
+#' @export 
+locate_path <- function(x, sample, dir = getwd()) {
+    if (!(is.character(sample) && length(sample) == 1L)) {
+        cli::cli_abort("{.arg sample} must be scalar string.")
+    }
+    locate_path_core(x, sample = sample, dir = dir)
+}
+
+define_path <- function(x, sample, dir = getwd()) {
+    x %||% locate_path_core(deparse(substitute(x)),
+        sample = sample, dir = dir
     )
 }
 
-locate_path <- function(x, sample, out_dir = getwd()) {
+locate_path_core <- function(x, sample, dir = getwd()) {
     x <- match.arg(x, c("kraken_report", "mpa_report", "kraken_out", "microbiome_out", "sckmer"))
-    file_path(out_dir, sample, ext = switch_ext(x))
+    file_path(dir, sample, ext = switch_ext(x))
 }
 
 switch_ext <- function(x) {

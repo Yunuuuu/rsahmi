@@ -8,7 +8,8 @@ read_kr(kraken_report, sample = NULL, min_reads = 2L, min_uniq = 2L)
 }
 \arguments{
 \item{kraken_report}{The path to kraken2uniq report, often in the form of
-\strong{sample.kraken.report.txt}.}
+\strong{sample.kraken.report.txt}. It's easy to use \link{locate_path} to create the
+path.}
 
 \item{sample}{A string, sample name.}
 

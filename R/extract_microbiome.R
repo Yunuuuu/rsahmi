@@ -19,14 +19,14 @@ extract_microbiome <- function(fq1, fq2 = NULL, kraken_out = NULL, kraken_report
         basename(fq1),
         perl = TRUE
     )
-    kraken_out <- define_path(kraken_out, sample = sample, out_dir = out_dir)
+    kraken_out <- define_path(kraken_out, sample = sample, dir = out_dir)
     kraken_report <- define_path(kraken_report,
         sample = sample,
-        out_dir = out_dir
+        dir = out_dir
     )
     mpa_report <- define_path(mpa_report,
         sample = sample,
-        out_dir = out_dir
+        dir = out_dir
     )
     if (!is.null(fq2)) {
         if (fq1 == fq2) {

@@ -1,6 +1,7 @@
 #' Read kraken report
 #' @param kraken_report The path to kraken2uniq report, often in the form of
-#'   __sample.kraken.report.txt__.
+#'   __sample.kraken.report.txt__. It's easy to use [locate_path] to create the
+#'   path. 
 #' @param sample A string, sample name.
 #' @param min_reads Minimal number of reads.
 #' @param min_uniq Minimal unique number.

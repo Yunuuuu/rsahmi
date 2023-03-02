@@ -15,11 +15,11 @@ taxa_counts <- function(fa1, fa2, taxa, kraken_report = NULL, mpa_report = NULL,
     sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
     kraken_report <- define_path(kraken_report,
         sample = sample,
-        out_dir = out_dir
+        dir = out_dir
     )
     mpa_report <- define_path(mpa_report,
         sample = sample,
-        out_dir = out_dir
+        dir = out_dir
     )
 
     # read in Fasta data -----------------------------------------
