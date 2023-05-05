@@ -7,14 +7,14 @@
 extract_microbiome(
   fq1,
   fq2 = NULL,
-  kraken_out,
-  kraken_report,
-  mpa_report,
+  kraken_out = NULL,
+  kraken_report = NULL,
+  mpa_report = NULL,
   out_dir = getwd(),
   sample = NULL,
   microbiome_pattern = "(?i)Bacteria|Fungi|Viruses",
-  ...,
   ntaxid = 8000L,
+  ...,
   sys_args = list()
 )
 }
@@ -22,13 +22,14 @@ extract_microbiome(
 \item{fq1, fq2}{The path to the classified microbiome fastq file (returned by
 \code{run_kraken2}).}
 
-\item{kraken_out}{The path to kraken output file (\emph{sample.output.txt}).}
+\item{kraken_out}{The path to kraken output file, if \code{NULL}, will locate
+\strong{sample.kraken.output.txt} in \code{out_dir}.}
 
-\item{kraken_report}{The path to kraken2uniq report
-(\emph{sample.kraken.report.txt}).}
+\item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
+will locate \strong{sample.kraken.report.txt} in \code{out_dir}.}
 
-\item{mpa_report}{The path to mpa style report
-(\emph{sample.kraken.report.mpa.txt}).}
+\item{mpa_report}{The path to mpa style report, if \code{NULL},
+will locate \strong{sample.kraken.report.mpa.txt} in \code{out_dir}.}
 
 \item{out_dir}{The path of output directory.}
 
@@ -37,9 +38,9 @@ extract_microbiome(
 \item{microbiome_pattern}{Perl regex patterns to match the bacteria
 microbiome.}
 
-\item{...}{Other arguments passed to \link{grepl}.}
-
 \item{ntaxid}{Number of taxids to extract at a time.}
+
+\item{...}{Other arguments passed to \link{grepl}.}
 
 \item{sys_args}{Other arguments passed to \link{system2}.}
 }

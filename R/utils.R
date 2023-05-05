@@ -91,3 +91,36 @@ new_handlers <- function(message = "taxa processing") {
         clear = FALSE
     ))
 }
+
+#' Locate the output file
+#' @param x One of "kraken_report", "mpa_report", "kraken_out",
+#'   "microbiome_out", "sckmer".
+#' @param sample An atomic character specifying sample names, will be used to
+#'   locate file since `SAHMI` use this to create output file name.
+#' @param dir Path to retuls directory.
+#' @return The path of x.
+#' @export 
+locate_path <- function(x, sample, dir = getwd()) {
+    locate_path_core(x, sample = sample, dir = dir)
+}
+
+define_path <- function(x, sample, dir = getwd()) {
+    x %||% locate_path_core(deparse(substitute(x)),
+        sample = sample, dir = dir
+    )
+}
+
+locate_path_core <- function(x, sample, dir = getwd()) {
+    x <- match.arg(x, c("kraken_report", "mpa_report", "kraken_out", "microbiome_out", "sckmer"))
+    file_path(dir, sample, ext = switch_ext(x))
+}
+
+switch_ext <- function(x) {
+    switch(x,
+        kraken_report = "kraken.report.txt",
+        mpa_report = "kraken.report.mpa.txt",
+        kraken_out = "kraken.output.txt",
+        microbiome_out = "microbiome.output.txt",
+        sckmer = "sckmer.txt"
+    )
+}

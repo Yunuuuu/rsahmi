@@ -4,15 +4,23 @@
 #' used to demultiplex the reads and create a barcode x taxa counts matrix. The
 #' full taxonomic classification of all resulting barcodes and the number of
 #' counts assigned to each clade are tabulated.
-#' @param taxa Taxa ids to extracted, can be a file, in which, the first column
-#'   will be extracted.
+#' @param taxa Taxa ids to extracted, can be a file, where the first column will
+#'   be extracted.
 #' @param n_filter Filter reads with `> n_filter` of one nucleotide.
 #' @inheritParams run_sckmer
 #' @importFrom parallelly availableCores
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL, out_dir = getwd(), cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
+taxa_counts <- function(fa1, fa2, taxa, kraken_report = NULL, mpa_report = NULL, sample = NULL, out_dir = getwd(), cb_len = 16L, umi_len = 10L, n_filter = 130L, cores = availableCores()) {
     sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
+    kraken_report <- define_path(kraken_report,
+        sample = sample,
+        dir = out_dir
+    )
+    mpa_report <- define_path(mpa_report,
+        sample = sample,
+        dir = out_dir
+    )
 
     # read in Fasta data -----------------------------------------
     reads <- ShortRead::readFasta(fa1)
@@ -41,7 +49,6 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
     barcode <- substr(sequences, 1L, cb_len)
     umi <- substr(sequences, cb_len + 1L, cb_len + umi_len)
     taxid <- gsub(".*taxid\\|", "", headers, perl = TRUE)
-    length(barcode)
 
     # prepare kraken report and mpa report data ------------------
     kr <- data.table::fread(kraken_report, header = FALSE, sep = "\t")[-c(1:2)]
@@ -97,7 +104,9 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
         , list(umi = sum(umi)),
         by = c("barcode", "taxid")
     ][order(-umi)]
-
+    if (!dir.exists(out_dir)) {
+        dir.create(out_dir, recursive = TRUE)
+    }
     data.table::fwrite(barcode_umi,
         file = file_path(out_dir, sample, ext = "all.barcodes.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE
@@ -131,12 +140,11 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
             tax <- tax[c("k", "p", "c", "o", "f", "g", "s"), on = "rank"]
             n <- nrow(tax)
             for (i in seq_len(n)) {
-                rank_i <- tax$rank[i]
                 .value. <- c(
                     rep_len(NA_character_, i - 1L),
                     rep_len(tax$name[i], n - i + 1L)
                 )
-                tax[, c(rank_i) := .value.]
+                tax[, (tax$rank[i]) := .value.]
             }
             p2()
             tax
@@ -149,8 +157,10 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
         data.table::rbindlist(tax_data, use.names = TRUE), # nolint
         by = "main_id"
     ][!is.na(name)] # nolint
+
+    cli::cli_alert("Quantifying microbes and creating the barcode-metagenome counts matrix")
     out <- merge(out, barcode_umi,
-        by = c(main_id = "taxid"),
+        by.x = "main_id", by.y = "taxid",
         allow.cartesian = TRUE
     )
     out[, main_id := NULL] # nolint
@@ -173,6 +183,7 @@ taxa_counts <- function(fa1, fa2, kraken_report, mpa_report, taxa, sample = NULL
         )
     )
     data.table::setorderv(out, c("taxid", "rank"))
+    cli::cli_alert_success("Quantifying done")
     data.table::fwrite(out,
         file = file_path(out_dir, sample, ext = "counts.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE

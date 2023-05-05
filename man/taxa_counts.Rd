@@ -7,9 +7,9 @@
 taxa_counts(
   fa1,
   fa2,
-  kraken_report,
-  mpa_report,
   taxa,
+  kraken_report = NULL,
+  mpa_report = NULL,
   sample = NULL,
   out_dir = getwd(),
   cb_len = 16L,
@@ -22,14 +22,14 @@ taxa_counts(
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
 \code{extract_microbiome}).}
 
-\item{kraken_report}{The path to kraken2uniq report
-(\emph{sample.kraken.report.txt}).}
+\item{taxa}{Taxa ids to extracted, can be a file, where the first column will
+be extracted.}
 
-\item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
-results.}
+\item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
+will locate \strong{sample.kraken.report.txt} in \code{out_dir}.}
 
-\item{taxa}{Taxa ids to extracted, can be a file, in which, the first column
-will be extracted.}
+\item{mpa_report}{The path to mpa style report, if \code{NULL},
+will locate \strong{sample.kraken.report.mpa.txt} in \code{out_dir}.}
 
 \item{sample}{A string, sample name, will be used to create output file name.}
 

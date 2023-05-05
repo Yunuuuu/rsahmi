@@ -6,17 +6,17 @@
 \usage{
 run_sckmer(
   fa1,
-  fa2,
-  kraken_report,
-  mpa_report,
-  microbiome_output,
+  fa2 = NULL,
+  kraken_report = NULL,
+  mpa_report = NULL,
+  microbiome_out = NULL,
   sample = NULL,
   out_dir = getwd(),
   ranks = c("G", "S"),
   cb_len = 16L,
   umi_len = 10L,
   host = 9606L,
-  nsample = Inf,
+  nsample = 1000L,
   kmer_len = 35L,
   min_frac = 0.5,
   cores = availableCores()
@@ -26,14 +26,15 @@ run_sckmer(
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
 \code{extract_microbiome}).}
 
-\item{kraken_report}{The path to kraken2uniq report
-(\emph{sample.kraken.report.txt}).}
+\item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
+will locate \strong{sample.kraken.report.txt} in \code{out_dir}.}
 
-\item{mpa_report}{A scalar logical indicates whethter reporting mpa-style
-results.}
+\item{mpa_report}{The path to mpa style report, if \code{NULL},
+will locate \strong{sample.kraken.report.mpa.txt} in \code{out_dir}.}
 
-\item{microbiome_output}{The path of microbiome output file (returned by
-\code{extract_microbiome}).}
+\item{microbiome_out}{The path of microbiome output file (returned by
+\link{extract_microbiome}). if \code{NULL}, will locate
+\strong{sample.microbiome.output.txt} in \code{out_dir}.}
 
 \item{sample}{A string, sample name, will be used to create output file name.}
 

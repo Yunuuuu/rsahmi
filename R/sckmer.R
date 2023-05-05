@@ -9,8 +9,9 @@
 #' barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers.
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
 #'   `extract_microbiome`).
-#' @param microbiome_output The path of microbiome output file (returned by
-#'   `extract_microbiome`).
+#' @param microbiome_out The path of microbiome output file (returned by
+#'   [extract_microbiome]). if `NULL`, will locate
+#'   __sample.microbiome.output.txt__ in `out_dir`.
 #' @param ranks Taxa ranks to analyze.
 #' @param cb_len Nucleutide length of cell barcodes
 #' @param umi_len Nucleutide length of umis
@@ -19,37 +20,48 @@
 #' @param kmer_len Kraken kmer length.
 #' @param min_frac Minimum fraction of kmers directly assigned to taxid to use
 #'   read.
-#' @inheritParams run_kraken2
 #' @inheritParams extract_microbiome
+#' @inheritParams run_kraken2
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = Inf, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
+run_sckmer <- function(fa1, fa2 = NULL, kraken_report = NULL, mpa_report = NULL, microbiome_out = NULL, sample = NULL, out_dir = getwd(), ranks = c("G", "S"), cb_len = 16L, umi_len = 10L, host = 9606L, nsample = 1000L, kmer_len = 35L, min_frac = 0.5, cores = availableCores()) {
     sample <- sample %||% sub("_0*[12]?\\.fa$", "", basename(fa1), perl = TRUE)
+    kraken_report <- define_path(kraken_report,
+        sample = sample,
+        dir = out_dir
+    )
+    mpa_report <- define_path(mpa_report, sample = sample, dir = out_dir)
+    microbiome_out <- define_path(microbiome_out,
+        sample = sample,
+        dir = out_dir
+    )
 
     # read in fasta data -----------------------------------------------
     reads1 <- ShortRead::readFasta(fa1)
     sequences1 <- ShortRead::sread(reads1)
-    reads2 <- ShortRead::readFasta(fa2)
-    sequences2 <- ShortRead::sread(reads2)
 
-    headers <- ShortRead::id(reads1)
     barcode <- substr(sequences1, 1L, cb_len)
     umi <- substr(sequences1, cb_len + 1L, cb_len + umi_len)
-    id <- gsub("\\s.*", "", headers, perl = TRUE)
-
-    headers2 <- ShortRead::id(reads2)
-    id2 <- gsub("\\s.*", "", headers2, perl = TRUE)
+    # we use id to match data
+    id <- gsub("\\s.*", "", ShortRead::id(reads1), perl = TRUE)
 
     # only keep data in both sequence ----------------------------------
-    inter_id <- intersect(id, id2)
-    idx <- id %in% inter_id
-    sequences1 <- sequences1[idx]
-    sequences2 <- sequences2[id2 %in% inter_id]
-    barcode <- barcode[idx]
-    umi <- umi[idx]
-    id <- id[idx] # we use id to match data
+    if (!is.null(fa2)) {
+        reads2 <- ShortRead::readFasta(fa2)
+        sequences2 <- ShortRead::sread(reads2)
+        id2 <- gsub("\\s.*", "", ShortRead::id(reads2), perl = TRUE)
+        inter_id <- intersect(id, id2)
+        idx <- id %in% inter_id
+        sequences1 <- sequences1[idx]
+        barcode <- barcode[idx]
+        umi <- umi[idx]
+        id <- id[idx]
+        sequences2 <- sequences2[id2 %in% inter_id]
+    } else {
+        sequences2 <- NULL
+    }
 
-    # prepare kr, mpa and microbiome_output data ---------------------------
+    # prepare kr, mpa and microbiome_out data ---------------------------
     kr <- data.table::fread(kraken_report, header = FALSE, sep = "\t")[-c(1:2)]
     kr[, V8 := str_trim(gsub("[^[:alnum:]]+", " ", V8, perl = TRUE))] # nolint
 
@@ -67,30 +79,33 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, s
         ), "*")
     }, character(1L))]
     # mpa$taxid[1L] <- NA_character_
-    microbiome_output <- data.table::fread(microbiome_output,
+    microbiome_out <- data.table::fread(microbiome_out,
         header = FALSE, drop = 1L
     )
-    microbiome_output[
+    microbiome_out[
         , c("name", "taxid") := {
             x <- str_match(V3, "\\s*(.+)\\s*\\(taxid\\s*(\\d+)\\s*\\)") # nolint
             apply(x[, -1L, drop = FALSE], 2L, identity, simplify = FALSE)
         }
     ]
-    microbiome_output[, taxid := as.integer(taxid)] # nolint
+    microbiome_out[, taxid := as.integer(taxid)] # nolint
 
     # extract all necessary taxa -------------------------------------------
     tx <- setdiff(kr$V7[kr$V6 %in% ranks], host) # nolint
-    tx <- intersect(tx, microbiome_output$taxid)
+    tx <- intersect(tx, microbiome_out$taxid)
 
     # define kmer for each tx --------------------------------------------
     out <- define_kmer(
         taxa_vec = tx, mpa_report = mpa,
-        microbiome_output = microbiome_output,
+        microbiome_out = microbiome_out,
         host = host, id = id, barcode = barcode, umi = umi,
         sequences1 = sequences1, sequences2 = sequences2,
         nsample = nsample, kmer_len = kmer_len, min_frac = min_frac,
         cores = cores
     )
+    if (!dir.exists(out_dir)) {
+        dir.create(out_dir, recursive = TRUE)
+    }
     data.table::fwrite(out,
         file = file_path(out_dir, sample, ext = "sckmer.txt"),
         sep = "\t", row.names = FALSE, col.names = TRUE
@@ -99,7 +114,7 @@ run_sckmer <- function(fa1, fa2, kraken_report, mpa_report, microbiome_output, s
 }
 utils::globalVariables(c("V8", "taxid", "V1", "V3"))
 
-define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barcode, umi, sequences1, sequences2, nsample, kmer_len, min_frac, cores) {
+define_kmer <- function(taxa_vec, mpa_report, microbiome_out, host, id, barcode, umi, sequences1, sequences2, nsample, kmer_len, min_frac, cores) {
     cli::cli_alert("Defining kmer for {.val {length(taxa_vec)}} taxa")
     old_handlers <- new_handlers()
     on.exit(progressr::handlers(old_handlers))
@@ -107,6 +122,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
     on.exit(future::plan(old_plan), add = TRUE)
     p <- progressr::progressor(along = taxa_vec, auto_finish = TRUE)
     barcode_kmer_list <- future.apply::future_lapply(taxa_vec, function(taxa) {
+        # we will exit this function in the median of the process
+        # so we update progress in the beginning
+        p()
         full_taxa <- grep(paste0("\\*", taxa, "\\*"),
             mpa_report$taxid, # nolint
             perl = TRUE, value = TRUE
@@ -128,7 +146,7 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
         ))
 
         # extract output data ------------------------------------------
-        taxa_out <- microbiome_output[taxid %in% child_taxa] # nolint
+        taxa_out <- microbiome_out[taxid %in% child_taxa] # nolint
         taxa_out[, c("r1", "r2") := data.table::tstrsplit(V5, # nolint
             split = "|:|", fixed = TRUE
         )]
@@ -143,9 +161,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                 sum(.idx, na.rm = TRUE) > 0L
             }
         }]
-        taxa_out[, c("r1", "r2") := lapply(.SD, trimws, # nolint
-            which = "both", whitespace = "[\\h\\v]"
-        ), .SDcols = c("r1", "r2")]
+        taxa_out[, c("r1", "r2") := lapply(.SD, str_trim), # nolint
+            .SDcols = c("r1", "r2")
+        ]
 
         if (nrow(taxa_out) == 0L) {
             return(NULL)
@@ -178,6 +196,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                 r1 = taxa_sequences1,
                 r2 = taxa_sequences2
             )
+            if (all(is.na(mate_seq)) || is.null(mate_seq)) {
+                return(NULL)
+            }
             barcode_data <- .mapply(function(pair, sequence, barcode) {
                 if (length(pair) == 0L) {
                     return(NULL)
@@ -196,7 +217,7 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
                 )]
                 res[, nt_len := nt_end - nt_start + 1L] # nolint
                 res <- res[taxid %in% c(0L, full_taxa)] # nolint
-                if (nrow(res) == 0L || sum(res$fkmer, na.rm = TRUE) < min_frac) {
+                if (nrow(res) == 0L || is.na(sequence) || sum(res$fkmer, na.rm = TRUE) < min_frac) {
                     return(NULL)
                 }
                 # calculate kmer
@@ -222,11 +243,9 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_output, host, id, barco
             data.table::rbindlist(barcode_data, use.names = FALSE)
         })
         out_data <- data.table::rbindlist(out_list, use.names = FALSE)
-        out_data[, list(kmer = length(k), uniq = length(unique(k))), # nolint
-            by = c("barcode", "taxid")
-        ]
-        p()
-        out_data
+        out_data[, list(
+            kmer = length(k), uniq = length(unique(k)) # nolint
+        ), by = c("barcode", "taxid")]
     })
     data.table::rbindlist(barcode_kmer_list, use.names = FALSE)
 }
