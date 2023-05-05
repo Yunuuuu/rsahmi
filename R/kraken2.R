@@ -140,7 +140,7 @@ report_mpa <- function(report, cmd = NULL, sample = NULL, out_dir = getwd(), sys
         file_path(out_dir, sample, ext = "kraken.report.mpa.txt"),
         "--intermediate-ranks"
     )
-    if (nzchar(Sys.which("python2")) == 1L && nzchar(Sys.which("python3")) == 0L) {
+    if (nzchar(Sys.which("python2")) && !nzchar(Sys.which("python3"))) {
         name <- "python2"
     } else {
         name <- "python3"

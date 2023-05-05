@@ -4,14 +4,13 @@
 
 run_command <- function(args = character(), cmd, name = NULL, sys_args = list(), verbose = TRUE) {
     if (!is.null(cmd)) {
-        if (!file.exists(cmd) &&
-            nzchar(Sys.which(cmd)) > 0L) {
+        if (!file.exists(cmd) && nzchar(Sys.which(cmd))) {
             cmd <- Sys.which(cmd)
         }
         cmd <- normalizePath(cmd, mustWork = TRUE)
     } else if (!is.null(name)) {
         cmd <- Sys.which(name)
-        if (nzchar(cmd) == 0L) {
+        if (!nzchar(cmd)) {
             cli::cli_abort("Cannot find {.field {name}} command")
         }
     }
