@@ -30,7 +30,7 @@ taxa_counts <- function(fa1, fa2, taxa, kraken_report = NULL, mpa_report = NULL,
         taxa <- data.table::fread(taxa, header = FALSE)[[1L]]
     }
     taxa <- as.integer(taxa)
-    taxa <- taxa[!is.na(taxa)]
+    taxa <- unique(taxa[!is.na(taxa)])
     # taxa_list <- split(taxa, ceiling(seq_along(taxa) / 2000L))
     # taxa_list <- lapply(taxa_list, function(tx) {
     #     paste0("\\*", tx, "\\*", collapse = "|")
