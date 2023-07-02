@@ -47,6 +47,7 @@ run_slsd <- function(kraken_reports, samples = NULL, method = "spearman", ..., m
                 method = method, ...
             )
             list(
+                rank = unique(rank),
                 r1 = min_vs_uniq$estimate,
                 r2 = min_vs_reads$estimate,
                 r3 = reads_vs_uniq$estimate,
