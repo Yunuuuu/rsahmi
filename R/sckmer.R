@@ -246,7 +246,7 @@ define_kmer <- function(taxa_vec, mpa_report, microbiome_out, host, id, barcode,
         out_data[, list(
             kmer = length(k), uniq = length(unique(k)) # nolint
         ), by = c("barcode", "taxid")]
-    })
+    }, future.packages = c("data.table"))
     data.table::rbindlist(barcode_kmer_list, use.names = FALSE)
 }
 utils::globalVariables(
