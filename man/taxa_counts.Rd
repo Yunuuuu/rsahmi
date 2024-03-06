@@ -20,7 +20,7 @@ taxa_counts(
 }
 \arguments{
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
-\code{extract_microbiome}).}
+\code{extract_microbiome}). We'll extract barcode sequence from \code{fa1}.}
 
 \item{taxa}{Taxa ids to extracted, can be a file, where the first column will
 be extracted.}

@@ -24,7 +24,7 @@ run_sckmer(
 }
 \arguments{
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
-\code{extract_microbiome}).}
+\code{extract_microbiome}). We'll extract barcode sequence from \code{fa1}.}
 
 \item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
 will locate \strong{sample.kraken.report.txt} in \code{out_dir}.}

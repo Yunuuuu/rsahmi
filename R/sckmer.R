@@ -8,7 +8,7 @@
 #' map outside the taxon's lineage are also discarded. The output is a table of
 #' barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers.
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
-#'   `extract_microbiome`).
+#'   `extract_microbiome`). We'll extract barcode sequence from `fa1`.
 #' @param microbiome_out The path of microbiome output file (returned by
 #'   [extract_microbiome]). if `NULL`, will locate
 #'   __sample.microbiome.output.txt__ in `out_dir`.

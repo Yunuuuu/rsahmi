@@ -10,7 +10,7 @@ ByteCompile: true
 Encoding: UTF-8
 OS_type: unix
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.0
 SystemRequirements: kraken2, Python2(or 3)
 Imports: 
     cli,
