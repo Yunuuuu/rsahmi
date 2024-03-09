@@ -1,5 +1,6 @@
 #' Running Kraken2
-#' @description 
+#'
+#' @description
 #' Metagenomic classification of paired-end reads from single-cell RNA
 #' sequencing fastq files can be performed using any k-mer based mapper that
 #' identifies a taxonomic ID for each k-mer and read. However, `SAHMI` is
@@ -13,21 +14,22 @@
 #' classifications, an MPA-style report, and raw sequencing fastq files with
 #' taxonomic classification for each read. Please see
 #' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown> for
-#' more details on installation and usage of Kraken2/KrakenUniq. 
+#' more details on installation and usage of Kraken2/KrakenUniq.
+#'
 #' @param fq1,fq2 Path to fastq 1 file.
 #' @param sample A string, sample name, will be used to create output file name.
 #' @param out_dir The path of output directory.
 #' @param ncbi_blast_path The path of ncbi-blastx.
 #' @param kraken2_db The path of kraken database.
 #' @param mpa_report A scalar logical indicates whethter reporting mpa-style
-#'   results. 
+#'   results.
 #' @param cores The number of cores to use.
 #' @param cmd The path of `kraken2` command.
 #' @param kraken2_args Other arguments passed to `kraken2`.
 #' @param python_cmd The path of `python2` or `python3`.
 #' @param sys_args Other arguments passed to [system2].
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
-#' @export 
+#' @export
 run_kraken2 <- function(fq1, fq2 = NULL, sample = NULL, out_dir = getwd(),
                         ncbi_blast_path = NULL, kraken2_db = NULL,
                         mpa_report = TRUE, cores = availableCores(),
