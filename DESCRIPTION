@@ -14,12 +14,10 @@ RoxygenNote: 7.3.0
 SystemRequirements: kraken2, Python2(or 3)
 Imports: 
     cli,
-    data.table (>= 1.14.9),
+    data.table (>= 1.15.0),
     future,
     future.apply,
     parallelly,
     progressr (>= 0.12.0),
     ShortRead
-Remotes:
-    Rdatatable/data.table
 Config/build/copy-method: link
