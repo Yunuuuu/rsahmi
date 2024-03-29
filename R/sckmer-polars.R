@@ -250,7 +250,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         pl$col("taxid", "kmer_len", "kmer_n_unique")
     )
 
-    # taxa counting by UMI ---------------------------------------
+    # prepare data for taxa counting by UMI ----------------------
     umi <- kreport$select(
         pl$col("taxids")$list$last()$alias("taxid"),
         pl$col("taxon")$list$last()$alias("taxa"),
