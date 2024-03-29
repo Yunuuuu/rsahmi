@@ -1,5 +1,5 @@
 #' Parse kraken report file
-#' 
+#'
 #' @param kraken_report The path to kraken report file.
 #' @param intermediate_ranks A bool indicates whether to include
 #' non-traditional taxonomic ranks in output.
@@ -60,7 +60,7 @@ parse_kraken_report <- function(kraken_report,
             # relocate columns -----------------------------
             select(
             "taxa", "taxid",
-            pl$col("phylogeny")$list$join("|"), 
+            pl$col("phylogeny")$list$join("|"),
             "percents", "reads"
         )
     }
@@ -114,20 +114,22 @@ parse_kreport_internal <- function(n, kreport, intermediate_ranks) {
         if (!is.null(prev_level) && actual_prev_level != prev_level) {
             report <- lapply(
                 report, .subset,
-                report$levels <= actual_prev_level
+                .subset2(row, "levels") <= actual_prev_level
             )
         }
         # add current items into report --------------
         for (nm in nms) {
-            report[[nm]] <- c(report[[nm]], row[[nm]])
+            report[[nm]] <- c(.subset2(report, nm), .subset2(row, nm))
         }
         if (!is.null(prev_level)) {
             # save current report --------------------
             if (intermediate_ranks ||
                 any(.subset2(row, "ranks") == kraken_main_ranks)) {
-                keep <- .subset2(row, "ranks") != "R" # don't use root species
+                # don't save root species
+                ranks <- .subset2(report, "ranks")
+                keep <- ranks != "R"
                 if (!intermediate_ranks) {
-                    keep <- keep & .subset2(row, "ranks") %in% kraken_main_ranks
+                    keep <- keep & ranks %in% kraken_main_ranks
                 }
                 reports[[i]] <- lapply(report, .subset, keep)
             }
@@ -140,6 +142,7 @@ parse_kreport_internal <- function(n, kreport, intermediate_ranks) {
     reports
 }
 
+# parse_kraken_report("kraken_report.txt")
 # waldo::compare(
 #     parse_kraken_report(kraken_report)$select(
 #         pl$col("classification")$list$join("|")$alias("column_1"),
