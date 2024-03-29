@@ -10,14 +10,13 @@ ByteCompile: true
 Encoding: UTF-8
 OS_type: unix
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.0
+RoxygenNote: 7.3.1
 SystemRequirements: kraken2, Python2(or 3)
 Imports: 
+    biosys (>= 0.0.0.9000),
     cli,
-    data.table (>= 1.15.0),
-    future,
-    future.apply,
-    parallelly,
-    progressr (>= 0.12.0),
+    polars,
     ShortRead
 Config/build/copy-method: link
+Remotes:  
+    Yunuuuu/biosys
