@@ -9,7 +9,6 @@
 #'    [sink_csv][polars::LazyFrame_sink_csv].
 #'  - `extract_kraken_reads`: Additional arguments passed to
 #'    [run][biosys::Execute] method.
-#' @export
 #' @name extract
 NULL
 
