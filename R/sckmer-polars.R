@@ -26,7 +26,7 @@
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
 #' @importFrom polars pl
-sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL, 
+sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                           cb_and_umi = function(sequence_id, read1, read2) {
                               lapply(
                                   strsplit(sequence_id, "_", fixed = TRUE),
@@ -104,7 +104,10 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     )
 
     # check read ----------------------------------------------------
-    read_nms <- setdiff(kout$columns, c("index", "name", "taxid", "sequence_id"))
+    read_nms <- setdiff(
+        kout$columns,
+        c("index", "name", "taxid", "sequence_id")
+    )
     if (length(read_nms) == 1L) {
         if (!is.null(fa2)) {
             cli::cli_warn(paste(
@@ -121,7 +124,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                 "since {.arg fa2} was not provided"
             ))
             read_nms <- "read1"
-            out <- kout$select(
+            kout <- kout$select(
                 pl$col("index", "name", "taxid", "sequence_id", read_nms)
             )
         }
@@ -251,7 +254,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     umi <- kreport$select(
         pl$col("taxids")$list$last()$alias("taxid"),
         pl$col("taxon")$list$last()$alias("taxa"),
-        pl$col("ranks")$list$last()$alias("rank"),
+        pl$col("ranks")$list$last()$alias("rank")
     )$join(
         kout$select(
             pl$col("cb")$alias("barcode"),
