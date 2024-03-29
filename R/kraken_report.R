@@ -144,12 +144,11 @@ parse_kreport_internal <- function(n, kreport, intermediate_ranks) {
 
 # parse_kraken_report("kraken_report.txt")
 # waldo::compare(
-#     parse_kraken_report(kraken_report)$select(
-#         pl$col("classification")$list$join("|")$alias("column_1"),
+#     rsahmi::parse_kraken_report(kraken_report, mpa = TRUE)$select(
+#         pl$col("phylogeny")$alias("column_1"),
 #         pl$col("reads")$alias("column_2")
 #     )$to_data_frame(),
-#     pl$read_csv(mpa_report, separator = "\t", has_header = FALSE)$
-#         to_data_frame()
+#     polars::pl$read_csv(mpa_report, separator = "\t", has_header = FALSE)$to_data_frame()
 # )
 # ✔ No differences
 kraken_main_ranks <- c("R", "K", "D", "P", "C", "O", "F", "G", "S")
