@@ -22,7 +22,7 @@ parse_kraken_report <- function(kraken_report,
             str$len_chars()$div(2L)$alias("levels"),
         # rename necessary columns
         pl$col("column_1")$str$strip_chars()$cast(pl$Float64)$alias("percents"),
-        pl$col("column_2")$alias("reads")$cast(pl$Int64)
+        pl$col("column_2")$alias("reads")
     )$
         collect()
 
@@ -30,7 +30,8 @@ parse_kraken_report <- function(kraken_report,
         parse_kreport_internal(
             kreport$height, kreport$to_list(), intermediate_ranks
         )
-    )
+    )$
+        with_columns(pl$col("reads")$cast(pl$List(pl$Int64)))
 
     if (mpa) {
         kreport <- kreport$select(
