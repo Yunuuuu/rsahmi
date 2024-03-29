@@ -261,7 +261,6 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 
 taxon_children <- function(kreport, taxon) {
     kreport$
-        filter(pl$col("taxids")$list$contains(taxon))$
         select(
         pl$col("taxids")$list$gather(
             pl$col("taxids")$list$eval(
