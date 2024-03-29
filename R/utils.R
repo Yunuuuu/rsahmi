@@ -1,28 +1,29 @@
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-run_command <- function(args = character(), cmd, name = NULL, sys_args = list(), verbose = TRUE) {
-    if (!is.null(cmd)) {
-        if (!file.exists(cmd) && nzchar(Sys.which(cmd))) {
-            cmd <- Sys.which(cmd)
-        }
-        cmd <- normalizePath(cmd, mustWork = TRUE)
-    } else if (!is.null(name)) {
-        cmd <- Sys.which(name)
-        if (!nzchar(cmd)) {
-            cli::cli_abort("Cannot find {.field {name}} command")
-        }
-    }
-    sys_args <- c(list(command = cmd, args = args), sys_args)
-    if (verbose) {
-        cli_args <- cli::cli_vec( # nolint
-            args,
-            list("vec-sep" = " ", "vec-last" = " ")
-        )
-        cli::cli_alert("Running command {.field {cmd} {cli_args}}")
-    }
-    do.call(system2, sys_args)
+is_scalar <- function(x) length(x) == 1L
+
+# mimic polars list methods --------------------------
+list_gather <- function(x, index, USE.NAMES = FALSE) {
+    mapply(.subset, x = x, i = index, USE.NAMES = USE.NAMES, SIMPLIFY = FALSE)
 }
 
+list_get <- function(x, index, USE.NAMES = FALSE) {
+    mapply(.subset, x = x, i = index, USE.NAMES = USE.NAMES)
+}
+
+list_last <- function(x, USE.NAMES = FALSE) {
+    mapply(.subset, x = x, i = lengths(x), USE.NAMES = USE.NAMES)
+}
+
+list_first <- function(x, USE.NAMES = FALSE) {
+    mapply(.subset, x = x, i = rep_len(1L, length(x)), USE.NAMES = USE.NAMES)
+}
+
+list_contains <- function(x, items) {
+    vapply(x, function(xx) any(xx %in% items), logical(1L))
+}
+
+######################################################
 column_to_rownames <- function(.data, var) {
     rownames(.data) <- as.character(.data[[var]])
     .data[[var]] <- NULL
@@ -47,36 +48,6 @@ new_handlers <- function(message = "taxa processing") {
         format_done = "Total time: {cli::pb_elapsed_clock}",
         clear = FALSE
     ))
-}
-
-# string utils -----------------------------------------------
-str_match <- function(string, pattern, ..., fixed = FALSE) {
-    out <- regmatches(
-        string,
-        regexec(
-            pattern = pattern, text = string,
-            perl = !fixed, ..., fixed = fixed
-        ),
-        invert = FALSE
-    )
-    out <- lapply(out, function(x) {
-        if (!length(x)) "" else x
-    })
-    out <- do.call("rbind", out)
-    out[out == ""] <- NA_character_
-    out
-}
-
-str_extract <- function(string, pattern, ..., fixed = FALSE) {
-    matches <- regexpr(pattern, string, perl = !fixed, ..., fixed = fixed)
-    start <- as.vector(matches)
-    end <- start + attr(matches, "match.length") - 1L
-    start[start == -1L] <- NA_integer_
-    substr(string, start, end)
-}
-
-str_trim <- function(string, which = "both") {
-    trimws(string, which = which, whitespace = "[\\h\\v]")
 }
 
 # file utils -----------------------------------------------
