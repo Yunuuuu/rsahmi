@@ -47,15 +47,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     # we get all operated taxon and their children
     # this is just used to filter kraken output data
     # otherwise, kraken output data will be very large
-    all_necessary_taxon <- kreport$
-        with_columns(
-        pl$col("taxids")$
-            list$eval(pl$arg_where(pl$element()$is_in(taxon))$min())$
-            explode()$alias("pos")
-    )$
-        filter(pl$col("pos")$is_not_null())$
-        select(pl$col("taxids")$list$slice(pl$col("pos")))$
-        to_series()$explode()$unique()
+    children_taxon <- taxon_children(kreport, taxon)
 
     # prepare taxid:kmer data ------------------------------------------
     kout <- pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
@@ -76,7 +68,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         # indicate the end of one read and the beginning of another.
         pl$col("column_5")$str$split("\\|:\\|")$alias("LCA")
     )$
-        filter(pl$col("taxid")$is_in(all_necessary_taxon))$
+        filter(pl$col("taxid")$is_in(children_taxon))$
         with_row_index("index")$
         explode("LCA")$ # all reads have been included in one column
         with_columns(
@@ -254,7 +246,8 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     umi <- kreport$select(
         pl$col("taxids")$list$last()$alias("taxid"),
         pl$col("taxon")$list$last()$alias("taxa"),
-        pl$col("ranks")$list$last()$alias("rank")
+        pl$col("ranks")$list$last()$alias("rank"),
+        pl$col("taxon")
     )$join(
         kout$select(
             pl$col("cb")$alias("barcode"),
@@ -266,19 +259,24 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     list(kmer = kmer, umi = umi)
 }
 
-kmer_query <- function(kout, kreport, read_nms, taxid, kmer_len, min_frac) {
-    lineage_taxon <- kreport$filter(pl$col("taxids")$list$contains(taxid))
-    child_taxon <- lineage_taxon$
-        select(
-        pl$col("taxids")$list$gather(
-            pl$col("taxids")$list$eval(
-                pl$arg_where(pl$element()$eq(taxid)$cum_sum()$gt(0L))
-            )
-        )
+taxon_children <- function(kreport, taxon) {
+    kreport$
+        with_columns(
+        pl$col("taxids")$
+            list$eval(pl$arg_where(pl$element()$is_in(taxon))$min())$
+            explode()$alias("pos")
     )$
+        filter(pl$col("pos")$is_not_null())$
+        select(pl$col("taxids")$list$slice(pl$col("pos")))$
         to_series()$explode()$unique()
-    lineage_taxon <- lineage_taxon$get_column("taxids")$
+}
+
+kmer_query <- function(kout, kreport, read_nms, taxid, kmer_len, min_frac) {
+    lineage_taxon <- kreport$filter(pl$col("taxids")$list$contains(taxid))$
+        get_column("taxids")$
         explode()$append("0")$unique()
+    child_taxon <- taxon_children(kreport, taxid)
+
     lazy_kout <- kout$lazy()$filter(pl$col("taxid")$is_in(child_taxon))
     out_list <- lapply(read_nms, function(read_nm) {
         cols <- c("cb", paste0(read_nm, "_sequence"))
