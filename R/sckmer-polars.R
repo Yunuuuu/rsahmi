@@ -266,9 +266,10 @@ taxon_children <- function(kreport, taxon) {
             pl$col("taxids")$list$eval(
                 pl$arg_where(pl$element()$is_in(taxon)$cum_sum()$gt(0L))
             )
-        )
+        )$explode()
     )$
-        to_series()$explode()$unique()
+        filter(pl$col("taxids")$is_not_null())$
+        to_series()$unique()
 }
 
 kmer_query <- function(kout, kreport, read_nms, taxid, kmer_len, min_frac) {
