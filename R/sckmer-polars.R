@@ -261,20 +261,21 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 
 taxon_children <- function(kreport, taxon) {
     kreport$
-        with_columns(
-        pl$col("taxids")$
-            list$eval(pl$arg_where(pl$element()$is_in(taxon))$min())$
-            explode()$alias("pos")
+        filter(pl$col("taxids")$list$contains(taxon))$
+        select(
+        pl$col("taxids")$list$gather(
+            pl$col("taxids")$list$eval(
+                pl$arg_where(pl$element()$is_in(taxon)$cum_sum()$gt(0L))
+            )
+        )
     )$
-        filter(pl$col("pos")$is_not_null())$
-        select(pl$col("taxids")$list$slice(pl$col("pos")))$
         to_series()$explode()$unique()
 }
 
 kmer_query <- function(kout, kreport, read_nms, taxid, kmer_len, min_frac) {
-    lineage_taxon <- kreport$filter(pl$col("taxids")$list$contains(taxid))$
-        get_column("taxids")$
-        explode()$append("0")$unique()
+    lineage_taxon <- kreport$
+        filter(pl$col("taxids")$list$contains(taxid))$
+        get_column("taxids")$explode()$append("0")$unique()
     child_taxon <- taxon_children(kreport, taxid)
 
     lazy_kout <- kout$lazy()$filter(pl$col("taxid")$is_in(child_taxon))
