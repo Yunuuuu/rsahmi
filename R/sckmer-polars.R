@@ -225,7 +225,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         .progress = list(
             name = "Defining kmer",
             format = paste(
-                "{cli::pb_name} {cli::pb_bar} {cli::pb_current}",
+                "{cli::pb_bar} {cli::pb_current}",
                 "{cli::pb_total} [{cli::pb_rate}] | {cli::pb_eta_str}",
                 sep = "/"
             ),
