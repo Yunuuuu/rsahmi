@@ -1,199 +1,106 @@
-#' Extract Microbiome reads and Kraken output
-#' @param fq1,fq2 The path to the classified microbiome fastq file (returned by
-#' `run_kraken2`).
-#' @param kraken_out The path to kraken output file, if `NULL`, will locate
-#'   __sample.kraken.output.txt__ in `out_dir`.
-#' @param kraken_report The path to kraken2uniq report, if `NULL`,
-#'   will locate __sample.kraken.report.txt__ in `out_dir`.
-#' @param mpa_report The path to mpa style report, if `NULL`,
-#'   will locate __sample.kraken.report.mpa.txt__ in `out_dir`.
-#' @param microbiome_pattern Perl regex patterns to match the bacteria
-#'   microbiome.
-#' @param ntaxid Number of taxids to extract at a time.
-#' @inheritParams run_kraken2
-#' @param ... Other arguments passed to [grepl].
-#' @seealso <https://github.com/sjdlabgroup/SAHMI>
+#' Extract reads and output from Kraken
+#'
+#' @param kraken_out The path to kraken output file.
+#' @param kraken_report The path to kraken report file.
+#' @param reads The original fastq files (input in `kraken2`).
+#' @param pattern Regex patterns to match.
+#' @param ...
+#'  - `extract_kraken_output`: Additional arguments passed to
+#'    [sink_csv][polars::LazyFrame_sink_csv].
+#'  - `extract_kraken_reads`: Additional arguments passed to
+#'    [run][biosys::Execute] method.
 #' @export
-extract_microbiome <- function(fq1, fq2 = NULL, kraken_out = NULL, kraken_report = NULL, mpa_report = NULL, out_dir = getwd(), sample = NULL, microbiome_pattern = "(?i)Bacteria|Fungi|Viruses", ntaxid = 8000L, ..., sys_args = list()) {
-    sample <- sample %||% sub("_0*[12]?\\.(fastq|fq)(\\.gz)?$", "",
-        basename(fq1),
-        perl = TRUE
+#' @name extract
+NULL
+
+# pak::repo_add("https://rpolars.r-universe.dev")
+# pak::pkg_install("https://github.com/pola-rs/r-polars/releases/latest/download/polars__x86_64-pc-linux-gnu.gz")
+# pak::pkg_install("pola-rs/r-polars")
+# pip install --user umi_tools
+# `sudo apt purge cargo` or
+# `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+#' @param taxon An atomic character specify
+#' @export
+#' @rdname extract
+#' @importFrom polars pl
+extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "d__Viruses")) {
+    parse_kraken_report(kraken_report)$
+        filter(pl$col("taxon")$list$contains(taxon))$
+        select(pl$col("taxids")$list$last())$
+        to_series()$cast(pl$String)
+}
+
+#' @export
+#' @rdname extract
+#' @importFrom polars pl
+extract_kraken_output <- function(kraken_out, taxids,
+                                  ofile = "kraken_microbiome_output.txt",
+                                  odir = getwd(), ...) {
+    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
+    # take care of taxid: "A"
+    if (taxids$is_in(pl$Series(c("81077", "A")))$any()) {
+        taxids <- taxids$append(c("81077", "A"))
+    }
+    pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
+        filter(
+        pl$col("column_3")$str$
+            extract(pl$lit("\\s*(.+)\\s*\\(taxid\\s*(\\d+|A)\\s*\\)"), 2L)$
+            is_in(taxids)
+    )$
+        sink_csv(
+        path = file.path(odir, ofile),
+        include_header = FALSE,
+        separator = "\t", ...
     )
-    kraken_out <- define_path(kraken_out, sample = sample, dir = out_dir)
-    kraken_report <- define_path(kraken_report,
-        sample = sample,
-        dir = out_dir
-    )
-    mpa_report <- define_path(mpa_report,
-        sample = sample,
-        dir = out_dir
-    )
-    if (!is.null(fq2)) {
-        if (fq1 == fq2) {
-            cli::cli_abort("{.arg fq1} and {.arg fq2} must be different.")
+}
+
+#' @export
+#' @rdname extract
+#' @importFrom polars pl
+extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
+                                 odir = getwd(), threads = NULL,
+                                 ..., seqkit = NULL) {
+    if (length(reads) < 1L || length(reads) > 2L) {
+        cli::cli_abort("{.arg reads} must be of length 1 or 2")
+    }
+    if (is.null(ofile)) {
+        if (is_scalar(reads)) {
+            ofile <- "kraken_microbiome_reads.fa"
+        } else {
+            ofile <- sprintf("kraken_microbiome_reads_%d.fa", seq_along(reads))
         }
+    } else if (length(ofile) != length(reads)) {
+        cli::cli_abort("{.arg ofile} must have the same length of {.arg reads}")
     }
-    taxid <- get_taxid(
-        kraken_report = kraken_report,
-        mpa_report = mpa_report,
-        microbiome_pattern = microbiome_pattern,
-        ...
-    )
-    if (!dir.exists(out_dir)) {
-        dir.create(out_dir, recursive = TRUE)
-    }
-    out_dir <- normalizePath(out_dir, mustWork = TRUE)
-    microbiome_kraken_out(
-        kraken_out = kraken_out,
-        taxid = taxid, ntaxid = ntaxid,
-        out_dir = out_dir,
-        sample = sample,
-        sys_args = sys_args
-    )
-    fq_files <- list(fq1 = fq1, fq2 = fq2)
-    for (i in names(fq_files)) {
-        fq <- fq_files[[i]]
-        if (is.null(fq)) next
-        cli::cli_alert("Extracting microbiome reads for {.arg {i}}")
-        microbiome_reads(
-            fq = fq, taxid = taxid,
-            ntaxid = ntaxid,
-            out_dir = out_dir,
-            sys_args = sys_args
+    file <- tempfile("kraken_ids")
+    pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
+        # second column is the sequence id
+        select(pl$col("column_2"))$unique()$
+        sink_csv(path = file, include_header = FALSE, separator = "\t")
+    on.exit(file.remove(file))
+    for (i in seq_along(reads)) {
+        extract_sequence_id(
+            fq = reads[[i]], ofile = ofile[[i]], ...,
+            threads = threads, seqkit = seqkit
         )
     }
 }
-utils::globalVariables(c("r", "V1", "row_ids", "h"))
 
-microbiome_kraken_out <- function(kraken_out, taxid, out_dir, sample = NULL, ntaxid = 8000L, sys_args = list()) {
-    taxid_list <- split(taxid, ceiling(seq_along(taxid) / ntaxid))
-
-    out_file <- file_path(out_dir, sample, ext = "microbiome.output.txt")
-    if (file.exists(out_file)) file.remove(out_file)
-
-    # extract microbiomme output -----------------------------------
-    kraken_out <- normalizePath(kraken_out, mustWork = TRUE)
-    out_file <- normalizePath(out_file, mustWork = FALSE)
-    cli::cli_alert("Extracting microbiome kraken2 output")
-    cli::cli_progress_bar(
-        total = length(taxid_list),
-        format = "{cli::pb_spin} Extracting kraken2 output | {cli::pb_current}/{cli::pb_total}",
-        format_done = "Total time: {cli::pb_elapsed_clock}",
-        clear = FALSE, auto_terminate = FALSE
-    )
-    for (i in seq_along(taxid_list)) {
-        taxid <- paste0("(taxid ", taxid_list[[i]], ")", collapse = "\\|")
-        run_command(
-            args = c(
-                sprintf("-w %s", shQuote(taxid)),
-                kraken_out, ">>",
-                out_file
-            ),
-            cmd = NULL,
-            name = "grep",
-            sys_args = sys_args,
-            verbose = FALSE
+extract_sequence_id <- function(fq, ofile, ..., threads, seqkit) {
+    biosys::seqkit("seq", "--only-id", fq, seqkit = seqkit)$
+        pipe(
+        biosys::seqkit(
+            "grep", biosys::arg("-f", file),
+            if (!is.null(threads)) {
+                biosys::arg("--threads", threads, format = "%d")
+            },
+            "-n",
+            seqkit = seqkit
         )
-        cli::cli_progress_update()
-    }
-    cli::cli_process_done()
-}
-
-#' @param fq Path to the classified microbiome fastq file
-#' @noRd
-microbiome_reads <- function(fq, taxid, out_dir, ntaxid = 8000L, sys_args = list()) {
-    taxid_list <- split(taxid, ceiling(seq_along(taxid) / ntaxid))
-    line_number_file <- tempfile("line_number_", fileext = ".txt")
-    if (file.exists(line_number_file)) {
-        file.remove(line_number_file)
-    }
-    file.create(line_number_file)
-    on.exit(file.remove(line_number_file))
-
-    line_number_file <- normalizePath(line_number_file, mustWork = TRUE)
-    fq <- normalizePath(fq, mustWork = TRUE)
-    cli::cli_alert("Finding reads")
-    cli::cli_progress_bar(
-        total = length(taxid_list),
-        format = "{cli::pb_spin} Finding reads | {cli::pb_current}/{cli::pb_total}",
-        format_done = "Total time: {cli::pb_elapsed_clock}",
-        clear = FALSE, auto_terminate = FALSE
-    )
-    for (i in seq_along(taxid_list)) {
-        taxid <- paste0("taxid|", taxid_list[[i]], collapse = "\\|")
-        run_command(
-            args = c(
-                "-wn", shQuote(taxid), fq, "|",
-                "grep -Eo", shQuote("^[^:]+"), ">>",
-                line_number_file
-            ),
-            cmd = NULL, name = "grep",
-            sys_args = sys_args,
-            verbose = FALSE
-        )
-        cli::cli_progress_update()
-    }
-    cli::cli_process_done()
-
-    data <- data.table::fread(
-        line_number_file,
-        header = FALSE, sep = "\t",
-        select = 1L
-    )
-    data[, r := V1 + 1L] # nolint
-    data.table::setnames(data, c("h", "r"))
-    data[, row_ids := seq_along(h)] # nolint
-    data <- data.table::melt(
-        data,
-        id.vars = "row_ids",
-        measure.vars = c("h", "r"),
-        variable.name = "name",
-        value.name = "value",
-        variable.factor = FALSE
-    )
-    data.table::setorderv(data, c("row_ids", "name"), na.last = TRUE)
-    data.table::fwrite(data[, "value"],
-        file = line_number_file,
-        sep = "\t",
-        row.names = FALSE,
-        col.names = FALSE
-    )
-
-    cli::cli_alert("Extracting reads")
-    out_file <- sub("\\.fq$", "", basename(fq), perl = TRUE)
-    out_file <- file_path(out_dir, out_file, ext = "fa")
-    run_command(
-        c(
-            shQuote("NR==FNR { lines[$1]; next } (FNR in lines)"),
-            line_number_file, fq, ">", out_file
-        ),
-        cmd = NULL,
-        name = "gawk"
-    )
-    run_command(
-        c("-i", shQuote("s/@/>/g"), out_file),
-        cmd = NULL, name = "sed"
-    )
-    cli::cli_alert_success("Extracting reads Done")
-}
-
-get_taxid <- function(kraken_report, mpa_report, microbiome_pattern, ...) {
-    kr <- data.table::fread(
-        kraken_report,
-        sep = "\t",
-        header = FALSE,
-        select = 7L
-    )[-c(1:2)]
-    mpa <- data.table::fread(
-        mpa_report,
-        sep = "\t",
-        header = FALSE,
-        select = 1L
-    )
-
-    # get matched taxid
-    taxid <- kr[[1L]][
-        grepl(microbiome_pattern, mpa[[1L]], perl = TRUE, ...)
-    ]
-    taxid[!is.na(taxid)]
+    )$
+        pipe(
+        biosys::seqkit("fq2fa", biosys::arg("-o", ofile), seqkit = seqkit)
+    )$
+        run(...)
 }
