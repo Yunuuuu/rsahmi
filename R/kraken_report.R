@@ -22,7 +22,7 @@ parse_kraken_report <- function(kraken_report,
             str$len_chars()$div(2L)$alias("levels"),
         # rename necessary columns
         pl$col("column_1")$str$strip_chars()$cast(pl$Float64)$alias("percents"),
-        pl$col("column_2")$alias("reads")
+        pl$col("column_2")$alias("reads")$cast(pl$Int64)
     )$
         collect()
 
@@ -114,7 +114,7 @@ parse_kreport_internal <- function(n, kreport, intermediate_ranks) {
         if (!is.null(prev_level) && actual_prev_level != prev_level) {
             report <- lapply(
                 report, .subset,
-                .subset2(row, "levels") <= actual_prev_level
+                .subset2(report, "levels") <= actual_prev_level
             )
         }
         # add current items into report --------------
