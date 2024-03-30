@@ -40,7 +40,7 @@ taxa_counts <- function(umi, taxids = NULL, kraken_report = NULL) {
         #     pl$col("taxon")$list$slice(0L, length = pl$col("taxon_len"))
         # )$
         #     drop("^.+_len$")$
-        #     with_row_index("index")$
+        with_row_index("index")$
         explode(pl$col("ranks", "taxon"))$
         with_columns(
         # A rank code, indicating (U)nclassified, (R)oot, (D)omain,
@@ -64,9 +64,10 @@ taxa_counts <- function(umi, taxids = NULL, kraken_report = NULL) {
         collect()$
         pivot(
         values = "taxon",
-        index = c("barcode", "taxid", "taxa", "rank", "umi"),
+        index = c("index", "barcode", "taxid", "taxa", "rank", "umi"),
         columns = "ranks"
-    )
+    )$
+        drop("index")
     # relocate columns ----------------------------
     cs <- list(pl$col("barcode", "taxid", "taxa", "rank"))
     columns <- counts$columns
