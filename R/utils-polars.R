@@ -6,7 +6,7 @@
 polars_lapply <- function(.x, .fn, ..., .progress, .threads = 2L) {
     # .threads <- min(as.integer(.threads), pl$thread_pool_size())
     poos_size <- max(.threads, 1L)
-    n <- length(.x)
+    n <- .x$len()
     bar <- do.call(cli::cli_progress_bar, c(
         .progress, list(total = n, clear = FALSE)
     ))
