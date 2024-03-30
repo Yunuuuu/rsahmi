@@ -10,8 +10,8 @@ sckmer_polars(
   kraken_out,
   fa2 = NULL,
   cb_and_umi = function(sequence_id, read1, read2) {
-     lapply(strsplit(sequence_id,
-    "_", fixed = TRUE), `[`, 2:3)
+     list(substring(read1, 1L, 16L),
+    substring(read1, 17L, 28L))
  },
   ranks = c("G", "S"),
   kmer_len = 35L,
@@ -22,7 +22,7 @@ sckmer_polars(
 }
 \arguments{
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
-\code{extract_kraken_reads}).}
+\link{extract_kraken_reads}).}
 
 \item{kraken_report}{The path to kraken report file.}
 
@@ -30,8 +30,8 @@ sckmer_polars(
 filtered with \link{extract_kraken_output}.}
 
 \item{cb_and_umi}{A function takes sequence id, read1, read2 and return a
-list of the same of the input, each have two elements correspond to cell
-barcode and UMI respectively.}
+list of 2 corresponding to cell barcode and UMI respectively., each should
+have the same length of the input.}
 
 \item{ranks}{Taxa ranks to analyze.}
 
@@ -52,6 +52,18 @@ identifier (UMI) are used to identify unique barcodes and reads. Data is
 reported for taxa of pre-specified ranks (default genus + species) taking
 into account all subsequently higher resolution ranks. The output is a table
 of barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers.
+}
+\examples{
+# for sequence from umi-tools, we can use following function
+cb_and_umi <- function(sequence_id, read1, read2) {
+    out <- lapply(
+        strsplit(sequence_id, "_", fixed = TRUE),
+        `[`, 2:3
+    )
+    lapply(1:2, function(i) {
+        vapply(out, function(o) as.character(.subset2(o, i)), character(1L))
+    })
+}
 }
 \seealso{
 \url{https://github.com/sjdlabgroup/SAHMI}

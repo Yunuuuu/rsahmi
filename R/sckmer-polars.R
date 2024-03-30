@@ -8,13 +8,13 @@
 #' of barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers.
 #'
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
-#'   `extract_kraken_reads`).
+#'   [extract_kraken_reads]).
 #' @inheritParams extract
 #' @param kraken_out The path of microbiome output file. Usually should be
 #'   filtered with [extract_kraken_output].
 #' @param cb_and_umi A function takes sequence id, read1, read2 and return a
-#' list of the same of the input, each have two elements correspond to cell
-#' barcode and UMI respectively.
+#' list of 2 corresponding to cell barcode and UMI respectively., each should
+#' have the same length of the input.
 #' @param ranks Taxa ranks to analyze.
 #' @param exclude A character of taxid to exclude, for `SAHMI`, the host taxid.
 #' Reads with any k-mers mapped to the `exclude` are discarded.
@@ -24,13 +24,24 @@
 #' read. Reads with `<=min_frac` of the k-mers map inside the taxon's lineage
 #' are also discarded.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
+#' @examples
+#' # for sequence from umi-tools, we can use following function
+#' cb_and_umi <- function(sequence_id, read1, read2) {
+#'     out <- lapply(
+#'         strsplit(sequence_id, "_", fixed = TRUE),
+#'         `[`, 2:3
+#'     )
+#'     lapply(1:2, function(i) {
+#'         vapply(out, function(o) as.character(.subset2(o, i)), character(1L))
+#'     })
+#' }
 #' @export
 #' @importFrom polars pl
 sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                           cb_and_umi = function(sequence_id, read1, read2) {
-                              lapply(
-                                  strsplit(sequence_id, "_", fixed = TRUE),
-                                  `[`, 2:3
+                              list(
+                                  substring(read1, 1L, 16L),
+                                  substring(read1, 17L, 28L)
                               )
                           },
                           ranks = c("G", "S"), kmer_len = 35L,
@@ -66,7 +77,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
             alias("taxid"),
         # Note that paired read data will contain a "|:|" token in this list to
         # indicate the end of one read and the beginning of another.
-        pl$col("column_5")$str$split("\\|:\\|")$alias("LCA")
+        pl$col("column_5")$str$split("|:|")$alias("LCA")
     )$
         filter(pl$col("taxid")$is_in(children_taxon))$
         with_row_index("index")$
@@ -81,7 +92,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         # the next 31: k-mers contained an ambiguous nucleotide
         # the next k-mer was not in the database
         # the last 3 k-mers mapped to taxonomy ID #562
-        pl$col("LCA")$str$strip_chars(), # $str$split(" "),
+        pl$col("LCA")$str$strip_chars(),
         pl$concat_str(
             pl$lit("read"),
             pl$int_range(end = pl$len())$over("index")$add(1L)$cast(pl$String),
@@ -137,7 +148,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         group_by("index", "name", "taxid", "sequence_id", read_nms,
         maintain_order = FALSE
     )$
-        agg(pl$col("^.+_kmer$", "^.+_taxid$")$implode())$
+        agg(pl$col("^.+_kmer$", "^.+_taxid$"))$
         explode(pl$col("^.+_kmer$", "^.+_taxid$"))$
         with_columns(
         pl$col("^.+_kmer$")$list$
@@ -183,29 +194,30 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 
     # extract cell barcode and umi -----------------------------------
     cb_and_umi <- cb_and_umi(ids, read1, read2)
-    if (length(cb_and_umi) != length(ids)) {
+    if (length(cb_and_umi) != 2L) {
         cli::cli_abort(c(
-            "{.code length(cb_and_umi) == length(sequence_id)} is not {.code TRUE}",
-            i = "{.fn cb_and_umi} must return cell barcode and umi for each reads"
+            "{.code length(cb_and_umi) == 2L} is not {.code TRUE}",
+            i = "{.fn cb_and_umi} must return a list of length 2"
         ))
-    } else if (!all(lengths(cb_and_umi) == 2L)) {
+    } else if (!all(lengths(cb_and_umi) == length(ids))) {
         cli::cli_abort(c(
-            "{.code all(lengths(cb_and_umi) == 2)} is not {.code TRUE}",
-            i = "{.fn cb_and_umi} must return cell barcode and umi for each reads"
+            paste(
+                "{.code all(lengths(cb_and_umi) == length(sequence_id))}",
+                "is not {.code TRUE}"
+            ),
+            i = paste(
+                "{.fn cb_and_umi} must return cell barcode and umi",
+                "for each reads"
+            )
         ))
     }
 
-    cb_and_umi <- lapply(1:2, function(i) {
-        vapply(cb_and_umi, function(o) {
-            as.character(.subset2(o, i))
-        }, character(1L))
-    })
-
     # integrate sequence, cell barcode and umi ----------------------
-    kout <- kout$
-        with_columns(read1_sequence = pl$Series(values = as.character(read1)))
+    kout <- kout$with_columns(
+        read1_sequence = pl$Series(values = as.character(read1))
+    )
     if (!is.null(fa2)) {
-        out <- kout$with_columns(
+        kout <- kout$with_columns(
             read2_sequence = pl$Series(values = as.character(read2))
         )
     }
@@ -259,8 +271,7 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 }
 
 taxon_children <- function(kreport, taxon) {
-    kreport$
-        select(
+    kreport$select(
         pl$col("taxids")$list$gather(
             pl$col("taxids")$list$eval(
                 pl$arg_where(pl$element()$is_in(taxon)$cum_sum()$gt(0L))
