@@ -76,5 +76,5 @@ taxa_counts <- function(umi, taxids = NULL, kraken_report = NULL) {
             cs <- c(cs, list(pl$col(pattern)))
         }
     }
-    counts$select(cs, pl$col("umi")$alias("counts"))
+    counts$select(c(cs, list(pl$col("umi")$alias("counts"))))
 }
