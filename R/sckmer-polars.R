@@ -149,7 +149,6 @@ sckmer_polars <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         maintain_order = FALSE
     )$
         agg(pl$col("^.+_kmer$", "^.+_taxid$"))$
-        explode(pl$col("^.+_kmer$", "^.+_taxid$"))$
         with_columns(
         pl$col("^.+_kmer$")$list$
             eval(pl$element()$div(pl$element()$sum()$cast(pl$Float64)))$
