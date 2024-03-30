@@ -51,14 +51,21 @@ sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     exclude <- pl$Series(values = exclude)$cast(pl$String)
 
     # extract operated taxon -----------------------------------------
-    taxon <- kreport$filter(pl$col("ranks")$list$last()$is_in(ranks))$
-        select(pl$col("taxids")$list$last()$alias("taxid"))$
+    taxon_struct <- kreport$filter(pl$col("ranks")$list$last()$is_in(ranks))$
+        select(
+        pl$col("taxids")$list$last()$alias("taxid"),
+        pl$col("taxon")$list$last()$alias("taxa")
+    )$
         filter(pl$col("taxid")$is_in(exclude)$not())$
-        to_series()
+        to_struct()
+
     # we get all operated taxon and their children
     # this is just used to filter kraken output data
     # otherwise, kraken output data will be very large
-    children_taxon <- taxon_children(kreport, taxon)
+    children_taxon <- taxon_children(
+        kreport,
+        taxon_struct$struct$field("taxid")
+    )
 
     # prepare taxid:kmer data ------------------------------------------
     kout <- pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
@@ -189,7 +196,11 @@ sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     if (!is.null(fa2)) read2 <- read2[match(ids, id2)]
 
     # for operated taxon, we also remove items not in kraken output
-    taxon <- taxon$filter(taxon$is_in(kout$get_column("taxid")))$unique()
+    taxon_struct <- taxon_struct$
+        filter(
+        taxon_struct$struct$field("taxid")$is_in(kout$get_column("taxid"))
+    )$
+        unique()
 
     # extract cell barcode and umi -----------------------------------
     cb_and_umi <- cb_and_umi(ids, read1, read2)
@@ -229,7 +240,7 @@ sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 
     # define kmer ---------------------------------------------------
     kmer_list <- polars_lapply(
-        taxon, kmer_query,
+        taxon_struct, kmer_query,
         kout = kout, kreport = kreport,
         read_nms = read_nms, kmer_len = kmer_len,
         min_frac = min_frac,
@@ -250,7 +261,7 @@ sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     kmer <- pl$concat(kmer_list, how = "vertical")$
         select(
         pl$col("cb")$alias("barcode"),
-        pl$col("taxid", "kmer_len", "kmer_n_unique")
+        pl$col("taxid", "taxa", "kmer_len", "kmer_n_unique")
     )
 
     # prepare data for taxa counting by UMI ----------------------
@@ -281,7 +292,9 @@ taxon_children <- function(kreport, taxon) {
         to_series()$unique()
 }
 
-kmer_query <- function(kout, kreport, read_nms, taxid, kmer_len, min_frac) {
+kmer_query <- function(kout, kreport, read_nms, taxa_struct, kmer_len, min_frac) {
+    taxa <- taxa_struct$struct$field("taxa")
+    taxid <- taxa_struct$struct$field("taxid")
     lineage_report <- kreport$filter(pl$col("taxids")$list$contains(taxid))
     child_taxon <- taxon_children(lineage_report, taxid)
     lineage_taxon <- lineage_report$
@@ -334,6 +347,6 @@ kmer_query <- function(kout, kreport, read_nms, taxid, kmer_len, min_frac) {
         pl$col("kmer")$len()$alias("kmer_len"),
         pl$col("kmer")$n_unique()$alias("kmer_n_unique")
     )$
-        with_columns(taxid = taxid)$
+        with_columns(taxid = taxid, taxa = taxa)$
         collect(collect_in_background = TRUE)
 }
