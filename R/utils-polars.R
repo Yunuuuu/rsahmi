@@ -39,7 +39,7 @@ polars_lapply <- function(.x, .fn, ..., .progress, .threads = 2L) {
 
                 # this pool has been released, so we directly
                 # step into next cycle and re-use this pool
-                if (i <= n) next
+                next
             }
         }
 
