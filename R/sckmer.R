@@ -38,15 +38,15 @@
 #' @export
 #' @importFrom polars pl
 sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
-                          cb_and_umi = function(sequence_id, read1, read2) {
-                              list(
-                                  substring(read1, 1L, 16L),
-                                  substring(read1, 17L, 28L)
-                              )
-                          },
-                          ranks = c("G", "S"), kmer_len = 35L,
-                          min_frac = 0.5, exclude = "9606",
-                          threads = 10L) {
+                   cb_and_umi = function(sequence_id, read1, read2) {
+                       list(
+                           substring(read1, 1L, 16L),
+                           substring(read1, 17L, 28L)
+                       )
+                   },
+                   ranks = c("G", "S"), kmer_len = 35L,
+                   min_frac = 0.5, exclude = "9606",
+                   threads = 10L) {
     kreport <- parse_kraken_report(kraken_report)
     exclude <- pl$Series(values = exclude)$cast(pl$String)
 
