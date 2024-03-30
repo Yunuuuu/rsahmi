@@ -9,7 +9,9 @@
 #'    [sink_csv][polars::LazyFrame_sink_csv].
 #'  - `extract_kraken_reads`: Additional arguments passed to
 #'    [run][biosys::Execute] method.
-#' @name extract
+#' @name extractor
+#' @seealso
+#' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
 NULL
 
 # pak::repo_add("https://rpolars.r-universe.dev")
@@ -19,9 +21,11 @@ NULL
 # `sudo apt purge cargo` or
 # `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
-#' @param taxon An atomic character specify
+#' @param taxon An atomic character specify the taxa name wanted. Should follow
+#' the kraken style, connected by rank codes, two underscores, and the
+#' scientific name of the taxon (e.g., "d__Viruses")
 #' @export
-#' @rdname extract
+#' @rdname extractor
 #' @importFrom polars pl
 extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "d__Viruses")) {
     parse_kraken_report(kraken_report)$
@@ -33,7 +37,7 @@ extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "
 }
 
 #' @export
-#' @rdname extract
+#' @rdname extractor
 #' @importFrom polars pl
 extract_kraken_output <- function(kraken_out, taxids,
                                   ofile = "kraken_microbiome_output.txt",
@@ -56,8 +60,9 @@ extract_kraken_output <- function(kraken_out, taxids,
     )
 }
 
+#' @param threads Number of threads to use, see `biosys::seqkit("grep")$help()`.
 #' @export
-#' @rdname extract
+#' @rdname extractor
 #' @importFrom polars pl
 extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
                                  odir = getwd(), threads = NULL,

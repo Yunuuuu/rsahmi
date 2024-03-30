@@ -44,6 +44,8 @@ are also discarded.}
 
 \item{exclude}{A character of taxid to exclude, for \code{SAHMI}, the host taxid.
 Reads with any k-mers mapped to the \code{exclude} are discarded.}
+
+\item{threads}{Number of threads to use, see \code{biosys::seqkit("grep")$help()}.}
 }
 \description{
 The function count the number of k-mers and unique k-mers
