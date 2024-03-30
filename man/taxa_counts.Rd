@@ -4,44 +4,15 @@
 \alias{taxa_counts}
 \title{Quantitation of microbes}
 \usage{
-taxa_counts(
-  fa1,
-  fa2,
-  taxa,
-  kraken_report = NULL,
-  mpa_report = NULL,
-  sample = NULL,
-  out_dir = getwd(),
-  cb_len = 16L,
-  umi_len = 10L,
-  n_filter = 130L,
-  cores = availableCores()
-)
+taxa_counts(umi, taxids = NULL, kraken_report = NULL)
 }
 \arguments{
-\item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
-\code{extract_microbiome}). We'll extract barcode sequence from \code{fa1}.}
+\item{umi}{UMI data returned by \link{sckmer}.}
 
-\item{taxa}{Taxa ids to extracted, can be a file, where the first column will
-be extracted.}
+\item{taxids}{Taxa ids to be extracted, if \code{NULL}, all taxon in \code{umi} will be
+counting.}
 
-\item{kraken_report}{The path to kraken2uniq report, if \code{NULL},
-will locate \strong{sample.kraken.report.txt} in \code{out_dir}.}
-
-\item{mpa_report}{The path to mpa style report, if \code{NULL},
-will locate \strong{sample.kraken.report.mpa.txt} in \code{out_dir}.}
-
-\item{sample}{A string, sample name, will be used to create output file name.}
-
-\item{out_dir}{The path of output directory.}
-
-\item{cb_len}{Nucleutide length of cell barcodes}
-
-\item{umi_len}{Nucleutide length of umis}
-
-\item{n_filter}{Filter reads with \verb{> n_filter} of one nucleotide.}
-
-\item{cores}{The number of cores to use.}
+\item{kraken_report}{The path to kraken report file.}
 }
 \description{
 After identifying true taxa, reads assigned to those taxa are
