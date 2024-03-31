@@ -21,14 +21,6 @@ to create the path.}
 
 \item{samples}{An atomic character specifying sample names.}
 
-\item{method}{A character string indicating which correlation coefficient is
-to be used for the test. One of "pearson", "kendall", or "spearman", can be
-abbreviated.}
-
-\item{...}{Other arguments passed to \link[stats:cor.test]{cor.test}.}
-
-\item{min_number}{An integer, the minimal number of items per taxid.}
-
 \item{min_reads}{Minimal number of reads.}
 
 \item{min_uniq}{Minimal unique number.}
