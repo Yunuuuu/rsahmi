@@ -292,7 +292,8 @@ taxon_children <- function(kreport, taxon) {
         to_series()$unique()
 }
 
-kmer_query <- function(kout, kreport, read_nms, taxa_struct, kmer_len, min_frac) {
+kmer_query <- function(kout, kreport, read_nms, taxa_struct,
+                       kmer_len, min_frac) {
     taxa <- taxa_struct$struct$field("taxa")
     taxid <- taxa_struct$struct$field("taxid")
     lineage_report <- kreport$filter(pl$col("taxids")$list$contains(taxid))
@@ -301,6 +302,8 @@ kmer_query <- function(kout, kreport, read_nms, taxa_struct, kmer_len, min_frac)
         get_column("taxids")$explode()$append("0")$unique()
 
     lazy_kout <- kout$lazy()$filter(pl$col("taxid")$is_in(child_taxon))
+    # Note: the SAHMI don't deduplicate UMI, so for each barcode,
+    # there may exists duplicates reads?
     out_list <- lapply(read_nms, function(read_nm) {
         cols <- c("cb", paste0(read_nm, "_sequence"))
         lazy_kout$
@@ -340,8 +343,6 @@ kmer_query <- function(kout, kreport, read_nms, taxa_struct, kmer_len, min_frac)
         )
     })
     pl$concat(out_list, how = "vertical")$
-        # for a sample, every cell barcode is unique, we can just group_by `cb`
-        # which is what official SAHMI do.
         group_by("cb", maintain_order = FALSE)$
         agg(
         pl$col("kmer")$len()$alias("kmer_len"),
