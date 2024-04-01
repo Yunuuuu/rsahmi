@@ -16,7 +16,7 @@
 #' @param min_number An integer, the minimal number of cell barcode per taxid.
 #' @importFrom polars pl
 #' @export
-sahmi_blsd <- function(kmer, method = "spearman", ..., p.adjust = "BH",
+blsd <- function(kmer, method = "spearman", ..., p.adjust = "BH",
                        min_kmer_len = 3L, min_number = 3L) {
     data_list <- kmer$
         filter(pl$col("kmer_len")$gt_eq(min_kmer_len))$

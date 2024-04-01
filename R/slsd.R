@@ -16,8 +16,8 @@
 #'   pvalue for `cor(#k-mers, #unique k-mers)` (r1 and p1), `cor(#k-mers,
 #'   #reads)` (r2 and p2) and `cor(#reads, #unique k-mers)` (r3 and p3).
 #' @export
-sahmi_slsd <- function(kreports, method = "spearman", ...,
-                       min_reads = 2L, min_uniq = 2L, min_number = 3L) {
+slsd <- function(kreports, method = "spearman", ...,
+                 min_reads = 2L, min_uniq = 2L, min_number = 3L) {
     kreports <- pl$concat(kreports, how = "vertical")
     kreports[, .SD[.N > min_number], by = "taxid"][rank %in% c("G", "S")][,
         {
