@@ -37,16 +37,16 @@
 #' }
 #' @export
 #' @importFrom polars pl
-sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
-                   cb_and_umi = function(sequence_id, read1, read2) {
-                       list(
-                           substring(read1, 1L, 16L),
-                           substring(read1, 17L, 28L)
-                       )
-                   },
-                   ranks = c("G", "S"), kmer_len = 35L,
-                   min_frac = 0.5, exclude = "9606",
-                   threads = 10L) {
+sahmi_kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
+                       cb_and_umi = function(sequence_id, read1, read2) {
+                           list(
+                               substring(read1, 1L, 16L),
+                               substring(read1, 17L, 28L)
+                           )
+                       },
+                       ranks = c("G", "S"), kmer_len = 35L,
+                       min_frac = 0.5, exclude = "9606",
+                       threads = 10L) {
     kreport <- parse_kraken_report(kraken_report)
     exclude <- pl$Series(values = exclude)$cast(pl$String)
 
@@ -238,6 +238,7 @@ sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         umi = pl$Series(values = cb_and_umi[[2L]])
     )
 
+    # prepare data for blsa ----------------------
     # define kmer ---------------------------------------------------
     kmer_list <- polars_lapply(
         taxon_struct, kmer_query,
@@ -264,11 +265,20 @@ sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         pl$col("taxid", "taxa", "kmer_len", "kmer_n_unique")
     )
 
-    # prepare data for taxa counting by UMI ----------------------
-    umi <- kreport$select(
+    # filter kreport only in kmer data -----------
+    kreport <- kreport$
+        with_columns(
         pl$col("taxids")$list$last()$alias("taxid"),
         pl$col("taxon")$list$last()$alias("taxa"),
-        pl$col("ranks")$list$last()$alias("rank"),
+        pl$col("ranks")$list$last()$alias("rank")
+    )$
+        filter(pl$col("taxid")$is_in(taxon_struct$struct$field("taxid")))
+
+    # prepare data for taxa counting by UMI ----------------------
+    # should we include all children taxa for a taxa?
+    # SAHMI don't use children taxon
+    umi <- kreport$select(
+        pl$col("taxid"), pl$col("taxa"), pl$col("rank"),
         pl$col("taxon"), pl$col("ranks")
     )$join(
         kout$select(
@@ -277,7 +287,15 @@ sckmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         )$unique(),
         on = "taxid", how = "inner"
     )
-    list(kmer = kmer, umi = umi)
+
+    # prepare data for slsd ----------------------
+    kreport <- kreport$select(
+        pl$col("taxid"), pl$col("taxa"), pl$col("rank"),
+        pl$all()$explude(c("taxid", "taxa", "rank"))$list$last()
+    )
+
+    # combine all result and return
+    list(kreport = kreport, kmer = kmer, umi = umi)
 }
 
 taxon_children <- function(kreport, taxon) {

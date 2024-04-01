@@ -4,15 +4,13 @@
 \alias{taxa_counts}
 \title{Quantitation of microbes}
 \usage{
-taxa_counts(umi, taxids = NULL, kraken_report = NULL)
+taxa_counts(umi, taxids = NULL)
 }
 \arguments{
-\item{umi}{UMI data returned by \link{sckmer}.}
+\item{umi}{UMI data returned by \link{sahmi_kmer}.}
 
 \item{taxids}{Taxa ids to be extracted, if \code{NULL}, all taxon in \code{umi} will be
 counting.}
-
-\item{kraken_report}{The path to kraken report file.}
 }
 \description{
 After identifying true taxa, reads assigned to those taxa are

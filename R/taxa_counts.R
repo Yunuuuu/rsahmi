@@ -5,23 +5,14 @@
 #' full taxonomic classification of all resulting barcodes and the number of
 #' counts assigned to each clade are tabulated.
 #'
-#' @param umi UMI data returned by [sckmer].
+#' @param umi UMI data returned by [sahmi_kmer].
 #' @param taxids Taxa ids to be extracted, if `NULL`, all taxon in `umi` will be
 #' counting.
-#' @inheritParams extractor
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-taxa_counts <- function(umi, taxids = NULL, kraken_report = NULL) {
+taxa_counts <- function(umi, taxids = NULL) {
     if (!is.null(taxids)) {
-        if (is.null(kraken_report)) {
-            cli::cli_abort(paste(
-                "{.arg kraken_report} must be provided to filter {.arg umi}",
-                "based on {.arg taxids}"
-            ))
-        }
-        kreport <- parse_kraken_report(kraken_report)
-        children_taxon <- taxon_children(kreport, taxids)
-        umi <- umi$filter(pl$col("taxid")$is_in(children_taxon))
+        umi <- umi$filter(pl$col("taxid")$is_in(taxids))
     }
     # create barcode umi data -----------------------------------
     counts <- umi$lazy()$

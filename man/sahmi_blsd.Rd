@@ -5,16 +5,16 @@
 \title{Barcode level signal denoising}
 \usage{
 sahmi_blsd(
-  sckmer,
+  kmer,
   method = "spearman",
   ...,
   p.adjust = "BH",
-  min_kmer_len = 1L,
+  min_kmer_len = 3L,
   min_number = 3L
 )
 }
 \arguments{
-\item{sckmer}{kmer data returned by \link{sckmer}.}
+\item{kmer}{kmer data returned by \link{sckmer}.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
