@@ -29,8 +29,13 @@ NULL
 #' @importFrom polars pl
 extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "d__Viruses")) {
     parse_kraken_report(kraken_report)$
+        explode(pl$col("ranks", "taxon"))$
         filter(
-        pl$col("taxon")$list$eval(pl$element()$is_in(taxon))$list$any()
+        pl$concat_str(
+            pl$col("ranks")$str$to_lowercase(),
+            pl$col("taxon"),
+            separator = "__"
+        )$is_in(pl$lit(taxon))
     )$
         select(pl$col("taxids")$list$last())$
         to_series()$unique()

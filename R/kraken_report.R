@@ -10,43 +10,88 @@
 parse_kraken_report <- function(kraken_report,
                                 intermediate_ranks = TRUE,
                                 mpa = FALSE) {
+    # https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown
+    # 1. Percentage of fragments covered by the clade rooted at this taxon
+    # 2. Number of fragments covered by the clade rooted at this taxon
+    # 3. Number of fragments assigned directly to this taxon
+    # * 4. Number of minimizers in read data associated with this taxon (new)
+    # * 5. An estimate of the number of distinct minimizers in read data
+    #    associated with this taxon (new)
+    # 6. A rank code, indicating (U)nclassified, (R)oot, (D)omain, (K)ingdom,
+    #    (P)hylum, (C)lass, (O)rder, (F)amily, (G)enus, or (S)pecies. Taxa that
+    #    are not at any of these 10 ranks have a rank code that is formed by
+    #    using the rank code of the closest ancestor rank with a number
+    #    indicating the distance from that rank. E.g., "G2" is a rank code
+    #    indicating a taxon is between genus and species and the grandparent
+    #    taxon is at the genus rank.
+    # 7. NCBI taxonomic ID number
+    # 8. Indented scientific name
     kreport <- pl$scan_csv(kraken_report, separator = "\t", has_header = FALSE)$
-        filter(pl$col("column_6")$neq("U"))$
-        select(
-        # rename necessary columns
-        pl$col("column_7")$cast(pl$String)$alias("taxids"),
-        pl$col("column_8")$str$strip_chars()$alias("taxon"),
-        pl$col("column_6")$alias("ranks"),
+        rename(
+        percents = "column_1", total_reads = "column_2", reads = "column_3"
+    )
+    if (kreport$width == 6L) {
+        cols <- pl$col("reads", "total_reads", "percents")
+        kreport <- kreport$
+            select(
+            # rename necessary columns
+            pl$col("column_5")$alias("taxids"),
+            pl$col("column_6")$alias("taxon"),
+            pl$col("column_4")$alias("ranks"),
+            pl$col("reads"), pl$col("total_reads"), pl$col("percents")
+        )
+    } else if (kreport$width == 8L) {
+        cols <- pl$col(
+            "minimizer_len", "minimizer_n_unique",
+            "reads", "total_reads", "percents"
+        )
+        kreport <- kreport$
+            select(
+            # rename necessary columns
+            pl$col("column_7")$alias("taxids"),
+            pl$col("column_8")$alias("taxon"),
+            pl$col("column_6")$alias("ranks"),
+            pl$col("column_4")$alias("minimizer_len"),
+            pl$col("column_5")$alias("minimizer_n_unique"),
+            pl$col("reads"), pl$col("total_reads"), pl$col("percents")
+        )
+    } else {
+        cli::cli_abort("Invalid kraken2 report")
+    }
+    kreport <- kreport$
+        filter(pl$col("ranks")$neq("U"))$
+        with_columns(
+        pl$col("percents")$str$strip_chars()$cast(pl$Float64),
+        pl$col("taxids")$cast(pl$String),
+        pl$col("taxon")$str$strip_chars(),
         # kraken2 use the prefix blank space to specify the level
-        pl$col("column_8")$str$extract(pl$lit("^( *)"), 1L)$
-            str$len_chars()$div(2L)$alias("levels"),
-        # rename necessary columns
-        pl$col("column_1")$str$strip_chars()$cast(pl$Float64)$alias("percents"),
-        pl$col("column_2")$alias("reads")
+        pl$col("taxon")$str$extract(pl$lit("^( *)"), 1L)$
+            str$len_chars()$div(2L)$alias("levels")
     )$
         collect()
-
     kreport <- pl$DataFrame(
         parse_kreport_internal(
             kreport$height, kreport$to_list(), intermediate_ranks
         )
     )$
-        with_columns(pl$col("reads")$cast(pl$List(pl$Int64)))
+        with_columns(
+        pl$col("reads")$cast(pl$List(pl$Int64)),
+        pl$col("total_reads")$cast(pl$List(pl$Int64))
+    )
 
     if (mpa) {
         kreport <- kreport$select(
             pl$col("taxon")$list$last()$alias("taxa"),
             pl$col("taxids")$list$last()$alias("taxid"),
             pl$col("ranks")$list$last()$alias("rank"),
-            pl$col("percents")$list$last(),
-            pl$col("reads")$list$last(),
-            pl$col("ranks", "taxon")
+            cols$list$last(), pl$col("ranks", "taxon")
         )$
             with_row_index("index")$
             explode(c("ranks", "taxon"))$
             # connect ranks with species names -------------
             group_by(
-            c("index", "taxa", "taxid", "percents", "reads"),
+            c("index", "taxa", "taxid", "rank"),
+            cols,
             maintain_order = TRUE
         )$
             agg(
@@ -60,16 +105,15 @@ parse_kraken_report <- function(kraken_report,
         )$
             # relocate columns -----------------------------
             select(
-            "taxa", "taxid",
-            pl$col("phylogeny")$list$join("|"),
-            "percents", "reads"
+            "taxa", "taxid", "rank",
+            pl$col("phylogeny")$list$join("|"), cols
         )
     }
     kreport
 }
 
 # bench::mark(
-#     dt = parse_kreport_data_table("kraken_report.txt"),
+#     dt = parse_kraken_data_table("kraken_report.txt"),
 #     polars = parse_kraken_report_polars("kraken_report.txt"),
 #     check = FALSE
 # )
