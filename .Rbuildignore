@@ -10,3 +10,4 @@
 ^README\.html$
 ^README\.md$
 ^LICENSE\.md$
+^README\.Rmd$
