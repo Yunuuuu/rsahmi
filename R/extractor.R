@@ -84,6 +84,8 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
     } else if (length(ofile) != length(reads)) {
         cli::cli_abort("{.arg ofile} must have the same length of {.arg reads}")
     }
+    if (!dir.exists(odir)) dir_create(odir)
+    ofile <- file.path(odir, ofile)
     file <- tempfile("kraken_sequence_id")
     pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
         # second column is the sequence id

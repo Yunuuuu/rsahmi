@@ -2,6 +2,13 @@
 
 is_scalar <- function(x) length(x) == 1L
 
+dir_create <- function(path, ...) {
+    if (!dir.exists(path) &&
+        !dir.create(path = path, showWarnings = FALSE, ...)) {
+        cli::cli_abort("Cannot create directory {.path {path}}")
+    }
+}
+
 # mimic polars list methods --------------------------
 list_gather <- function(x, index, USE.NAMES = FALSE) {
     mapply(.subset, x = x, i = index, USE.NAMES = USE.NAMES, SIMPLIFY = FALSE)
