@@ -15,13 +15,6 @@
 #' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
 NULL
 
-# pak::repo_add("https://rpolars.r-universe.dev")
-# pak::pkg_install("https://github.com/pola-rs/r-polars/releases/latest/download/polars__x86_64-pc-linux-gnu.gz")
-# pak::pkg_install("pola-rs/r-polars")
-# pip install --user umi_tools
-# `sudo apt purge cargo` or
-# `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-
 #' @param taxon An atomic character specify the taxa name wanted. Should follow
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses")
