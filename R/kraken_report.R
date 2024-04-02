@@ -191,7 +191,7 @@ parse_kreport_internal <- function(n, kreport, intermediate_ranks) {
 # waldo::compare(
 #     rsahmi::parse_kraken_report(kraken_report, mpa = TRUE)$select(
 #         pl$col("phylogeny")$alias("column_1"),
-#         pl$col("reads")$alias("column_2")
+#         pl$col("total_reads")$alias("column_2")
 #     )$to_data_frame(),
 #     polars::pl$read_csv(mpa_report, separator = "\t", has_header = FALSE)$to_data_frame()
 # )
