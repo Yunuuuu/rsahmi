@@ -48,6 +48,7 @@ extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "
 extract_kraken_output <- function(kraken_out, taxids,
                                   ofile = "kraken_microbiome_output.txt",
                                   odir = getwd(), ...) {
+    if (!dir.exists(odir)) dir_create(odir)
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
     if (taxids$is_in(pl$Series(c("81077", "A")))$any()) {
