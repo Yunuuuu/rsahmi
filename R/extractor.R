@@ -2,7 +2,8 @@
 #'
 #' @param kraken_out The path to kraken output file.
 #' @param kraken_report The path to kraken report file.
-#' @param reads The original fastq files (input in `kraken2`).
+#' @param reads The original fastq files (input in `kraken2`). You can pass
+#' two paired-end files directly.
 #' @param pattern Regex patterns to match.
 #' @param ...
 #'  - `extract_kraken_output`: Additional arguments passed to

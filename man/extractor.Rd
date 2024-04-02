@@ -46,7 +46,8 @@ scientific name of the taxon (e.g., "d__Viruses")}
 \link[biosys:Execute]{run} method.
 }}
 
-\item{reads}{The original fastq files (input in \code{kraken2}).}
+\item{reads}{The original fastq files (input in \code{kraken2}). You can pass
+two paired-end files directly.}
 
 \item{threads}{Number of threads to use, see \code{biosys::seqkit("grep")$help()}.}
 
