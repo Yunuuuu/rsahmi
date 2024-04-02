@@ -84,7 +84,7 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
     } else if (length(ofile) != length(reads)) {
         cli::cli_abort("{.arg ofile} must have the same length of {.arg reads}")
     }
-    file <- tempfile("kraken_ids")
+    file <- tempfile("kraken_sequence_id")
     pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
         # second column is the sequence id
         select(pl$col("column_2"))$unique()$
@@ -92,17 +92,18 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
     on.exit(file.remove(file))
     for (i in seq_along(reads)) {
         extract_sequence_id(
-            fq = reads[[i]], ofile = ofile[[i]], ...,
+            fq = reads[[i]], ofile = ofile[[i]],
+            sequence_id = file, ...,
             threads = threads, seqkit = seqkit
         )
     }
 }
 
-extract_sequence_id <- function(fq, ofile, ..., threads, seqkit) {
+extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads, seqkit) {
     biosys::seqkit("seq", "--only-id", fq, seqkit = seqkit)$
         pipe(
         biosys::seqkit(
-            "grep", biosys::arg("-f", file),
+            "grep", biosys::arg("-f", sequence_id),
             if (!is.null(threads)) {
                 biosys::arg("--threads", threads, format = "%d")
             },
