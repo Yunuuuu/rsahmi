@@ -68,6 +68,7 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     )
 
     # prepare taxid:kmer data ------------------------------------------
+    cli::cli_alert_info("Parsing {.path {kraken_out}}")
     kout <- pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
         filter(
         pl$col("column_5")$str$
@@ -173,11 +174,13 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         collect()
 
     # read in fasta data -----------------------------------------------
+    cli::cli_alert_info("Reading {.path {fa1}}")
     read1 <- ShortRead::readFasta(fa1)
     id1 <- as.character(ShortRead::id(read1))
     read1 <- ShortRead::sread(read1)
 
     if (!is.null(fa2)) {
+        cli::cli_alert_info("Reading {.path {fa2}}")
         read2 <- ShortRead::readFasta(fa2)
         id2 <- as.character(ShortRead::id(read2))
         read2 <- ShortRead::sread(read2)
@@ -203,6 +206,7 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         unique()
 
     # extract cell barcode and umi -----------------------------------
+    cli::cli_alert_info("Defining {.field cell barcode} and {.field UMI}")
     cb_and_umi <- cb_and_umi(ids, read1, read2)
     if (length(cb_and_umi) != 2L) {
         cli::cli_abort(c(
@@ -240,6 +244,7 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 
     # prepare data for blsa ----------------------
     # define kmer ---------------------------------------------------
+    cli::cli_alert_info("Defining {.field kmer}")
     kmer_list <- polars_lapply(
         taxon_struct, kmer_query,
         kout = kout, kreport = kreport,
