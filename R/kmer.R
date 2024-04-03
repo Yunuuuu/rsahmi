@@ -296,7 +296,9 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     # prepare data for slsd ----------------------
     kreport <- kreport$select(
         pl$col("taxid"), pl$col("taxa"), pl$col("rank"),
-        pl$all()$exclude(c("taxid", "taxa", "rank"))$list$last()
+        pl$all()$
+            exclude(c("taxid", "taxa", "rank", "taxids", "taxon", "ranks"))$
+            list$last()
     )
 
     # combine all result and return

@@ -8,27 +8,39 @@ slsd(
   kreports,
   method = "spearman",
   ...,
-  min_reads = 2L,
-  min_uniq = 2L,
+  min_reads = 3L,
+  min_minimizer_n_unique = 3L,
   min_number = 3L
 )
 }
 \arguments{
-\item{kraken_reports}{The paths to kraken2uniq report for all samples, often
-in the form of \strong{sample.kraken.report.txt}. It's easy to use \link{locate_path}
-to create the path.}
+\item{kreports}{kreports data returned by \link{kmer} for all samples.}
 
-\item{samples}{An atomic character specifying sample names.}
+\item{method}{A character string indicating which correlation coefficient is
+to be used for the test. One of "pearson", "kendall", or "spearman", can be
+abbreviated.}
+
+\item{...}{Other arguments passed to \link[stats:cor.test]{cor.test}.}
+
+\item{min_reads}{An integer, the minimal number of the total reads to filter
+taxa. SAHMI use \code{2}.}
+
+\item{min_minimizer_n_unique}{An integer, the minimal number of the unique
+number of minimizer to filter taxa. SAHMI use \code{2}.}
+
+\item{min_number}{An integer, the minimal number of samples per taxid. SAHMI
+use \code{4}.}
 }
 \value{
-A \link[data.table:data.table]{data.table} of correlation coefficient and
-pvalue for \verb{cor(#k-mers, #unique k-mers)} (r1 and p1), \verb{cor(#k-mers, #reads)} (r2 and p2) and \verb{cor(#reads, #unique k-mers)} (r3 and p3).
+A polars \link[polars:DataFrame_class]{DataFrame} of correlation
+coefficient and pvalue for \code{cor(minimizer_len, minimizer_n_unique)} (r1 and
+p1), \code{cor(minimizer_len, total_reads)} (r2 and p2) and \code{cor(total_reads, minimizer_n_unique)} (r3 and p3).
 }
 \description{
 In the low-microbiome biomass setting, real microbes also exhibit a
 proportional number of total k-mers, number of unique k-mers, as well as
 number of total assigned sequencing reads across samples; i.e. the following
 three Spearman correlations are significant when tested using sample-level
-data provided in Kraken reports: \verb{cor(#k-mers, #unique k-mers)},
-\verb{cor(#k-mers, #reads)} and \verb{cor(#reads, #unique k-mers)}.
+data provided in Kraken reports: \code{cor(minimizer_len, minimizer_n_unique)},
+\code{cor(minimizer_len, total_reads)} and \code{cor(total_reads, minimizer_n_unique)}.
 }
