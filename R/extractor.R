@@ -1,10 +1,8 @@
 #' Extract reads and output from Kraken
 #'
-#' @param kraken_out The path to kraken output file.
 #' @param kraken_report The path to kraken report file.
 #' @param reads The original fastq files (input in `kraken2`). You can pass
 #' two paired-end files directly.
-#' @param pattern Regex patterns to match.
 #' @param ...
 #'  - `extract_kraken_output`: Additional arguments passed to
 #'    [sink_csv][polars::LazyFrame_sink_csv].
@@ -35,6 +33,10 @@ extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "
         to_series()$unique()
 }
 
+#' @param kraken_out The path to kraken output file.
+#' @param taxids A character specify taxa identifier to extract.
+#' @param ofile A string of file save the kraken output of specified `taxids`.
+#' @param odir A string of directory to save the `ofile`.
 #' @export
 #' @rdname extractor
 #' @importFrom polars pl
@@ -61,6 +63,7 @@ extract_kraken_output <- function(kraken_out, taxids,
 }
 
 #' @param threads Number of threads to use, see `biosys::seqkit("grep")$help()`.
+#' @inheritParams biosys::seqkit
 #' @export
 #' @rdname extractor
 #' @importFrom polars pl

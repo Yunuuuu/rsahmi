@@ -5,7 +5,7 @@
 #' Spearman correlation between the number of total and unique k-mers across
 #' barcodes.
 #'
-#' @param kmer kmer data returned by [sckmer].
+#' @param kmer kmer data returned by [kmer].
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be
 #'   abbreviated.

@@ -5,7 +5,7 @@
 #' full taxonomic classification of all resulting barcodes and the number of
 #' counts assigned to each clade are tabulated.
 #'
-#' @param umi UMI data returned by [sahmi_kmer].
+#' @param umi UMI data returned by [kmer].
 #' @param taxids Taxa ids to be extracted, if `NULL`, all taxon in `umi` will be
 #' counting.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>

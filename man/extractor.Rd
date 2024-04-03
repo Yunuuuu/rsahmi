@@ -39,6 +39,12 @@ scientific name of the taxon (e.g., "d__Viruses")}
 
 \item{kraken_out}{The path to kraken output file.}
 
+\item{taxids}{A character specify taxa identifier to extract.}
+
+\item{ofile}{A string of file save the kraken output of specified \code{taxids}.}
+
+\item{odir}{A string of directory to save the \code{ofile}.}
+
 \item{...}{\itemize{
 \item \code{extract_kraken_output}: Additional arguments passed to
 \link[polars:IO_sink_csv]{sink_csv}.
@@ -51,7 +57,7 @@ two paired-end files directly.}
 
 \item{threads}{Number of threads to use, see \code{biosys::seqkit("grep")$help()}.}
 
-\item{pattern}{Regex patterns to match.}
+\item{seqkit}{A string of path to \code{seqkit} command.}
 }
 \description{
 Extract reads and output from Kraken

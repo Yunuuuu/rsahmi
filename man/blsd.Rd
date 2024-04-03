@@ -14,7 +14,7 @@ blsd(
 )
 }
 \arguments{
-\item{kmer}{kmer data returned by \link{sckmer}.}
+\item{kmer}{kmer data returned by \link{kmer}.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
