@@ -206,7 +206,7 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
         unique()
 
     # extract cell barcode and umi -----------------------------------
-    cli::cli_alert_info("Defining {.field cell barcode} and {.field UMI}")
+    cli::cli_alert_info("Parsing {.field cell barcode} and {.field UMI}")
     cb_and_umi <- cb_and_umi(ids, read1, read2)
     if (length(cb_and_umi) != 2L) {
         cli::cli_abort(c(
@@ -244,7 +244,7 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 
     # prepare data for blsa ----------------------
     # define kmer ---------------------------------------------------
-    cli::cli_alert_info("Defining {.field kmer}")
+    cli::cli_alert_info("Calculating {.field kmer}")
     kmer_list <- polars_lapply(
         taxon_struct, kmer_query,
         kout = kout, kreport = kreport,
@@ -258,8 +258,8 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                 sep = "/"
             ),
             format_done = paste(
-                "{cli::pb_name} for {.val {cli::pb_total}} tax{?a/on}",
-                "in {cli::pb_elapsed}"
+                "Kmer statistic has been tabulated for",
+                "{.val {cli::pb_total}} tax{?a/on} in {cli::pb_elapsed}"
             )
         ),
         .threads = threads
