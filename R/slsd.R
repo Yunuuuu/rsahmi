@@ -6,7 +6,8 @@
 #' three Spearman correlations are significant when tested using sample-level
 #' data provided in Kraken reports: `cor(minimizer_len, minimizer_n_unique)`,
 #' `cor(minimizer_len, total_reads)` and `cor(total_reads, minimizer_n_unique)`.
-#'
+#' (`r1>0 & r2>0 & r3>0 & p1<0.05 & p2<0.05 & p3<0.05`).
+#' 
 #' @param kreports kreports data returned by [kmer] for all samples.
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be

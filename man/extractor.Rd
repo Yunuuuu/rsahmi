@@ -39,7 +39,7 @@ scientific name of the taxon (e.g., "d__Viruses")}
 
 \item{kraken_out}{The path to kraken output file.}
 
-\item{taxids}{A character specify taxa identifier to extract.}
+\item{taxids}{A character specify NCBI taxonony identifier to extract.}
 
 \item{ofile}{A string of file save the kraken output of specified \code{taxids}.}
 

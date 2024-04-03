@@ -35,7 +35,7 @@ SAHMI use \code{2}.}
 True taxa are detected on multiple barcodes and with a proprotional number of
 total and unique k-mer sequences across barcodes, measured as a significant
 Spearman correlation between the number of total and unique k-mers across
-barcodes.
+barcodes. (\code{padj < 0.05})
 }
 \seealso{
 https://github.com/sjdlabgroup/SAHMI

@@ -3,7 +3,7 @@
 #' True taxa are detected on multiple barcodes and with a proprotional number of
 #' total and unique k-mer sequences across barcodes, measured as a significant
 #' Spearman correlation between the number of total and unique k-mers across
-#' barcodes.
+#' barcodes. (`padj < 0.05`)
 #'
 #' @param kmer kmer data returned by [kmer].
 #' @param method A character string indicating which correlation coefficient is

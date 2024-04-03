@@ -34,7 +34,7 @@ extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "
 }
 
 #' @param kraken_out The path to kraken output file.
-#' @param taxids A character specify taxa identifier to extract.
+#' @param taxids A character specify NCBI taxonony identifier to extract.
 #' @param ofile A string of file save the kraken output of specified `taxids`.
 #' @param odir A string of directory to save the `ofile`.
 #' @export

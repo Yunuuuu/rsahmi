@@ -43,4 +43,5 @@ number of total assigned sequencing reads across samples; i.e. the following
 three Spearman correlations are significant when tested using sample-level
 data provided in Kraken reports: \code{cor(minimizer_len, minimizer_n_unique)},
 \code{cor(minimizer_len, total_reads)} and \code{cor(total_reads, minimizer_n_unique)}.
+(\code{r1>0 & r2>0 & r3>0 & p1<0.05 & p2<0.05 & p3<0.05}).
 }
