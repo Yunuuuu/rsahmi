@@ -13,11 +13,14 @@
 #' @param p.adjust Pvalue correction method, a character string. Can be
 #'   abbreviated. Details see [p.adjust][stats::p.adjust].
 #' @param min_kmer_len An integer, the minimal number of kmer to filter taxa.
-#' @param min_number An integer, the minimal number of cell barcode per taxid.
+#' SAHMI use `2`.
+#' @param min_number An integer, the minimal number of cell per taxid. SAHMI use
+#' `4`.
+#' @seealso https://github.com/sjdlabgroup/SAHMI
 #' @importFrom polars pl
 #' @export
 blsd <- function(kmer, method = "spearman", ..., p.adjust = "BH",
-                       min_kmer_len = 3L, min_number = 3L) {
+                 min_kmer_len = 3L, min_number = 3L) {
     data_list <- kmer$
         filter(pl$col("kmer_len")$gt_eq(min_kmer_len))$
         filter(pl$len()$over("taxid", "taxa")$gt_eq(min_number))$

@@ -25,13 +25,18 @@ abbreviated.}
 \item{p.adjust}{Pvalue correction method, a character string. Can be
 abbreviated. Details see \link[stats:p.adjust]{p.adjust}.}
 
-\item{min_kmer_len}{An integer, the minimal number of kmer to filter taxa.}
+\item{min_kmer_len}{An integer, the minimal number of kmer to filter taxa.
+SAHMI use \code{2}.}
 
-\item{min_number}{An integer, the minimal number of cell barcode per taxid.}
+\item{min_number}{An integer, the minimal number of cell per taxid. SAHMI use
+\code{4}.}
 }
 \description{
 True taxa are detected on multiple barcodes and with a proprotional number of
 total and unique k-mer sequences across barcodes, measured as a significant
 Spearman correlation between the number of total and unique k-mers across
 barcodes.
+}
+\seealso{
+https://github.com/sjdlabgroup/SAHMI
 }
