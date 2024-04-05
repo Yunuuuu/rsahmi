@@ -7,7 +7,7 @@
 taxa_counts(umi, taxids = NULL)
 }
 \arguments{
-\item{umi}{UMI data returned by \link{kmer}.}
+\item{umi}{UMI data returned by \link{prep_dataset}.}
 
 \item{taxids}{Taxa ids to be extracted, if \code{NULL}, all taxon in \code{umi} will be
 counting.}

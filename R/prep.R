@@ -1,11 +1,18 @@
-#' Tabulating k-mer statistics
+#' Prepare kraken report, k-mer statistics, UMI data
 #'
-#' @description The function count the number of k-mers and unique k-mers
-#' assigned to a taxon across barcodes. The cell barcode and unique molecular
-#' identifier (UMI) are used to identify unique barcodes and reads. Data is
-#' reported for taxa of pre-specified ranks (default genus + species) taking
-#' into account all subsequently higher resolution ranks. The output is a table
-#' of barcodes, taxonomic IDs, number of k-mers, and number of unique k-mers.
+#' @description Three elements returned by this function:
+#'
+#' * `kreport`: Used by [slsd].
+#'
+#' * `kmer`: Used by [blsd]. The function count the number of k-mers and unique
+#'        k-mers assigned to a taxon across barcodes. The cell barcode and
+#'        unique molecular identifier (UMI) are used to identify unique barcodes
+#'        and reads.  Data is reported for taxa of pre-specified ranks (default
+#'        genus + species) taking into account all subsequently higher
+#'        resolution ranks. The output is a table of barcodes, taxonomic IDs,
+#'        number of k-mers, and number of unique k-mers.
+#'
+#' * `umi`: Used by [taxa_counts].
 #'
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
 #'   [extract_kraken_reads]).
@@ -16,13 +23,16 @@
 #' list of 2 corresponding to cell barcode and UMI respectively., each should
 #' have the same length of the input.
 #' @param ranks Taxa ranks to analyze.
-#' @param exclude A character of taxid to exclude, for `SAHMI`, the host taxid.
-#' Reads with any k-mers mapped to the `exclude` are discarded.
 #' @param kmer_len Kraken kmer length. Default: `35L`, which is the default kmer
 #' size of kraken2.
 #' @param min_frac Minimum fraction of kmers directly assigned to taxid to use
 #' read. Reads with `<=min_frac` of the k-mers map inside the taxon's lineage
 #' are also discarded.
+#' @param exclude A character of taxid to exclude, for `SAHMI`, the host taxid.
+#' Reads with any k-mers mapped to the `exclude` are discarded.
+#' @param threads Number of threads to use.
+#' @param odir A string of directory to save the results.
+#' @param overwrite A bool indicates whether to overwrite the files in `odir`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @examples
 #' # for sequence from umi-tools, we can use following function
@@ -35,18 +45,41 @@
 #'         vapply(out, function(o) as.character(.subset2(o, i)), character(1L))
 #'     })
 #' }
-#' @export
 #' @importFrom polars pl
-kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
-                 cb_and_umi = function(sequence_id, read1, read2) {
-                     list(
-                         substring(read1, 1L, 16L),
-                         substring(read1, 17L, 28L)
-                     )
-                 },
-                 ranks = c("G", "S"), kmer_len = 35L,
-                 min_frac = 0.5, exclude = "9606",
-                 threads = 10L) {
+#' @export
+prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
+                         cb_and_umi = function(sequence_id, read1, read2) {
+                             list(
+                                 substring(read1, 1L, 16L),
+                                 substring(read1, 17L, 28L)
+                             )
+                         },
+                         ranks = c("G", "S"), kmer_len = 35L,
+                         min_frac = 0.5, exclude = "9606",
+                         threads = 10L, overwrite = TRUE, odir = "SAHMI") {
+    if (!is.null(odir)) {
+        if (!dir.exists(odir) && file.exists(odir)) {
+            cli::cli_abort(paste(
+                "{.arg odir} must be a directory",
+                "but you specify a file",
+                sep = ", "
+            ))
+        } else if (dir.exists(odir)) {
+            ofiles <- paste0(
+                file.path(odir, c("kreport", "kmer", "umi")), ".parquet"
+            )
+            exists <- ofiles[file.exists(ofiles)]
+            if (!overwrite && length(exists)) {
+                cli::cli_abort(c(
+                    "Found files {.path {ofiles}}",
+                    i = "You can set {.code overwrite = TRUE} if you want to overrite"
+                ))
+            }
+        } else {
+            dir_create(odir)
+        }
+    }
+    cli::cli_alert_info("Parsing {.path {kraken_report}}")
     kreport <- parse_kraken_report(kraken_report)
     exclude <- pl$Series(values = exclude)$cast(pl$String)
 
@@ -300,9 +333,26 @@ kmer <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
             exclude(c("taxid", "taxa", "rank", "taxids", "taxon", "ranks"))$
             list$last()
     )
-
+    # save all results ---------------------------
+    if (!is.null(odir)) {
+        kreport$write_parquet(file.path(odir, "kreport.parquet"))
+        kmer$write_parquet(file.path(odir, "kmer.parquet"))
+        umi$write_parquet(file.path(odir, "umi.parquet"))
+    }
     # combine all result and return
     list(kreport = kreport, kmer = kmer, umi = umi)
+}
+
+#' @param dir A string of directory containing the files returned by
+#' `prep_dataset`.
+#' @export
+#' @rdname prep_dataset
+read_dataset <- function(dir) {
+    list(
+        kreport = pl$read_parquet(file.path(dir, "kreport.parquet")),
+        kmer = pl$read_parquet(file.path(dir, "kmer.parquet")),
+        umi = pl$read_parquet(file.path(dir, "umi.parquet"))
+    )
 }
 
 taxon_children <- function(kreport, taxon) {

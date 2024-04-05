@@ -14,7 +14,7 @@ slsd(
 )
 }
 \arguments{
-\item{kreports}{kreports data returned by \link{kmer} for all samples.}
+\item{kreports}{kreports data returned by \link{prep_dataset} for all samples.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
