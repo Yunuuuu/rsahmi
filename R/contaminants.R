@@ -9,9 +9,9 @@
 #' one of "two.sided", "greater" (default) or "less". You can specify just the
 #' initial letter.
 #' @return A polars [DataFrame][polars::DataFrame_class] with following
-#' attributes: 
+#' attributes:
 #' 1. `pvalues`: Quantile test pvalue.
-#' 2. `sig`: significant taxids based on `alpha`.
+#' 2. `contaminants`: significant taxids based on `alpha`.
 #' @export
 contaminants <- function(kraken_reports,
                          taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
@@ -50,8 +50,10 @@ contaminants <- function(kraken_reports,
     }, USE.NAMES = TRUE)
 
     # collect results and return ----------------
-    structure(pl$concat(kreports, celllines, how = "vertical"),
-        pvalues = pvalues, sig = names(pvalues)[pvalues < alpha]
+    structure(
+        pl$concat(kreports, celllines, how = "vertical"),
+        pvalues = pvalues,
+        contaminants = names(pvalues)[!is.na(pvalues) & pvalues < alpha]
     )
 }
 
