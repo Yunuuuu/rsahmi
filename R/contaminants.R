@@ -47,7 +47,7 @@ contaminants <- function(kraken_reports, study = "current study",
     pvalues <- imap(rpmm_list, function(rpmm, taxid) {
         quantile_test(rpmm$get_column("rpmm")$to_r(),
             ref = ref_quantile[taxid],
-            p = quantile, alternative = alternative
+            alternative = alternative
         )
     }, USE.NAMES = TRUE)
 
@@ -98,6 +98,7 @@ parse_rpmm <- function(kraken_report, taxon) {
     )
 }
 
+# https://people.stat.sc.edu/hitchcock/Rexamples518section3_2.txt
 # https://people.stat.sc.edu/hitchcock/notes518fall13sec32filledin.pdf
 quantile_test <- function(x, ref = 0, p = .5, alternative) {
     n <- length(x)
