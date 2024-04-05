@@ -4,7 +4,9 @@
 #' @param intermediate_ranks A bool indicates whether to include
 #' non-traditional taxonomic ranks in output.
 #' @param mpa A bool indicates whether to use mpa-style.
-#' @return A polars [DataFrame][polars::DataFrame_class]
+#' @return A polars [DataFrame][polars::DataFrame_class].
+#' @seealso 
+#' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
 #' @importFrom polars pl
 #' @export
 parse_kraken_report <- function(kraken_report,

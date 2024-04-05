@@ -15,8 +15,11 @@ non-traditional taxonomic ranks in output.}
 \item{mpa}{A bool indicates whether to use mpa-style.}
 }
 \value{
-A polars \link[polars:DataFrame_class]{DataFrame}
+A polars \link[polars:DataFrame_class]{DataFrame}.
 }
 \description{
 Parse kraken report file
+}
+\seealso{
+\url{https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown}
 }
