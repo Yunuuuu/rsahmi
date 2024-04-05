@@ -6,6 +6,7 @@
 \usage{
 contaminants(
   kraken_reports,
+  study = "current study",
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   quantile = 0.95,
   alpha = 0.05,
@@ -14,6 +15,9 @@ contaminants(
 }
 \arguments{
 \item{kraken_reports}{A character of path to all kraken report files.}
+
+\item{study}{A string of the study name, used to differentiate with cell line
+data.}
 
 \item{taxon}{An atomic character specify the taxa name wanted. Should follow
 the kraken style, connected by rank codes, two underscores, and the
@@ -33,7 +37,7 @@ A polars \link[polars:DataFrame_class]{DataFrame} with following
 attributes:
 \enumerate{
 \item \code{pvalues}: Quantile test pvalue.
-\item \code{sig}: significant taxids based on \code{alpha}.
+\item \code{contaminants}: significant taxids based on \code{alpha}.
 }
 }
 \description{

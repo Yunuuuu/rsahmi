@@ -1,6 +1,8 @@
 #' Identifying contaminants and false positives taxa (cell line quantile test)
 #'
 #' @param kraken_reports A character of path to all kraken report files.
+#' @param study A string of the study name, used to differentiate with cell line
+#' data.
 #' @inheritParams extractor
 #' @param quantile Probabilities with values in `[0, 1]` specifying the quantile
 #' to calculate.
@@ -13,7 +15,7 @@
 #' 1. `pvalues`: Quantile test pvalue.
 #' 2. `contaminants`: significant taxids based on `alpha`.
 #' @export
-contaminants <- function(kraken_reports,
+contaminants <- function(kraken_reports, study = "current study",
                          taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                          quantile = 0.95, alpha = 0.05,
                          alternative = "greater") {
@@ -51,7 +53,11 @@ contaminants <- function(kraken_reports,
 
     # collect results and return ----------------
     structure(
-        pl$concat(kreports, celllines, how = "vertical"),
+        pl$concat(
+            kreports$with_columns(study = pl$lit(study)),
+            celllines$with_columns(study = pl$lit("cell lines")),
+            how = "vertical"
+        ),
         pvalues = pvalues,
         contaminants = names(pvalues)[!is.na(pvalues) & pvalues < alpha]
     )
