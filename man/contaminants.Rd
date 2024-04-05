@@ -2,16 +2,18 @@
 % Please edit documentation in R/contaminants.R
 \name{contaminants}
 \alias{contaminants}
-\title{Identifying contaminants and false positives (cell line quantile test)}
+\title{Identifying contaminants and false positives taxa (cell line quantile test)}
 \usage{
 contaminants(
-  kraken_report,
+  kraken_reports,
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-  quantile = 0.99
+  quantile = 0.95,
+  alpha = 0.05,
+  alternative = "greater"
 )
 }
 \arguments{
-\item{kraken_report}{The path to kraken report file.}
+\item{kraken_reports}{A character of path to all kraken report files.}
 
 \item{taxon}{An atomic character specify the taxa name wanted. Should follow
 the kraken style, connected by rank codes, two underscores, and the
@@ -19,10 +21,21 @@ scientific name of the taxon (e.g., "d__Viruses")}
 
 \item{quantile}{Probabilities with values in \verb{[0, 1]} specifying the quantile
 to calculate.}
+
+\item{alpha}{Level of significance.}
+
+\item{alternative}{A string specifying the alternative hypothesis, must be
+one of "two.sided", "greater" (default) or "less". You can specify just the
+initial letter.}
 }
 \value{
-A polars \link[polars:DataFrame_class]{DataFrame}
+A polars \link[polars:DataFrame_class]{DataFrame} with following
+attributes:
+\enumerate{
+\item \code{pvalues}: Quantile test pvalue.
+\item \code{sig}: significant taxids based on \code{alpha}.
+}
 }
 \description{
-Identifying contaminants and false positives (cell line quantile test)
+Identifying contaminants and false positives taxa (cell line quantile test)
 }

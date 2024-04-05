@@ -1,13 +1,59 @@
-#' Identifying contaminants and false positives (cell line quantile test)
+#' Identifying contaminants and false positives taxa (cell line quantile test)
 #'
+#' @param kraken_reports A character of path to all kraken report files.
 #' @inheritParams extractor
 #' @param quantile Probabilities with values in `[0, 1]` specifying the quantile
 #' to calculate.
-#' @return A polars [DataFrame][polars::DataFrame_class]
+#' @param alpha Level of significance.
+#' @param alternative A string specifying the alternative hypothesis, must be
+#' one of "two.sided", "greater" (default) or "less". You can specify just the
+#' initial letter.
+#' @return A polars [DataFrame][polars::DataFrame_class] with following
+#' attributes: 
+#' 1. `pvalues`: Quantile test pvalue.
+#' 2. `sig`: significant taxids based on `alpha`.
 #' @export
-contaminants <- function(kraken_report,
+contaminants <- function(kraken_reports,
                          taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                         quantile = 0.99) {
+                         quantile = 0.95, alpha = 0.05,
+                         alternative = "greater") {
+    alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
+    kreports <- lapply(kraken_reports, parse_rpmm, taxon = taxon)
+    kreports <- pl$concat(kreports, how = "vertical")
+
+    # prepare celllines data ----------------------
+    celllines <- pl$read_parquet(
+        internal_file("extdata", "cell_lines.parquet")
+    )$
+        select(pl$col("taxid", "rpmm"))
+    celllines <- kreports$select(pl$col("taxid", "taxa"))$
+        join(celllines, on = "taxid", how = "inner")
+
+    # Do quantile test ----------------------------
+    ref_quantile <- celllines$group_by("taxid")$
+        agg(pl$col("rpmm")$quantile(quantile))$
+        to_data_frame()
+    ref_quantile <- structure(ref_quantile$rpmm, names = ref_quantile$taxid)
+    rpmm_list <- kreports$partition_by(pl$col("taxid", "taxa"))
+    names(rpmm_list) <- vapply(
+        rpmm_list,
+        function(x) x$slice(0L, 1L)$get_column("taxid")$to_r(),
+        character(1L)
+    )
+    pvalues <- imap(rpmm_list, function(rpmm, taxid) {
+        quantile_test(rpmm$get_column("rpmm")$to_r(),
+            ref = ref_quantile[taxid],
+            p = quantile, alternative = alternative
+        )
+    }, USE.NAMES = TRUE)
+
+    # collect results and return ----------------
+    structure(pl$concat(kreports, celllines, how = "vertical"),
+        pvalues = pvalues, sig = names(pvalues)[pvalues < alpha]
+    )
+}
+
+parse_rpmm <- function(kraken_report, taxon) {
     kreport <- parse_kraken_report(kraken_report)
     ref_reads <- kreport$
         filter(
@@ -17,9 +63,9 @@ contaminants <- function(kraken_report,
             separator = "__"
         )$is_in(pl$lit(taxon))
     )$
-        select(pl$col("total_reads")$sum())$to_series()
-
-    rpmm <- kreport$
+        select(pl$col("total_reads")$list$last()$sum())$
+        to_series()$cast(pl$Float64)
+    kreport$
         with_row_index("index")$
         with_columns(
         pl$col("taxids")$list$last()$alias("taxid"),
@@ -38,16 +84,21 @@ contaminants <- function(kraken_report,
         unique()$
         select(
         pl$col("taxid", "taxa"),
-        pl$col("total_reads")$div(ref_reads)$mul(10^6L)$alias("rpmm")
+        pl$col("total_reads")$alias("rpmm")$div(ref_reads)$mul(10^6L)
     )
+}
 
-    cell_lines <- pl$read_parquet("inst/extdata/cell_lines.parquet")$
-        group_by("taxid")$
-        agg(pl$col("rpmm")$log10()$quantile(quantile))$
-        select(
-        pl$col("taxid"),
-        pl$col("rpmm")$alias("cell_lines_rpmm"),
-        pl$lit(10)$pow(pl$col("rpmm"))$alias("cell_lines_rpmm_quantile")
+# https://people.stat.sc.edu/hitchcock/notes518fall13sec32filledin.pdf
+quantile_test <- function(x, ref = 0, p = .5, alternative) {
+    n <- length(x)
+    T1 <- sum(x <= ref)
+    T2 <- sum(x < ref)
+    switch(alternative,
+        less = stats::pbinom(T2 - 1L, n, p, lower.tail = FALSE),
+        greater = stats::pbinom(T1, n, p),
+        two.sided = 2 * min(
+            stats::pbinom(T2 - 1L, n, p, lower.tail = FALSE),
+            stats::pbinom(T1, n, p)
+        )
     )
-    rpmm$join(cell_lines, "taxid", how = "left")
 }

@@ -8,7 +8,7 @@ cell_lines <- pl$DataFrame(
 )
 cell_lines <- cell_lines$select(
     # study = pl$lit("cell lines"), pl$col("sample"),
-    pl$col("taxid"), 
+    pl$col("taxid")$cast(pl$String), 
     # pl$col("name")$alias("taxa"), 
     # pl$col("rank"),
     # pl$col("reads")$alias("total_reads"),
