@@ -18,6 +18,7 @@ contaminants <- function(kraken_reports,
                          quantile = 0.95, alpha = 0.05,
                          alternative = "greater") {
     alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
+    cli::cli_alert_info("Parsing reads per million microbiome reads (rpmm)")
     kreports <- lapply(kraken_reports, parse_rpmm, taxon = taxon)
     kreports <- pl$concat(kreports, how = "vertical")
 
@@ -30,11 +31,12 @@ contaminants <- function(kraken_reports,
         join(celllines, on = "taxid", how = "inner")
 
     # Do quantile test ----------------------------
+    cli::cli_alert_info("Doing quantile test")
     ref_quantile <- celllines$group_by("taxid")$
         agg(pl$col("rpmm")$quantile(quantile))$
         to_data_frame()
     ref_quantile <- structure(ref_quantile$rpmm, names = ref_quantile$taxid)
-    rpmm_list <- kreports$partition_by(pl$col("taxid", "taxa"))
+    rpmm_list <- kreports$partition_by("taxid", "taxa")
     names(rpmm_list) <- vapply(
         rpmm_list,
         function(x) x$slice(0L, 1L)$get_column("taxid")$to_r(),
