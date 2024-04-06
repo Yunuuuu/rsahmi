@@ -5,19 +5,47 @@
 #' full taxonomic classification of all resulting barcodes and the number of
 #' counts assigned to each clade are tabulated.
 #'
-#' @param umi UMI data returned by [prep_dataset].
-#' @param taxids Taxa ids to be extracted, if `NULL`, all taxon in `umi` will be
-#' counting.
+#' @param umi_list A list of polars [DataFrame][polars::DataFrame_class] for UMI
+#' data returned by [prep_dataset].
+#' @param samples A character of sample identifier for each element in
+#' `umi_list`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
-taxa_counts <- function(umi, taxids = NULL) {
-    if (!is.null(taxids)) {
-        umi <- umi$filter(pl$col("taxid")$is_in(taxids))
+taxa_counts <- function(umi_list, samples = NULL) {
+    groups <- c("sample", "barcode", "taxid", "taxa", "rank", "taxon", "ranks")
+    if (is.list(umi_list)) {
+        if (!is.null(samples) && length(samples) != length(umi_list)) {
+            cli::cli_abort(
+                "{.arg samples} must have the same length of {.arg umi_list}"
+            )
+        }
+        samples <- samples %||% names(umi_list) %||% seq_along(umi_list)
+        umi_list <- .mapply(function(umi, sample) {
+            umi$with_columns(sample = pl$lit(sample))
+        }, list(umi = umi_list, sample = samples))
+    } else if (polars::is_polars_df(umi_list)) {
+        if (!is.null(samples)) {
+            if (length(samples) != 1L) {
+                cli::cli_abort(
+                    "{.arg samples} must be a scalar string for a single umi"
+                )
+            }
+            umi <- umi_list$with_columns(sample = pl$lit(samples))
+        } else {
+            groups <- setdiff(groups, "sample")
+            umi <- umi_list
+        }
+    } else {
+        cli::cli_abort(paste(
+            "{.arg umi_list} must be a polars {.cls DataFrame}",
+            "or a list of polars {.cls DataFrame}"
+        ))
     }
+
     # create barcode umi data -----------------------------------
     counts <- umi$lazy()$
         with_columns(pl$col(pl$List(pl$String))$list$join("|"))$
-        group_by("barcode", "taxid", "taxa", "rank", "taxon", "ranks")$
+        group_by(groups)$
         agg(pl$col("umi")$n_unique())$
         with_columns(pl$col("ranks", "taxon")$str$split("|"))$
         #     with_columns(
@@ -54,19 +82,19 @@ taxa_counts <- function(umi, taxids = NULL) {
     )$
         collect()$
         pivot(
-        values = "taxon",
-        index = c("index", "barcode", "taxid", "taxa", "rank", "umi"),
+        values = "taxon", index = c("index", columns, "umi"),
         columns = "ranks"
     )$
         drop("index")
+
     # relocate columns ----------------------------
-    cs <- list(pl$col("barcode", "taxid", "taxa", "rank"))
+    columns <- list(pl$col(setdiff(groups, c("taxon", "ranks"))))
     columns <- counts$columns
     for (taxa in c("root", "domain", "kingdom", "phylum", "class", "order", "family", "genus", "species")) {
         pattern <- sprintf("^%s\\d*$", taxa)
         if (any(grepl(pattern, columns, perl = TRUE))) {
-            cs <- c(cs, list(pl$col(pattern)))
+            columns <- c(columns, list(pl$col(pattern)))
         }
     }
-    counts$select(c(cs, list(pl$col("umi")$alias("counts"))))
+    counts$select(c(columns, list(pl$col("umi")$alias("counts"))))
 }

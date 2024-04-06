@@ -4,13 +4,14 @@
 \alias{taxa_counts}
 \title{Quantitation of microbes}
 \usage{
-taxa_counts(umi, taxids = NULL)
+taxa_counts(umi_list, samples = NULL)
 }
 \arguments{
-\item{umi}{UMI data returned by \link{prep_dataset}.}
+\item{umi_list}{A list of polars \link[polars:DataFrame_class]{DataFrame} for UMI
+data returned by \link{prep_dataset}.}
 
-\item{taxids}{Taxa ids to be extracted, if \code{NULL}, all taxon in \code{umi} will be
-counting.}
+\item{samples}{A character of sample identifier for each element in
+\code{umi_list}.}
 }
 \description{
 After identifying true taxa, reads assigned to those taxa are
