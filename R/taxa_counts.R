@@ -12,7 +12,7 @@
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
 taxa_counts <- function(umi_list, samples = NULL) {
-    groups <- c("sample", "barcode", "taxid", "taxa", "rank", "taxon", "ranks")
+    columns <- c("sample", "barcode", "taxid", "taxa", "rank")
     if (is.list(umi_list)) {
         if (!is.null(samples) && length(samples) != length(umi_list)) {
             cli::cli_abort(
@@ -33,7 +33,7 @@ taxa_counts <- function(umi_list, samples = NULL) {
             }
             umi <- umi_list$with_columns(sample = pl$lit(samples))
         } else {
-            groups <- setdiff(groups, "sample")
+            columns <- setdiff(columns, "sample")
             umi <- umi_list
         }
     } else {
@@ -46,7 +46,7 @@ taxa_counts <- function(umi_list, samples = NULL) {
     # create barcode umi data -----------------------------------
     counts <- umi$lazy()$
         with_columns(pl$col(pl$List(pl$String))$list$join("|"))$
-        group_by(groups)$
+        group_by(c(columns, "taxon", "ranks"))$
         agg(pl$col("umi")$n_unique())$
         with_columns(pl$col("ranks", "taxon")$str$split("|"))$
         #     with_columns(
@@ -89,7 +89,7 @@ taxa_counts <- function(umi_list, samples = NULL) {
         drop("index")
 
     # relocate columns ----------------------------
-    columns <- list(pl$col(setdiff(groups, c("taxon", "ranks"))))
+    columns <- list(pl$col(columns))
     columns <- counts$columns
     for (taxa in c("root", "domain", "kingdom", "phylum", "class", "order", "family", "genus", "species")) {
         pattern <- sprintf("^%s\\d*$", taxa)
