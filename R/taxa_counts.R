@@ -22,7 +22,7 @@ taxa_counts <- function(umi_list, samples = NULL) {
         samples <- samples %||% names(umi_list) %||% seq_along(umi_list)
         umi_list <- .mapply(function(umi, sample) {
             umi$with_columns(sample = pl$lit(sample))
-        }, list(umi = umi_list, sample = samples))
+        }, list(umi = umi_list, sample = samples), NULL)
     } else if (polars::is_polars_df(umi_list)) {
         if (!is.null(samples)) {
             if (length(samples) != 1L) {
