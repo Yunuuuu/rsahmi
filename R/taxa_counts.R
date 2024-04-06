@@ -90,10 +90,10 @@ taxa_counts <- function(umi_list, samples = NULL) {
 
     # relocate columns ----------------------------
     columns <- list(pl$col(columns))
-    columns <- counts$columns
+    all_nms <- counts$columns
     for (taxa in c("root", "domain", "kingdom", "phylum", "class", "order", "family", "genus", "species")) {
         pattern <- sprintf("^%s\\d*$", taxa)
-        if (any(grepl(pattern, columns, perl = TRUE))) {
+        if (any(grepl(pattern, all_nms, perl = TRUE))) {
             columns <- c(columns, list(pl$col(pattern)))
         }
     }
