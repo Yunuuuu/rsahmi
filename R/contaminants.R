@@ -13,12 +13,14 @@
 #' @return A polars [DataFrame][polars::DataFrame_class] with following
 #' attributes:
 #' 1. `pvalues`: Quantile test pvalue.
-#' 2. `contaminants`: significant taxids based on `alpha`.
+#' 2. `truly`: significant taxids based on `alpha`.
 #' @export
-contaminants <- function(kraken_reports, study = "current study",
-                         taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                         quantile = 0.95, alpha = 0.05,
-                         alternative = "greater") {
+remove_contaminants <- function(kraken_reports, study = "current study",
+                                taxon = c(
+                                    "d__Bacteria", "d__Fungi", "d__Viruses"
+                                ),
+                                quantile = 0.95, alpha = 0.05,
+                                alternative = "greater") {
     alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
     cli::cli_alert_info("Parsing reads per million microbiome reads (rpmm)")
     kreports <- lapply(kraken_reports, parse_rpmm, taxon = taxon)
@@ -59,7 +61,7 @@ contaminants <- function(kraken_reports, study = "current study",
             how = "vertical"
         ),
         pvalues = pvalues,
-        contaminants = names(pvalues)[!is.na(pvalues) & pvalues < alpha]
+        truly = names(pvalues)[!is.na(pvalues) & pvalues < alpha]
     )
 }
 
