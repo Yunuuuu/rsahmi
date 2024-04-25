@@ -42,10 +42,10 @@ attributes:
 \enumerate{
 \item \code{pvalues}: Quantile test pvalue.
 \item \code{exclusive}: taxids in current study but not found in cellline data.
-\item \code{significance}: significant taxids based on \code{alpha}.
+\item \code{significant}: significant taxids based on \code{alpha}.
 \item \code{truly}: truly taxids based on \code{alpha} and \code{exclusive}, if \code{exclusive} is
-\code{FALSE}, this should be the same with \code{significance}, otherwise, this
-should be the union of \code{exclusive} and \code{significance}.
+\code{FALSE}, this should be the same with \code{significant}, otherwise, this
+should be the union of \code{exclusive} and \code{significant}.
 }
 }
 \description{
