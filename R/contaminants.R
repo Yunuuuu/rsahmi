@@ -53,11 +53,11 @@ remove_contaminants <- function(kraken_reports, study = "current study",
         if (is.na(ref)) return(NA_real_) # styler: off
         quantile_test(
             rpmm$get_column("rpmm")$to_r(),
-            ref = ref_quantile[taxid],
+            ref = ref,
             alternative = alternative
         )
     }, rpmm = rpmm_list, taxid = taxids, USE.NAMES = FALSE)
-    exclusive <- setdiff(taxids, ref_quantile$taxid)
+    exclusive <- setdiff(taxids, names(ref_quantile))
     truly <- taxids[!is.na(pvalues) & pvalues < alpha]
     if (exclusive) {
         truly <- union(exclusive, truly)
