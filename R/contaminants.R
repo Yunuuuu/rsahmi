@@ -49,7 +49,7 @@ remove_contaminants <- function(kraken_reports, study = "current study",
             ref = ref_quantile[taxid],
             alternative = alternative
         )
-    }, list(rpmm = rpmm_list, taxid = taxids), USE.NAMES = FALSE)
+    }, rpmm = rpmm_list, taxid = taxids, USE.NAMES = FALSE)
 
     # collect results and return ----------------
     structure(
