@@ -15,7 +15,7 @@
 #' @return A polars [DataFrame][polars::DataFrame_class] with following
 #' attributes:
 #' 1. `pvalues`: Quantile test pvalue.
-#' 2. `exclusive`: taxa in current study but not found in cellline data.
+#' 2. `exclusive`: taxids in current study but not found in cellline data.
 #' 3. `truly`: significant taxids based on `alpha` and `exclusive`.
 #' @export
 remove_contaminants <- function(kraken_reports, study = "current study",

@@ -41,7 +41,7 @@ A polars \link[polars:DataFrame_class]{DataFrame} with following
 attributes:
 \enumerate{
 \item \code{pvalues}: Quantile test pvalue.
-\item \code{exclusive}: taxa in current study but not found in cellline data.
+\item \code{exclusive}: taxids in current study but not found in cellline data.
 \item \code{truly}: significant taxids based on \code{alpha} and \code{exclusive}.
 }
 }
