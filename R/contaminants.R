@@ -57,10 +57,10 @@ remove_contaminants <- function(kraken_reports, study = "current study",
             alternative = alternative
         )
     }, rpmm = rpmm_list, taxid = taxids, USE.NAMES = FALSE)
-    exclusive <- setdiff(taxids, names(ref_quantile))
+    exclusive_taxids <- setdiff(taxids, names(ref_quantile))
     truly <- taxids[!is.na(pvalues) & pvalues < alpha]
     if (exclusive) {
-        truly <- union(exclusive, truly)
+        truly <- union(exclusive_taxids, truly)
     }
 
     # collect results and return ----------------
@@ -71,7 +71,7 @@ remove_contaminants <- function(kraken_reports, study = "current study",
             how = "vertical"
         ),
         pvalues = structure(pvalues, names = taxids),
-        exclusive = exclusive,
+        exclusive = exclusive_taxids,
         truly = truly
     )
 }
