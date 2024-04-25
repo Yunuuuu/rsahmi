@@ -10,17 +10,21 @@
 #' @param alternative A string specifying the alternative hypothesis, must be
 #' one of "two.sided", "greater" (default) or "less". You can specify just the
 #' initial letter.
+#' @param exclusive A boolean value, indicates whether taxa not found in
+#' celllines data should be regarded as truly. Default: `TRUE`.
 #' @return A polars [DataFrame][polars::DataFrame_class] with following
 #' attributes:
 #' 1. `pvalues`: Quantile test pvalue.
-#' 2. `truly`: significant taxids based on `alpha`.
+#' 2. `exclusive`: taxa in current study but not found in cellline data.
+#' 3. `truly`: significant taxids based on `alpha` and `exclusive`.
 #' @export
 remove_contaminants <- function(kraken_reports, study = "current study",
                                 taxon = c(
                                     "d__Bacteria", "d__Fungi", "d__Viruses"
                                 ),
                                 quantile = 0.95, alpha = 0.05,
-                                alternative = "greater") {
+                                alternative = "greater",
+                                exclusive = TRUE) {
     alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
     cli::cli_alert_info("Parsing reads per million microbiome reads (rpmm)")
     kreports <- lapply(kraken_reports, parse_rpmm, taxon = taxon)
@@ -45,11 +49,19 @@ remove_contaminants <- function(kraken_reports, study = "current study",
         rpmm$slice(0L, 1L)$get_column("taxid")$to_r()
     }, character(1L))
     pvalues <- mapply(function(rpmm, taxid) {
-        quantile_test(rpmm$get_column("rpmm")$to_r(),
+        ref <- ref_quantile[taxid]
+        if (is.na(ref)) return(NA_real_) # styler: off
+        quantile_test(
+            rpmm$get_column("rpmm")$to_r(),
             ref = ref_quantile[taxid],
             alternative = alternative
         )
     }, rpmm = rpmm_list, taxid = taxids, USE.NAMES = FALSE)
+    exclusive <- setdiff(taxids, ref_quantile$taxid)
+    truly <- taxids[!is.na(pvalues) & pvalues < alpha]
+    if (exclusive) {
+        truly <- union(exclusive, truly)
+    }
 
     # collect results and return ----------------
     structure(
@@ -59,7 +71,8 @@ remove_contaminants <- function(kraken_reports, study = "current study",
             how = "vertical"
         ),
         pvalues = structure(pvalues, names = taxids),
-        truly = taxids[!is.na(pvalues) & pvalues < alpha]
+        exclusive = exclusive,
+        truly = truly
     )
 }
 

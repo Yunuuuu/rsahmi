@@ -10,7 +10,8 @@ remove_contaminants(
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   quantile = 0.95,
   alpha = 0.05,
-  alternative = "greater"
+  alternative = "greater",
+  exclusive = TRUE
 )
 }
 \arguments{
@@ -31,13 +32,17 @@ to calculate.}
 \item{alternative}{A string specifying the alternative hypothesis, must be
 one of "two.sided", "greater" (default) or "less". You can specify just the
 initial letter.}
+
+\item{exclusive}{A boolean value, indicates whether taxa not found in
+celllines data should be regarded as truly. Default: \code{TRUE}.}
 }
 \value{
 A polars \link[polars:DataFrame_class]{DataFrame} with following
 attributes:
 \enumerate{
 \item \code{pvalues}: Quantile test pvalue.
-\item \code{truly}: significant taxids based on \code{alpha}.
+\item \code{exclusive}: taxa in current study but not found in cellline data.
+\item \code{truly}: significant taxids based on \code{alpha} and \code{exclusive}.
 }
 }
 \description{
