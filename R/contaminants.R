@@ -16,7 +16,10 @@
 #' attributes:
 #' 1. `pvalues`: Quantile test pvalue.
 #' 2. `exclusive`: taxids in current study but not found in cellline data.
-#' 3. `truly`: significant taxids based on `alpha` and `exclusive`.
+#' 3. `significance`: significant taxids based on `alpha`.
+#' 3. `truly`: truly taxids based on `alpha` and `exclusive`, if `exclusive` is
+#'    `FALSE`, this should be the same with `significance`, otherwise, this
+#'    should be the union of `exclusive` and `significance`.
 #' @export
 remove_contaminants <- function(kraken_reports, study = "current study",
                                 taxon = c(
@@ -58,7 +61,7 @@ remove_contaminants <- function(kraken_reports, study = "current study",
         )
     }, rpmm = rpmm_list, taxid = taxids, USE.NAMES = FALSE)
     exclusive_taxids <- setdiff(taxids, names(ref_quantile))
-    truly <- taxids[!is.na(pvalues) & pvalues < alpha]
+    truly <- significance <- taxids[!is.na(pvalues) & pvalues < alpha]
     if (exclusive) {
         truly <- union(exclusive_taxids, truly)
     }
@@ -72,6 +75,7 @@ remove_contaminants <- function(kraken_reports, study = "current study",
         ),
         pvalues = structure(pvalues, names = taxids),
         exclusive = exclusive_taxids,
+        significance = significance,
         truly = truly
     )
 }
