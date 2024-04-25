@@ -41,17 +41,15 @@ remove_contaminants <- function(kraken_reports, study = "current study",
         to_data_frame()
     ref_quantile <- structure(ref_quantile$rpmm, names = ref_quantile$taxid)
     rpmm_list <- kreports$partition_by("taxid", "taxa")
-    names(rpmm_list) <- vapply(
-        rpmm_list,
-        function(x) x$slice(0L, 1L)$get_column("taxid")$to_r(),
-        character(1L)
-    )
-    pvalues <- imap(rpmm_list, function(rpmm, taxid) {
+    taxids <- vapply(rpmm_list, function(rpmm) {
+        rpmm$slice(0L, 1L)$get_column("taxid")$to_r()
+    }, character(1L))
+    pvalues <- mapply(function(rpmm, taxid) {
         quantile_test(rpmm$get_column("rpmm")$to_r(),
             ref = ref_quantile[taxid],
             alternative = alternative
         )
-    }, USE.NAMES = TRUE)
+    }, list(rpmm = rpmm_list, taxid = taxids), USE.NAMES = FALSE)
 
     # collect results and return ----------------
     structure(
@@ -60,8 +58,8 @@ remove_contaminants <- function(kraken_reports, study = "current study",
             celllines$with_columns(study = pl$lit("cell lines")),
             how = "vertical"
         ),
-        pvalues = pvalues,
-        truly = names(pvalues)[!is.na(pvalues) & pvalues < alpha]
+        pvalues = structure(pvalues, names = taxids),
+        truly = taxids[!is.na(pvalues) & pvalues < alpha]
     )
 }
 
