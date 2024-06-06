@@ -20,7 +20,7 @@ prep_dataset(
   exclude = "9606",
   threads = 10L,
   overwrite = TRUE,
-  odir = "SAHMI"
+  odir = "rsahmi"
 )
 
 read_dataset(dir)

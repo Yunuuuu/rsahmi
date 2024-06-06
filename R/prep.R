@@ -56,7 +56,7 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                          },
                          ranks = c("G", "S"), kmer_len = 35L,
                          min_frac = 0.5, exclude = "9606",
-                         threads = 10L, overwrite = TRUE, odir = "SAHMI") {
+                         threads = 10L, overwrite = TRUE, odir = "rsahmi") {
     if (!is.null(odir)) {
         if (!dir.exists(odir) && file.exists(odir)) {
             cli::cli_abort(paste(
