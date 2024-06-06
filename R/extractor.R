@@ -43,7 +43,7 @@ extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "
 extract_kraken_output <- function(kraken_out, taxids,
                                   ofile = "kraken_microbiome_output.txt",
                                   odir = getwd(), ...) {
-    if (!dir.exists(odir)) dir_create(odir)
+    dir_create(odir)
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
     if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
@@ -82,7 +82,7 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
     } else if (length(ofile) != length(reads)) {
         cli::cli_abort("{.arg ofile} must have the same length of {.arg reads}")
     }
-    if (!dir.exists(odir)) dir_create(odir)
+    dir_create(odir)
     ofile <- file.path(odir, ofile)
     file <- tempfile("kraken_sequence_id")
     pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
