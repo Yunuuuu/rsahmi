@@ -90,13 +90,14 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
         select(pl$col("column_2"))$unique()$
         sink_csv(path = file, include_header = FALSE, separator = "\t")
     on.exit(file.remove(file))
-    for (i in seq_along(reads)) {
+    status <- vapply(seq_along(reads), function(i) {
         extract_sequence_id(
             fq = reads[[i]], ofile = ofile[[i]],
             sequence_id = file, ...,
             threads = threads, seqkit = seqkit
         )
-    }
+    }, integer(1L))
+    invisible(status)
 }
 
 extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads, seqkit) {
