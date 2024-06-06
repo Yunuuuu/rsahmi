@@ -26,7 +26,7 @@ taxa_counts <- function(umi_list, samples = NULL) {
         umi <- pl$concat(umi_list, how = "vertical")
     } else if (polars::is_polars_df(umi_list)) {
         if (!is.null(samples)) {
-            if (length(samples) != 1L) {
+            if (!is_scalar(samples)) {
                 cli::cli_abort(
                     "{.arg samples} must be a scalar string for a single umi"
                 )
