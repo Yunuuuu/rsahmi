@@ -5,7 +5,7 @@
 #' non-traditional taxonomic ranks in output.
 #' @param mpa A bool indicates whether to use mpa-style.
 #' @return A polars [DataFrame][polars::DataFrame_class].
-#' @seealso 
+#' @seealso
 #' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
 #' @importFrom polars pl
 #' @export
@@ -30,7 +30,7 @@ parse_kraken_report <- function(kraken_report,
     # 8. Indented scientific name
     kreport <- pl$scan_csv(kraken_report, separator = "\t", has_header = FALSE)$
         rename(
-        percents = "column_1", total_reads = "column_2", reads = "column_3"
+        column_1 = "percents", column_2 = "total_reads", column_3 = "reads"
     )
     if (kreport$width == 6L) {
         cols <- pl$col("reads", "total_reads", "percents")

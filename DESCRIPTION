@@ -15,7 +15,7 @@ SystemRequirements: kraken2, seqkit
 Imports: 
     biosys (>= 0.0.0.9000),
     cli,
-    polars,
+    polars (>= 0.17.0),
     ShortRead
 Remotes: 
     Yunuuuu/biosys
