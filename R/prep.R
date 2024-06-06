@@ -180,16 +180,24 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     kout <- kout$lazy()$with_columns(
         pl$col(read_nms)$str$extract_all("(\\d+|A):")$name$suffix("_taxid"),
         pl$col(read_nms)$str$extract_all(":\\d+")$name$suffix("_kmer")
-    )$
-        explode(pl$col("^.+_taxid$", "^.+_kmer$"))$
-        with_columns(
-        pl$col("^.+_taxid$")$str$strip_chars_end(":"),
-        pl$col("^.+_kmer$")$str$strip_chars_start(":")$cast(pl$Int64)
-    )$
-        group_by("index", "name", "taxid", "sequence_id", read_nms,
-        maintain_order = FALSE
-    )$
-        agg(pl$col("^.+_kmer$", "^.+_taxid$"))$
+    )
+    for (read_nm in read_nms) {
+        kout <- kout$
+            explode(pl$col(sprintf(c("%s_taxid", "%s_kmer"), read_nm)))$
+            with_columns(
+            pl$col(sprintf("%s_taxid", read_nm))$
+                str$strip_chars_end(":"),
+            pl$col(sprintf("%s_kmer", read_nm))$
+                str$strip_chars_start(":")$cast(pl$Int64)
+        )$
+            group_by(
+            "index", "name", "taxid", "sequence_id",
+            sprintf(c("%s_taxid", "%s_kmer"), setdiff(read_nms, read_nm)),
+            maintain_order = FALSE
+        )$
+            agg(pl$col(sprintf(c("%s_taxid", "%s_kmer"), read_nm)))
+    }
+    kout <- kout$
         with_columns(
         pl$col("^.+_kmer$")$list$
             eval(pl$element()$div(pl$element()$sum()$cast(pl$Float64)))$
