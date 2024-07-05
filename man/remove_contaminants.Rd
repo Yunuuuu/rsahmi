@@ -11,7 +11,7 @@ remove_contaminants(
   quantile = 0.95,
   alpha = 0.05,
   alternative = "greater",
-  exclusive = TRUE
+  exclusive = FALSE
 )
 }
 \arguments{
@@ -34,7 +34,7 @@ one of "two.sided", "greater" (default) or "less". You can specify just the
 initial letter.}
 
 \item{exclusive}{A boolean value, indicates whether taxa not found in
-celllines data should be regarded as truly. Default: \code{TRUE}.}
+celllines data should be regarded as truly. Default: \code{FALSE}.}
 }
 \value{
 A polars \link[polars:DataFrame_class]{DataFrame} with following
@@ -42,10 +42,10 @@ attributes:
 \enumerate{
 \item \code{pvalues}: Quantile test pvalue.
 \item \code{exclusive}: taxids in current study but not found in cellline data.
-\item \code{significant}: significant taxids based on \code{alpha}.
-\item \code{truly}: truly taxids based on \code{alpha} and \code{exclusive}, if \code{exclusive} is
-\code{FALSE}, this should be the same with \code{significant}, otherwise, this
-should be the union of \code{exclusive} and \code{significant}.
+\item \code{significant}: significant taxids with \code{pvalues < alpha}.
+\item \code{truly}: truly taxids based on \code{alpha} and \code{exclusive}. If \code{exclusive} is
+\code{TRUE}, this should be the union of \code{exclusive} and \code{significant},
+otherwise, this should be the same with \code{significant}.
 }
 }
 \description{
