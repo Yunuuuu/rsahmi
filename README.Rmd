@@ -60,3 +60,21 @@ pak::pkg_install("Yunuuuu/rsahmi")
 
 You must also install [seqkit](https://bioinf.shenwei.me/seqkit/) and
 [kraken2](https://github.com/DerrickWood/kraken2/wiki/Manual). 
+
+## Cite
+If you use this package, please cite:
+
+ - Ghaddar B, Biswas A, Harris C, Omary MB, Carpizo DR, Blaser MJ, De S. Tumor
+microbiome links cellular programs and immunity in pancreatic cancer. Cancer
+Cell. 2022 Oct 10;40(10):1240-1253.e5. doi: 10.1016/j.ccell.2022.09.009. PMID:
+36220074; PMCID: PMC9556978. 
+ - Ghaddar B, Blaser MJ, De S. Denoising sparse microbial signals from
+single-cell sequencing of mammalian host tissues. Nat Comput Sci. 2023
+Sep;3(9):741-747. doi: 10.1038/s43588-023-00507-1. Epub 2023 Sep 18. PMID:
+37946872; PMCID: PMC10634611.
+ - Song Y, Peng Y, Qin C, Jiang S, Lin J, Lai S, Wu J, Ding M, Du Y, Yu L, Xu T.
+Antibiotic use attenuates response to immune checkpoint blockade in urothelial
+carcinoma via inhibiting CD74-MIF/COPA: revealing cross-talk between
+anti-bacterial immunity and anti-tumor immunity through a tumor marker
+prognostic study. Int J Surg. 2024 Jul 12. doi: 10.1097/JS9.0000000000001901.
+Epub ahead of print. PMID: 38995167. 
