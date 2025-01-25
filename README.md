@@ -65,10 +65,11 @@ If you use this package, please cite:
   single-cell sequencing of mammalian host tissues. Nat Comput Sci. 2023
   Sep;3(9):741-747. doi: 10.1038/s43588-023-00507-1. Epub 2023 Sep 18.
   PMID: 37946872; PMCID: PMC10634611.
-- Song Y, Peng Y, Qin C, Jiang S, Lin J, Lai S, Wu J, Ding M, Du Y, Yu
-  L, Xu T. Antibiotic use attenuates response to immune checkpoint
-  blockade in urothelial carcinoma via inhibiting CD74-MIF/COPA:
-  revealing cross-talk between anti-bacterial immunity and anti-tumor
-  immunity through a tumor marker prognostic study. Int J Surg. 2024
-  Jul 12. doi: 10.1097/JS9.0000000000001901. Epub ahead of print. PMID:
-  38995167.
+- Song, Yuxuan PhD; Peng, Yun PhD; Qin, Caipeng PhD; Jiang, Shan PhD;
+  Lin, Jiaxing PhD; Lai, Shicong MD; Wu, Jilin PhD; Ding, Mengting PhD;
+  Du, Yiqing PhD*; Yu, Luping MD*; Xu, Tao MD\*. Antibiotic use
+  attenuates response to immune checkpoint blockade in urothelial
+  carcinoma via inhibiting CD74-MIF/COPA: revealing cross-talk between
+  anti-bacterial immunity and ant-itumor immunity. International Journal
+  of Surgery 111(1):p 972-987, January 2025. \| DOI:
+  10.1097/JS9.0000000000001901
