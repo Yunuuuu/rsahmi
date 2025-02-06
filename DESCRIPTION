@@ -2,7 +2,7 @@ Package: rsahmi
 Title: Single-cell Analysis of Host-Microbiome Interactions
 Version: 0.0.2.9000
 Authors@R: 
-    person("Yun", "Peng", , "yunyunpp96@outlook.com", role = c("aut", "cre"))
+    person("Yun", "Peng", , "yunyunp96@163.com", role = c("aut", "cre"), comment = c(ORCID = "0000-0003-2801-3332"))
 Description: rsahmi enables the systematic recovery and denoising of
     microbial signals from genomic sequencing of host tissues.
 License: MIT + file LICENSE
