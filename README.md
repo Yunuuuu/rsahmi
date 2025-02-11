@@ -20,16 +20,26 @@ if (!requireNamespace("pak")) {
 }
 ```
 
-`rsami` depends on [polars](https://rpolars.github.io/index.html), you
+`rsahmi` depends on [polars](https://rpolars.github.io/index.html), you
 can install it by:
 
 ``` r
-pak::repo_add("https://community.r-multiverse.org")
-pak::pkg_install("polars")
+if (Sys.info()["sysname"] == "Linux") {
+    pak::pkg_install(
+        "https://github.com/pola-rs/r-polars/releases/latest/download/polars__x86_64-pc-linux-gnu.gz"
+    )
+} else if (Sys.info()["sysname"] == "Darwin") {
+    pak::pkg_install(
+        "https://github.com/pola-rs/r-polars/releases/latest/download/polars__x86_64-apple-darwin20.tgz"
+    )
+} else {
+    stop("Unsupported operating system")
+}
 ```
 
 You can also install the development version of `polars` from
-[Github](https://github.com/pola-rs/r-polars)
+[Github](https://github.com/pola-rs/r-polars) or
+[R-universe](https://community.r-multiverse.org):
 
 In this way, you must install `rustc` to compile `polars`
 
@@ -43,8 +53,14 @@ Then install the `polars` package:
 pak::pkg_install("pola-rs/r-polars")
 ```
 
-You can install the development version of `rsahmi` from
-[GitHub](https://github.com/Yunuuuu/rsahmi):
+Or
+
+``` r
+pak::repo_add("https://community.r-multiverse.org")
+pak::pkg_install("polars")
+```
+
+Then you can install `rsahmi`:
 
 ``` r
 pak::pkg_install("Yunuuuu/rsahmi")
