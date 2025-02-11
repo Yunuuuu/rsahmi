@@ -24,7 +24,7 @@ if (!requireNamespace("pak")) {
 can install it by:
 
 ``` r
-pak::repo_add("https://rpolars.r-universe.dev")
+pak::repo_add("https://community.r-multiverse.org")
 pak::pkg_install("polars")
 ```
 
