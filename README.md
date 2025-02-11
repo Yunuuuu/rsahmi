@@ -41,9 +41,8 @@ You can also install the development version of `polars` from
 [Github](https://github.com/pola-rs/r-polars) or
 [R-universe](https://community.r-multiverse.org):
 
-In this way, you must install `rustc` to compile `polars`
-
-You can install `rustc` with `rustup`:
+In this way, you must install `rustc` to compile `polars`, you can
+install `rustc` with `rustup`:
 
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
