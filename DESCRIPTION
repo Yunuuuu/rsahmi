@@ -18,4 +18,4 @@ Imports:
     polars (>= 0.17.0),
     ShortRead
 Remotes: 
-    Yunuuuu/biosys
+    WangLabCSU/biosys
