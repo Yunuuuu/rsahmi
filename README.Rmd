@@ -48,7 +48,7 @@ if (Sys.info()["sysname"] == "Linux") {
 
 You can also install the development version of `polars` from
 [Github](https://github.com/pola-rs/r-polars) or
-[R-universe](https://community.r-multiverse.org):
+[R-universe](https://community.r-multiverse.org/polars):
 
 In this way, you must install `rustc` to compile `polars`, you can install
 `rustc` with `rustup`:
