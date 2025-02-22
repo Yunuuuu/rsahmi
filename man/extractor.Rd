@@ -49,13 +49,14 @@ scientific name of the taxon (e.g., "d__Viruses")}
 \item \code{extract_kraken_output}: Additional arguments passed to
 \link[polars:IO_sink_csv]{sink_csv}.
 \item \code{extract_kraken_reads}: Additional arguments passed to
-\link[biosys:Execute]{run} method.
+\code{\link[blit:cmd_run]{cmd_run}} method.
 }}
 
 \item{reads}{The original fastq files (input in \code{kraken2}). You can pass
 two paired-end files directly.}
 
-\item{threads}{Number of threads to use, see \code{biosys::seqkit("grep")$help()}.}
+\item{threads}{Number of threads to use, see
+\code{blit::cmd_help(blit::seqkit("grep"))}.}
 
 \item{seqkit}{A string of path to \code{seqkit} command.}
 }

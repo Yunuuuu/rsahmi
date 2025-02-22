@@ -7,7 +7,7 @@
 #'  - `extract_kraken_output`: Additional arguments passed to
 #'    [sink_csv][polars::LazyFrame_sink_csv].
 #'  - `extract_kraken_reads`: Additional arguments passed to
-#'    [run][biosys::Execute] method.
+#'    [`cmd_run`][blit::cmd_run] method.
 #' @name extractor
 #' @seealso
 #' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
@@ -62,8 +62,9 @@ extract_kraken_output <- function(kraken_out, taxids,
     )
 }
 
-#' @param threads Number of threads to use, see `biosys::seqkit("grep")$help()`.
-#' @inheritParams biosys::seqkit
+#' @param threads Number of threads to use, see
+#' `blit::cmd_help(blit::seqkit("grep"))`.
+#' @inheritParams blit::seqkit
 #' @export
 #' @rdname extractor
 #' @importFrom polars pl
@@ -101,19 +102,20 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
 }
 
 extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads, seqkit) {
-    biosys::seqkit("seq", "--only-id", fq, seqkit = seqkit)$
+    command <- blit::seqkit("seq", "--only-id", fq, seqkit = seqkit)$
         pipe(
-        biosys::seqkit(
-            "grep", biosys::arg("-f", sequence_id),
+        blit::seqkit(
+            "grep", blit::arg("-f", sequence_id),
             if (!is.null(threads)) {
-                biosys::arg("--threads", threads, format = "%d")
+                blit::arg("--threads", threads, format = "%d")
             },
             "-n",
             seqkit = seqkit
         )
-    )$
-        pipe(
-        biosys::seqkit("fq2fa", biosys::arg("-o", ofile), seqkit = seqkit)
-    )$
-        run(...)
+    )
+    command <- blit::seqkit(command,
+        "fq2fa", blit::arg("-o", ofile),
+        seqkit = seqkit
+    )
+    blit::cmd_run(command, ...)
 }
