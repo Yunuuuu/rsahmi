@@ -7,6 +7,7 @@
 # file: standalone-polars.R
 # last-updated: 2025-02-26
 # license: https://unlicense.org
+# dependencies: [standalone-pkg.R]
 # imports: [cli, rlang]
 # ---
 
@@ -28,12 +29,16 @@
 
 pl <- NULL
 
+install_polars <- function() {
+    orepos <- getOption("repos")
+    options(repos = c("https://community.r-multiverse.org", orepos))
+    on.exit(options(repos = orepos), add = TRUE)
+    install_pkgs("polars")
+}
+
 use_polars <- function(reason) {
     if (is.null(pl)) {
-        if (!rlang::is_installed("polars")) {
-            orepos <- getOption("repos")
-            options(repos = c("https://community.r-multiverse.org", orepos))
-            on.exit(options(repos = orepos), add = TRUE)
+        if (!is_installed("polars")) {
             if (missing(reason)) {
                 reason <- sprintf(
                     "to use `%s` package",
@@ -43,11 +48,7 @@ use_polars <- function(reason) {
             rlang::check_installed("polars", reason = reason)
         }
         ns <- topenv(environment())
-        if (bindingIsLocked("pl", ns)) {
-            unlockBinding("pl", ns)
-            on.exit(lockBinding("pl", ns), add = TRUE)
-        }
-        assign("pl", polars::pl, envir = ns, inherits = FALSE)
+        utils::assignInNamespace("pl", polars::pl, ns = ns)
     }
 }
 
