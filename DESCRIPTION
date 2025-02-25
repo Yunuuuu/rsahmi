@@ -16,7 +16,8 @@ Imports:
     blit (>= 0.1.0),
     cli,
     rlang (>= 1.1.0),
-    ShortRead
+    ShortRead,
+    utils
 Suggests: 
     polars (>= 0.17.0)
 Remotes:
