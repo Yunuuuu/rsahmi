@@ -65,12 +65,14 @@ extract_kraken_output <- function(kraken_out, taxids,
 
 #' @param threads Number of threads to use, see
 #' `blit::cmd_help(blit::seqkit("grep"))`.
+#' @param envpath A string of path to be added to the environment variable
+#' `PATH`.
 #' @inheritParams blit::seqkit
 #' @export
 #' @rdname extractor
 extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
                                  odir = getwd(), threads = NULL,
-                                 ..., seqkit = NULL) {
+                                 ..., envpath = NULL, seqkit = NULL) {
     use_polars()
     if (length(reads) < 1L || length(reads) > 2L) {
         cli::cli_abort("{.arg reads} must be of length 1 or 2")
@@ -84,6 +86,7 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
     } else if (length(ofile) != length(reads)) {
         cli::cli_abort("{.arg ofile} must have the same length of {.arg reads}")
     }
+    assert_string(envpath, allow_empty = FALSE)
     dir_create(odir)
     ofile <- file.path(odir, ofile)
     file <- tempfile("kraken_sequence_id")
@@ -96,13 +99,16 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
         extract_sequence_id(
             fq = reads[[i]], ofile = ofile[[i]],
             sequence_id = file, ...,
-            threads = threads, seqkit = seqkit
+            threads = threads,
+            envpath = envpath,
+            seqkit = seqkit
         )
     }, integer(1L))
     invisible(status)
 }
 
-extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads, seqkit) {
+extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads,
+                                envpath, seqkit) {
     command <- blit::seqkit("seq", "--only-id", fq, seqkit = seqkit)$
         pipe(
         blit::seqkit(
@@ -118,5 +124,6 @@ extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads, seqkit) {
         "fq2fa", blit::arg("-o", ofile),
         seqkit = seqkit
     )
+    blit::cmd_envpath(command, envpath)
     blit::cmd_run(command, ...)
 }

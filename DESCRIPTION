@@ -1,5 +1,5 @@
 Package: rsahmi
-Title: Single-cell Analysis of Host-Microbiome Interactions
+Title: Single-Cell Analysis of Host-Microbiome Interactions
 Version: 0.0.2.9000
 Authors@R: 
     person("Yun", "Peng", , "yunyunp96@163.com", role = c("aut", "cre"), comment = c(ORCID = "0000-0003-2801-3332"))
@@ -15,7 +15,7 @@ SystemRequirements: kraken2, seqkit
 Imports: 
     blit (>= 0.1.0),
     cli,
-    rlang,
+    rlang (>= 1.1.0),
     ShortRead
 Suggests: 
     polars (>= 0.17.0)

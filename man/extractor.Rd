@@ -27,6 +27,7 @@ extract_kraken_reads(
   odir = getwd(),
   threads = NULL,
   ...,
+  envpath = NULL,
   seqkit = NULL
 )
 }
@@ -57,6 +58,9 @@ two paired-end files directly.}
 
 \item{threads}{Number of threads to use, see
 \code{blit::cmd_help(blit::seqkit("grep"))}.}
+
+\item{envpath}{A string of path to be added to the environment variable
+\code{PATH}.}
 
 \item{seqkit}{A string of path to \code{seqkit} command.}
 }
