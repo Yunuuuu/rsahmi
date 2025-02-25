@@ -109,21 +109,23 @@ extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
 
 extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads,
                                 envpath, seqkit) {
-    command <- blit::seqkit("seq", "--only-id", fq, seqkit = seqkit)$
-        pipe(
-        blit::seqkit(
-            "grep", blit::arg("-f", sequence_id),
-            if (!is.null(threads)) {
-                blit::arg("--threads", threads, format = "%d")
-            },
-            "-n",
-            seqkit = seqkit
-        )
-    )
-    command <- blit::seqkit(command,
-        "fq2fa", blit::arg("-o", ofile),
+    command <- blit::seqkit("seq", "--only-id", fq, seqkit = seqkit)
+    command <- blit::seqkit(
+        command,
+        "grep", 
+        blit::arg("-f", sequence_id),
+        if (!is.null(threads)) {
+            blit::arg("--threads", threads, format = "%d")
+        },
+        "-n",
         seqkit = seqkit
     )
-    blit::cmd_envpath(command, envpath)
+    command <- blit::seqkit(
+        command,
+        "fq2fa", 
+        blit::arg("-o", ofile),
+        seqkit = seqkit
+    )
+    command <- blit::cmd_envpath(command, envpath)
     blit::cmd_run(command, ...)
 }
