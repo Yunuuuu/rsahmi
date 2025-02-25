@@ -3,7 +3,7 @@ Title: Single-cell Analysis of Host-Microbiome Interactions
 Version: 0.0.2.9000
 Authors@R: 
     person("Yun", "Peng", , "yunyunp96@163.com", role = c("aut", "cre"), comment = c(ORCID = "0000-0003-2801-3332"))
-Description: rsahmi enables the systematic recovery and denoising of
+Description: This package enables the systematic recovery and denoising of
     microbial signals from genomic sequencing of host tissues.
 License: MIT + file LICENSE
 ByteCompile: true
@@ -13,9 +13,10 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 SystemRequirements: kraken2, seqkit
 Imports: 
-    blit (>= 0.0.0.9000),
+    blit (>= 0.1.0),
     cli,
     polars (>= 0.17.0),
     ShortRead
-Remotes: 
+Remotes:
     WangLabCSU/blit
+Additional_repositories: https://community.r-multiverse.org
