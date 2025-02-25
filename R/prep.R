@@ -286,7 +286,7 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     # prepare data for blsa ----------------------
     # define kmer ---------------------------------------------------
     cli::cli_alert_info("Calculating {.field kmer}")
-    kmer_list <- polars_lapply(
+    kmer_list <- series_lapply(
         taxon_struct, kmer_query,
         kout = kout, kreport = kreport,
         read_nms = read_nms, kmer_len = kmer_len,
