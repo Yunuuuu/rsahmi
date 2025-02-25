@@ -7,11 +7,11 @@
 #' @return A polars [DataFrame][polars::DataFrame_class].
 #' @seealso
 #' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
-#' @importFrom polars pl
 #' @export
 parse_kraken_report <- function(kraken_report,
                                 intermediate_ranks = TRUE,
                                 mpa = FALSE) {
+    use_polars()
     # https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown
     # 1. Percentage of fragments covered by the clade rooted at this taxon
     # 2. Number of fragments covered by the clade rooted at this taxon

@@ -17,10 +17,10 @@
 #' @param min_number An integer, the minimal number of cell per taxid. SAHMI use
 #' `4`.
 #' @seealso https://github.com/sjdlabgroup/SAHMI
-#' @importFrom polars pl
 #' @export
 blsd <- function(kmer, method = "spearman", ..., p.adjust = "BH",
                  min_kmer_len = 3L, min_number = 3L) {
+    use_polars()
     data_list <- kmer$
         filter(pl$col("kmer_len")$gt_eq(min_kmer_len))$
         filter(pl$len()$over("taxid", "taxa")$gt_eq(min_number))$

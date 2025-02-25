@@ -1,7 +1,18 @@
+pl <- NULL
+
+use_polars <- function() {
+    if (is.null(pl)) {
+        orepos <- getOption("repos")
+        options(repos = c("https://community.r-multiverse.org", orepos))
+        on.exit(options(repos = orepos))
+        rlang::check_installed("polars", "to use `rsahmi` package")
+        pl <<- polars::pl
+    }
+}
+
 #' @param .x A series object.
 #' @param .fn Must call `$collect_in_background()` method.
 #' @keywords internal
-#' @importFrom polars pl
 #' @noRd
 polars_lapply <- function(.x, .fn, ..., .progress, .threads = 2L) {
     # .threads <- min(as.integer(.threads), pl$thread_pool_size())

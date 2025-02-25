@@ -45,7 +45,6 @@
 #'         vapply(out, function(o) as.character(.subset2(o, i)), character(1L))
 #'     })
 #' }
-#' @importFrom polars pl
 #' @export
 prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                          cb_and_umi = function(sequence_id, read1, read2) {
@@ -57,6 +56,7 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                          ranks = c("G", "S"), kmer_len = 35L,
                          min_frac = 0.5, exclude = "9606",
                          threads = 10L, overwrite = TRUE, odir = "rsahmi") {
+    use_polars()
     if (!is.null(odir)) {
         if (!dir.exists(odir) && file.exists(odir)) {
             cli::cli_abort(paste(
@@ -356,6 +356,7 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
 #' @export
 #' @rdname prep_dataset
 read_dataset <- function(dir) {
+    use_polars()
     list(
         kreport = pl$read_parquet(file.path(dir, "kreport.parquet")),
         kmer = pl$read_parquet(file.path(dir, "kmer.parquet")),

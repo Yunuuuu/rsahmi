@@ -12,6 +12,7 @@
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @export
 taxa_counts <- function(umi_list, samples = NULL) {
+    use_polars()
     columns <- c("sample", "barcode", "taxid", "taxa", "rank")
     if (is.list(umi_list)) {
         if (!is.null(samples) && length(samples) != length(umi_list)) {

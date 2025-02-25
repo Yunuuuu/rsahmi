@@ -15,8 +15,10 @@ SystemRequirements: kraken2, seqkit
 Imports: 
     blit (>= 0.1.0),
     cli,
-    polars (>= 0.17.0),
+    rlang,
     ShortRead
+Suggests: 
+    polars (>= 0.17.0)
 Remotes:
     WangLabCSU/blit
 Additional_repositories: https://community.r-multiverse.org

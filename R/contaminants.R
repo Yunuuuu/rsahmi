@@ -28,6 +28,7 @@ remove_contaminants <- function(kraken_reports, study = "current study",
                                 quantile = 0.95, alpha = 0.05,
                                 alternative = "greater",
                                 exclusive = FALSE) {
+    use_polars()
     alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
     cli::cli_alert_info("Parsing reads per million microbiome reads (rpmm)")
     kreports <- lapply(kraken_reports, parse_rpmm, taxon = taxon)

@@ -18,8 +18,9 @@ NULL
 #' scientific name of the taxon (e.g., "d__Viruses")
 #' @export
 #' @rdname extractor
-#' @importFrom polars pl
-extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "d__Viruses")) {
+extract_taxids <- function(kraken_report,
+                           taxon = c("d__Bacteria", "d__Fungi", "d__Viruses")) {
+    use_polars()
     parse_kraken_report(kraken_report)$
         explode(pl$col("ranks", "taxon"))$
         filter(
@@ -39,10 +40,10 @@ extract_taxids <- function(kraken_report, taxon = c("d__Bacteria", "d__Fungi", "
 #' @param odir A string of directory to save the `ofile`.
 #' @export
 #' @rdname extractor
-#' @importFrom polars pl
 extract_kraken_output <- function(kraken_out, taxids,
                                   ofile = "kraken_microbiome_output.txt",
                                   odir = getwd(), ...) {
+    use_polars()
     dir_create(odir)
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
@@ -67,10 +68,10 @@ extract_kraken_output <- function(kraken_out, taxids,
 #' @inheritParams blit::seqkit
 #' @export
 #' @rdname extractor
-#' @importFrom polars pl
 extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
                                  odir = getwd(), threads = NULL,
                                  ..., seqkit = NULL) {
+    use_polars()
     if (length(reads) < 1L || length(reads) > 2L) {
         cli::cli_abort("{.arg reads} must be of length 1 or 2")
     }

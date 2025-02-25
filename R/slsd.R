@@ -26,6 +26,7 @@
 #' @export
 slsd <- function(kreports, method = "spearman", ...,
                  min_reads = 3L, min_minimizer_n_unique = 3L, min_number = 3L) {
+    use_polars()
     data_list <- pl$concat(kreports, how = "vertical")$
         filter(
         pl$col("total_reads")$gt_eq(min_reads),
