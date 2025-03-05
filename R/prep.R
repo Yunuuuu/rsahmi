@@ -45,6 +45,10 @@
 #'         vapply(out, function(o) as.character(.subset2(o, i)), character(1L))
 #'     })
 #' }
+#' @return A list of three polars [DataFrame][polars::DataFrame_class]:
+#'  - kreport: Used by [`slsd()`].
+#'  - kmer: Used by [`blsd()`].
+#'  - umi: Used by [`taxa_counts()`].
 #' @export
 prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                          cb_and_umi = function(sequence_id, read1, read2) {

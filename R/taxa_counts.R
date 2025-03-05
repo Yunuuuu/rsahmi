@@ -10,6 +10,7 @@
 #' @param samples A character of sample identifier for each element in
 #' `umi_list`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
+#' @return A polars [DataFrame][polars::DataFrame_class].
 #' @export
 taxa_counts <- function(umi_list, samples = NULL) {
     use_polars()

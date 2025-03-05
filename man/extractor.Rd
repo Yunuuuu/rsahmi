@@ -64,6 +64,19 @@ two paired-end files directly.}
 
 \item{seqkit}{A string of path to \code{seqkit} command.}
 }
+\value{
+\itemize{
+\item \code{extract_taxids}: An atomic character vector of taxon identifiers.
+}
+
+\itemize{
+\item \code{extract_kraken_output}: A polars \link[polars:DataFrame_class]{DataFrame}.
+}
+
+\itemize{
+\item \code{extract_kraken_reads}: Exit status invisiblely.
+}
+}
 \description{
 Extract reads and output from Kraken
 }

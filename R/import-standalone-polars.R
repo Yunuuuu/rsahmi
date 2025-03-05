@@ -8,7 +8,7 @@
 # last-updated: 2025-02-26
 # license: https://unlicense.org
 # dependencies: [standalone-pkg.R]
-# imports: [cli, rlang]
+# imports: [rlang]
 # ---
 
 # This file contains several helper functions for working with the polars
@@ -31,12 +31,10 @@
 
 pl <- NULL
 
-#' Helper function to install `polars` package
-#'
-#' Helper function to install `polars` package from
-#' [`r-multiverse`](https://community.r-multiverse.org).
-#'
-#' @export
+# Helper function to install `polars` package
+#
+# Helper function to install `polars` package from
+# [`r-multiverse`](https://community.r-multiverse.org).
 install_polars <- function() {
     orepos <- getOption("repos")
     options(repos = c("https://community.r-multiverse.org", orepos))
@@ -55,7 +53,10 @@ use_polars <- function(reason) {
             on.exit(options(repos = orepos), add = TRUE)
             rlang::check_installed("polars", reason = reason)
         }
-        utils::assignInNamespace("pl", polars::pl, ns = pkg_namespace())
+        utils::assignInNamespace("pl",
+            getExportedValue("polars", "pl"),
+            ns = pkg_namespace()
+        )
     }
 }
 
@@ -65,14 +66,17 @@ use_polars <- function(reason) {
 #' @param .progress Additional arguments passed to [cli::cli_progress_bar].
 #' @keywords internal
 #' @noRd
-series_lapply <- function(.x, .fn, ..., .progress, .threads = 2L) {
+series_lapply <- function(.x, .fn, ..., .progress, .threads = 1L) {
     # .threads <- min(as.integer(.threads), pl$thread_pool_size())
     poos_size <- max(.threads, 1L)
     n <- .x$len()
-    bar <- rlang::inject(cli::cli_progress_bar(
-        !!!.progress,
-        total = n, clear = FALSE
-    ))
+    if (is_installed("cli")) {
+        bar <- rlang::inject(
+            getExportedValue("cli", "cli_progress_bar")(
+                !!!.progress, total = n, clear = FALSE
+            )
+        )
+    }
     out <- vector("list", n)
     # pools: store the index of result
     # NA means this pool can be used
@@ -98,7 +102,11 @@ series_lapply <- function(.x, .fn, ..., .progress, .threads = 2L) {
                 # collect result from this pool and release this pool
                 out[[handle_index]] <- polars_handle$join()
                 pools[pool] <- NA_integer_
-                cli::cli_progress_update(inc = 1L, id = bar)
+                if (is_installed("cli")) {
+                    getExportedValue("cli", "cli_progress_update")(
+                        inc = 1L, id = bar
+                    )
+                }
 
                 # this pool has been released, so we directly
                 # step into next cycle and re-use this pool

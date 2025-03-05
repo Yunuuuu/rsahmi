@@ -16,7 +16,8 @@
 #' SAHMI use `2`.
 #' @param min_number An integer, the minimal number of cell per taxid. SAHMI use
 #' `4`.
-#' @seealso https://github.com/sjdlabgroup/SAHMI
+#' @seealso <https://github.com/sjdlabgroup/SAHMI>
+#' @return A polars [DataFrame][polars::DataFrame_class]
 #' @export
 blsd <- function(kmer, method = "spearman", ..., p.adjust = "BH",
                  min_kmer_len = 3L, min_number = 3L) {

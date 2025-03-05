@@ -16,6 +16,8 @@ NULL
 #' @param taxon An atomic character specify the taxa name wanted. Should follow
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses")
+#' @return 
+#'  - `extract_taxids`: An atomic character vector of taxon identifiers.
 #' @export
 #' @rdname extractor
 extract_taxids <- function(kraken_report,
@@ -38,6 +40,8 @@ extract_taxids <- function(kraken_report,
 #' @param taxids A character specify NCBI taxonony identifier to extract.
 #' @param ofile A string of file save the kraken output of specified `taxids`.
 #' @param odir A string of directory to save the `ofile`.
+#' @return 
+#'  - `extract_kraken_output`: A polars [DataFrame][polars::DataFrame_class].
 #' @export
 #' @rdname extractor
 extract_kraken_output <- function(kraken_out, taxids,
@@ -68,6 +72,8 @@ extract_kraken_output <- function(kraken_out, taxids,
 #' @param envpath A string of path to be added to the environment variable
 #' `PATH`.
 #' @inheritParams blit::seqkit
+#' @return
+#'  - `extract_kraken_reads`: Exit status invisiblely.
 #' @export
 #' @rdname extractor
 extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,

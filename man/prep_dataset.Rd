@@ -59,6 +59,14 @@ Reads with any k-mers mapped to the \code{exclude} are discarded.}
 \item{dir}{A string of directory containing the files returned by
 \code{prep_dataset}.}
 }
+\value{
+A list of three polars \link[polars:DataFrame_class]{DataFrame}:
+\itemize{
+\item kreport: Used by \code{\link[=slsd]{slsd()}}.
+\item kmer: Used by \code{\link[=blsd]{blsd()}}.
+\item umi: Used by \code{\link[=taxa_counts]{taxa_counts()}}.
+}
+}
 \description{
 Three elements returned by this function:
 \itemize{

@@ -13,6 +13,9 @@ data returned by \link{prep_dataset}.}
 \item{samples}{A character of sample identifier for each element in
 \code{umi_list}.}
 }
+\value{
+A polars \link[polars:DataFrame_class]{DataFrame}.
+}
 \description{
 After identifying true taxa, reads assigned to those taxa are
 extracted and then undergo a series of filters. The cell barcode and UMI are
