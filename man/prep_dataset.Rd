@@ -70,15 +70,15 @@ A list of three polars \link[polars:DataFrame_class]{DataFrame}:
 \description{
 Three elements returned by this function:
 \itemize{
-\item \code{kreport}: Used by \link{slsd}.
-\item \code{kmer}: Used by \link{blsd}. The function count the number of k-mers and unique
-k-mers assigned to a taxon across barcodes. The cell barcode and
-unique molecular identifier (UMI) are used to identify unique barcodes
-and reads.  Data is reported for taxa of pre-specified ranks (default
-genus + species) taking into account all subsequently higher
+\item \code{kreport}: Used by \code{\link[=slsd]{slsd()}}.
+\item \code{kmer}: Used by \code{\link[=blsd]{blsd()}}. The function count the number of k-mers and
+unique k-mers assigned to a taxon across barcodes. The cell barcode
+and unique molecular identifier (UMI) are used to identify unique
+barcodes and reads.  Data is reported for taxa of pre-specified ranks
+(default genus + species) taking into account all subsequently higher
 resolution ranks. The output is a table of barcodes, taxonomic IDs,
 number of k-mers, and number of unique k-mers.
-\item \code{umi}: Used by \link{taxa_counts}.
+\item \code{umi}: Used by \code{\link[=taxa_counts]{taxa_counts()}}.
 }
 }
 \examples{

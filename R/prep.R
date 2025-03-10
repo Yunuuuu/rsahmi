@@ -2,17 +2,17 @@
 #'
 #' @description Three elements returned by this function:
 #'
-#' * `kreport`: Used by [slsd].
+#' * `kreport`: Used by [`slsd()`].
 #'
-#' * `kmer`: Used by [blsd]. The function count the number of k-mers and unique
-#'        k-mers assigned to a taxon across barcodes. The cell barcode and
-#'        unique molecular identifier (UMI) are used to identify unique barcodes
-#'        and reads.  Data is reported for taxa of pre-specified ranks (default
-#'        genus + species) taking into account all subsequently higher
+#' * `kmer`: Used by [`blsd()`]. The function count the number of k-mers and
+#'        unique k-mers assigned to a taxon across barcodes. The cell barcode
+#'        and unique molecular identifier (UMI) are used to identify unique
+#'        barcodes and reads.  Data is reported for taxa of pre-specified ranks
+#'        (default genus + species) taking into account all subsequently higher
 #'        resolution ranks. The output is a table of barcodes, taxonomic IDs,
 #'        number of k-mers, and number of unique k-mers.
 #'
-#' * `umi`: Used by [taxa_counts].
+#' * `umi`: Used by [`taxa_counts()`].
 #'
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
 #'   [extract_kraken_reads]).
