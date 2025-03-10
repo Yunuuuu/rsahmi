@@ -11,6 +11,12 @@
 #' `umi_list`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @return A polars [DataFrame][polars::DataFrame_class].
+#' @examples 
+#' \dontrun{
+#' # `umi_list` should be the output of all samples from `prep_dataset()`, and 
+#' # filtered by `slsd()` and `blsd()`
+#' taxa_counts(umi_list, basename(names(umi_list)))
+#' }
 #' @export
 taxa_counts <- function(umi_list, samples = NULL) {
     use_polars()

@@ -14,7 +14,7 @@ slsd(
 )
 }
 \arguments{
-\item{kreports}{kreports data returned by \link{prep_dataset} for all samples.}
+\item{kreports}{kreports data returned by \code{\link[=prep_dataset]{prep_dataset()}} for all samples.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
@@ -44,4 +44,18 @@ three Spearman correlations are significant when tested using sample-level
 data provided in Kraken reports: \code{cor(minimizer_len, minimizer_n_unique)},
 \code{cor(minimizer_len, total_reads)} and \code{cor(total_reads, minimizer_n_unique)}.
 (\code{r1>0 & r2>0 & r3>0 & p1<0.05 & p2<0.05 & p3<0.05}).
+}
+\examples{
+\dontrun{
+# `sahmi_datasets` should be the output of all samples from `prep_dataset()`
+slsd <- slsd(lapply(sahmi_datasets, `[[`, "kreport"))
+real_taxids_slsd <- slsd$filter(
+    pl$col("r1")$gt(0),
+    pl$col("r2")$gt(0),
+    pl$col("r3")$gt(0),
+    pl$col("p1")$lt(0.05),
+    pl$col("p2")$lt(0.05),
+    pl$col("p3")$lt(0.05)
+)$get_column("taxid")
+}
 }

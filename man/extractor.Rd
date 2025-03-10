@@ -80,6 +80,41 @@ two paired-end files directly.}
 \description{
 Extract reads and output from Kraken
 }
+\examples{
+\dontrun{
+# For 10x Genomic data, `fq1` only contain barcode and umi, but the official
+# didn't give any information for this. In this way, I prefer using
+# `umi-tools` to transform the `umi` into fq2 and then run `rsahmi` with
+# only fq2.
+blit::kraken2(
+    fq1 = fq1,
+    fq2 = fq2,
+    classified_out = "classified.fq",
+    # Number of threads to use
+    blit::arg("--threads", 10L, format = "\%d"),
+    # the kraken database
+    blit::arg("--db", kraken_db),
+    "--use-names", "--report-minimizer-data",
+) |> blit::cmd_run()
+
+# `kraken_report` should be the output of `blit::kraken2()`
+taxids <- extract_taxids(kraken_report = "kraken_report.txt")
+
+# `kraken_out` should be the output of `blit::kraken2()`
+extract_kraken_output(kraken_out = "kraken_output.txt", taxids = taxids)
+
+# 1. `kraken_out` should be the output of `extract_kraken_output()`
+# 2. `fq1` and `fq2` should be the same with `blit::kraken2()`
+extract_kraken_reads(
+    kraken_out = "kraken_microbiome_output.txt",
+    reads = c(fq1, fq2),
+    threads = 10L, # Number of threads to use
+    # try to change `seqkit` argument into your seqkit path. If `NULL`, the
+    # internal will detect it in your `PATH` environment variable
+    seqkit = NULL
+)
+}
+}
 \seealso{
 \url{https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown}
 }

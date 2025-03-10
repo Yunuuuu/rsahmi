@@ -45,6 +45,34 @@
 #'         vapply(out, function(o) as.character(.subset2(o, i)), character(1L))
 #'     })
 #' }
+#'
+#' \dontrun{
+#' # 1. `fa1` and `fa2` should be the output of `extract_kraken_reads()`
+#' # 2. `kraken_report` should be the output of `blit::kraken2()`
+#' # 3. `kraken_out` should be the output of `extract_kraken_output()`
+#' sahmi_dataset <- prep_dataset(
+#'     fa1 = "kraken_microbiome_reads.fa",
+#'     # if you have paired sequence, please also specify `fa2`,
+#'     # !!! Also pay attention to the file name of `fa1` (add suffix `_1`)
+#'     # if you use paired reads.
+#'     # fa2 = "kraken_microbiome_reads_2.fa",
+#'     kraken_report = "kraken_report.txt",
+#'     kraken_out = "kraken_microbiome_output.txt",
+#'     odir = dir
+#' )
+#' # you may want to prepare all datasets for subsequent workflows.
+#' # `paths` should be the output directory for each sample from
+#' # `blit::kraken2()`, `extract_kraken_output()` and `extract_kraken_reads()`.
+#' sahmi_datasets <- lapply(paths, function(dir) {
+#'     prep_dataset(
+#'         fa1 = file.path(dir, "kraken_microbiome_reads.fa"),
+#'         # fa2 = file.path(dir, "kraken_microbiome_reads_2.fa"),
+#'         kraken_report = file.path(dir, "kraken_report.txt"),
+#'         kraken_out = file.path(dir, "kraken_microbiome_output.txt"),
+#'         odir = dir
+#'     )
+#' })
+#' }
 #' @return A list of three polars [DataFrame][polars::DataFrame_class]:
 #'  - kreport: Used by [`slsd()`].
 #'  - kmer: Used by [`blsd()`].

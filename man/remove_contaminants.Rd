@@ -51,3 +51,35 @@ otherwise, this should be the same with \code{significant}.
 \description{
 Identifying contaminants and false positives taxa (cell line quantile test)
 }
+\examples{
+\dontrun{
+# `paths` should be the output directory for each sample from
+# `blit::kraken2()`
+truly_microbe <- remove_contaminants(
+    kraken_reports = file.path(paths, "kraken_report.txt"), 
+    quantile = 0.99, exclusive = FALSE
+)
+microbe_for_plot <- attr(truly_microbe, "truly")[
+    order(attr(truly_microbe, "pvalue")[attr(truly_microbe, "truly")])
+]
+microbe_for_plot <- microbe_for_plot[
+    !microbe_for_plot \%in\% attr(truly_microbe, "exclusive")
+]
+ggplot(
+    truly_microbe$filter(pl$col("taxid")$is_in(microbe_for_plot))$
+        to_data_frame(),
+    aes(rpmm),
+) +
+    geom_density(aes(fill = study), alpha = 0.5) +
+    scale_x_log10() +
+    facet_wrap(facets = vars(taxa), scales = "free") +
+    theme(
+        strip.clip = "off",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "inside",
+        legend.position.inside = c(1, 0),
+        legend.justification.inside = c(1, 0)
+    )
+}
+}

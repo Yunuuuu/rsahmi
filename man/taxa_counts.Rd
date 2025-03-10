@@ -23,6 +23,13 @@ used to demultiplex the reads and create a barcode x taxa counts matrix. The
 full taxonomic classification of all resulting barcodes and the number of
 counts assigned to each clade are tabulated.
 }
+\examples{
+\dontrun{
+# `umi_list` should be the output of all samples from `prep_dataset()`, and 
+# filtered by `slsd()` and `blsd()`
+taxa_counts(umi_list, basename(names(umi_list)))
+}
+}
 \seealso{
 \url{https://github.com/sjdlabgroup/SAHMI}
 }

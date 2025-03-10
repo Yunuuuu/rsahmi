@@ -7,8 +7,8 @@
 #' data provided in Kraken reports: `cor(minimizer_len, minimizer_n_unique)`,
 #' `cor(minimizer_len, total_reads)` and `cor(total_reads, minimizer_n_unique)`.
 #' (`r1>0 & r2>0 & r3>0 & p1<0.05 & p2<0.05 & p3<0.05`).
-#' 
-#' @param kreports kreports data returned by [prep_dataset] for all samples.
+#'
+#' @param kreports kreports data returned by [`prep_dataset()`] for all samples.
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be
 #'   abbreviated.
@@ -23,6 +23,19 @@
 #'   coefficient and pvalue for `cor(minimizer_len, minimizer_n_unique)` (r1 and
 #'   p1), `cor(minimizer_len, total_reads)` (r2 and p2) and `cor(total_reads,
 #'   minimizer_n_unique)` (r3 and p3).
+#' @examples
+#' \dontrun{
+#' # `sahmi_datasets` should be the output of all samples from `prep_dataset()`
+#' slsd <- slsd(lapply(sahmi_datasets, `[[`, "kreport"))
+#' real_taxids_slsd <- slsd$filter(
+#'     pl$col("r1")$gt(0),
+#'     pl$col("r2")$gt(0),
+#'     pl$col("r3")$gt(0),
+#'     pl$col("p1")$lt(0.05),
+#'     pl$col("p2")$lt(0.05),
+#'     pl$col("p3")$lt(0.05)
+#' )$get_column("taxid")
+#' }
 #' @export
 slsd <- function(kreports, method = "spearman", ...,
                  min_reads = 3L, min_minimizer_n_unique = 3L, min_number = 3L) {
