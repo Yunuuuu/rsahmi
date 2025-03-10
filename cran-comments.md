@@ -17,6 +17,9 @@ This resubmission addresses all the points raised by the reviewer:
 4. Ensured compliance with CRAN file writing policies  
    Removed any default file paths in functions that write data (including `extract_kraken_output()` and `prep_dataset()`)
 
+5. Non-standard file/directory found at top level: 'rsahmi.Rmd'
+   remote the the file
+
 Thank you for your time and consideration.
 
 ## R CMD check results
