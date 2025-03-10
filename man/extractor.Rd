@@ -15,8 +15,8 @@ extract_taxids(
 extract_kraken_output(
   kraken_out,
   taxids,
+  odir,
   ofile = "kraken_microbiome_output.txt",
-  odir = getwd(),
   ...
 )
 
@@ -42,9 +42,9 @@ scientific name of the taxon (e.g., "d__Viruses")}
 
 \item{taxids}{A character specify NCBI taxonony identifier to extract.}
 
-\item{ofile}{A string of file save the kraken output of specified \code{taxids}.}
-
 \item{odir}{A string of directory to save the \code{ofile}.}
+
+\item{ofile}{A string of file save the kraken output of specified \code{taxids}.}
 
 \item{...}{\itemize{
 \item \code{extract_kraken_output}: Additional arguments passed to
@@ -100,8 +100,14 @@ blit::kraken2(
 # `kraken_report` should be the output of `blit::kraken2()`
 taxids <- extract_taxids(kraken_report = "kraken_report.txt")
 
-# `kraken_out` should be the output of `blit::kraken2()`
-extract_kraken_output(kraken_out = "kraken_output.txt", taxids = taxids)
+# 1. `kraken_out` should be the output of `blit::kraken2()`
+# 2. `taxids` should be the output of `extract_taxids()`
+# 3. `odir`: the output directory
+extract_kraken_output(
+    kraken_out = "kraken_output.txt",
+    taxids = taxids,
+    odir = # specify the output directory
+)
 
 # 1. `kraken_out` should be the output of `extract_kraken_output()`
 # 2. `fq1` and `fq2` should be the same with `blit::kraken2()`

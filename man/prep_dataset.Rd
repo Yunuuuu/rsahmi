@@ -20,7 +20,7 @@ prep_dataset(
   exclude = "9606",
   threads = 10L,
   overwrite = TRUE,
-  odir = "rsahmi"
+  odir = NULL
 )
 
 read_dataset(dir)
@@ -97,6 +97,8 @@ cb_and_umi <- function(sequence_id, read1, read2) {
 # 1. `fa1` and `fa2` should be the output of `extract_kraken_reads()`
 # 2. `kraken_report` should be the output of `blit::kraken2()`
 # 3. `kraken_out` should be the output of `extract_kraken_output()`
+# 4. `dir`: you may want to specify the output directory since this process 
+#           is time-consuming
 sahmi_dataset <- prep_dataset(
     fa1 = "kraken_microbiome_reads.fa",
     # if you have paired sequence, please also specify `fa2`,
@@ -105,7 +107,7 @@ sahmi_dataset <- prep_dataset(
     # fa2 = "kraken_microbiome_reads_2.fa",
     kraken_report = "kraken_report.txt",
     kraken_out = "kraken_microbiome_output.txt",
-    odir = dir
+    odir = NULL
 )
 # you may want to prepare all datasets for subsequent workflows.
 # `paths` should be the output directory for each sample from

@@ -38,8 +38,14 @@ NULL
 #' # `kraken_report` should be the output of `blit::kraken2()`
 #' taxids <- extract_taxids(kraken_report = "kraken_report.txt")
 #'
-#' # `kraken_out` should be the output of `blit::kraken2()`
-#' extract_kraken_output(kraken_out = "kraken_output.txt", taxids = taxids)
+#' # 1. `kraken_out` should be the output of `blit::kraken2()`
+#' # 2. `taxids` should be the output of `extract_taxids()`
+#' # 3. `odir`: the output directory
+#' extract_kraken_output(
+#'     kraken_out = "kraken_output.txt",
+#'     taxids = taxids,
+#'     odir = # specify the output directory
+#' )
 #'
 #' # 1. `kraken_out` should be the output of `extract_kraken_output()`
 #' # 2. `fq1` and `fq2` should be the same with `blit::kraken2()`
@@ -78,9 +84,8 @@ extract_taxids <- function(kraken_report,
 #'  - `extract_kraken_output`: A polars [DataFrame][polars::DataFrame_class].
 #' @export
 #' @rdname extractor
-extract_kraken_output <- function(kraken_out, taxids,
-                                  ofile = "kraken_microbiome_output.txt",
-                                  odir = getwd(), ...) {
+extract_kraken_output <- function(kraken_out, taxids, odir,
+                                  ofile = "kraken_microbiome_output.txt", ...) {
     use_polars()
     dir_create(odir)
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
