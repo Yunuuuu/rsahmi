@@ -5,9 +5,9 @@
 #' two paired-end files directly.
 #' @param ...
 #'  - `extract_kraken_output`: Additional arguments passed to
-#'    [sink_csv][polars::LazyFrame_sink_csv].
+#'    [`sink_csv()`][polars::LazyFrame_sink_csv].
 #'  - `extract_kraken_reads`: Additional arguments passed to
-#'    [`cmd_run`][blit::cmd_run] method.
+#'    [`cmd_run()`][blit::cmd_run] method.
 #' @name extractor
 #' @seealso
 #' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>

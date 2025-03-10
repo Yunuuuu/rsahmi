@@ -27,12 +27,12 @@ read_dataset(dir)
 }
 \arguments{
 \item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
-\link{extract_kraken_reads}).}
+\code{\link[=extract_kraken_reads]{extract_kraken_reads()}}).}
 
 \item{kraken_report}{The path to kraken report file.}
 
 \item{kraken_out}{The path of microbiome output file. Usually should be
-filtered with \link{extract_kraken_output}.}
+filtered with \code{\link[=extract_kraken_output]{extract_kraken_output()}}.}
 
 \item{cb_and_umi}{A function takes sequence id, read1, read2 and return a
 list of 2 corresponding to cell barcode and UMI respectively., each should

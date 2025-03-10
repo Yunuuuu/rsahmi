@@ -15,10 +15,10 @@
 #' * `umi`: Used by [`taxa_counts()`].
 #'
 #' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
-#'   [extract_kraken_reads]).
+#'   [`extract_kraken_reads()`]).
 #' @inheritParams extractor
 #' @param kraken_out The path of microbiome output file. Usually should be
-#'   filtered with [extract_kraken_output].
+#'   filtered with [`extract_kraken_output()`].
 #' @param cb_and_umi A function takes sequence id, read1, read2 and return a
 #' list of 2 corresponding to cell barcode and UMI respectively., each should
 #' have the same length of the input.
