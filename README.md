@@ -7,23 +7,20 @@ Single-cell Analysis of Host-Microbiome Interactions
 
 ## Installation
 
-Here, we use `pak` to install package, you can also use `remotes`
+You can install the development version from
+[r-universe](https://yunuuuu.r-universe.dev/rsahmi) with:
 
 ``` r
-if (!requireNamespace("pak")) {
-    install.packages("pak",
-        repos = sprintf(
-            "https://r-lib.github.io/p/pak/devel/%s/%s/%s",
-            .Platform$pkgType, R.Version()$os, R.Version()$arch
-        )
-    )
-}
+install.packages("rsahmi",
+    repos = c("https://yunuuuu.r-universe.dev", "https://cloud.r-project.org")
+)
 ```
 
-Then you can install `rsahmi`:
+or from [GitHub](https://github.com/Yunuuuu/rsahmi) with:
 
 ``` r
-pak::pkg_install("Yunuuuu/rsahmi")
+# install.packages("remotes")
+remotes::install_github("Yunuuuu/ggalign")
 ```
 
 You must also install [seqkit](https://bioinf.shenwei.me/seqkit/) and
