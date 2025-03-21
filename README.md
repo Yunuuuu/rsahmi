@@ -11,7 +11,7 @@ You can install the development version from
 [r-universe](https://yunuuuu.r-universe.dev/rsahmi) with:
 
 ``` r
-install.packages("rsahmi",
+BiocManager::install("rsahmi",
     repos = c("https://yunuuuu.r-universe.dev", "https://cloud.r-project.org")
 )
 ```
