@@ -8,7 +8,7 @@ Single-cell Analysis of Host-Microbiome Interactions
 A computational resource designed to accurately detect microbial nucleic
 acids while filtering out contaminants and false-positive taxonomic
 assignments from standard transcriptomic sequencing of mammalian
-tissues. This implementation leverages the ‘polars’ package for fast and
+tissues. This implementation leverages the `polars` package for fast and
 systematic microbial signal recovery and denoising from host tissue
 genomic sequencing.
 
