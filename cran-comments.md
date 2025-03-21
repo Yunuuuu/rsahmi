@@ -1,26 +1,44 @@
-## Resubmission changes 
-This resubmission addresses all the points raised by the reviewer:  
+## Resubmission changes
 
-1. Expanded `DESCRIPTION` field
-   - Added more details on package functionality and implemented methods.
-   - Included relevant references in the required format.
+First and foremost, I truly appreciate the time and effort you have taken to
+review my package, and I am grateful for your valuable feedback. I sincerely
+apologize for not being able to address your concerns due to the following
+reasons:
 
-2. Added `\value{}` tags  
-   - Included `\value{}` sections in all relevant `.Rd` files (`blsd.Rd`, `extractor.Rd`, `prep_dataset.Rd`, `taxa_counts.Rd`).
-   - The `install_polars` function has been removed, as all other functions now prompt users to install `polars` if needed.
-   - Clearly described function outputs, including their structure and meaning.
+1. Example Execution (\dontrun{} → \donttest{})
 
-3. Improved examples in `.Rd` files  
-   - Added examples for exported functions.
-   - Since all functions require large sequencing data, examples are wrapped in `\dontrun{}` to prevent execution during checks.
+This package implements the SAHMI algorithm using polars and includes a dataset
+(4.9M), which makes it impractical to add additional datasets. The algorithm
+requires at least three FASTQ files, and the absence of such data makes it
+difficult to provide meaningful runnable examples.
 
-4. Ensured compliance with CRAN file writing policies  
-   Removed any default file paths in functions that write data (including `extract_kraken_output()` and `prep_dataset()`)
+Additionally, the package depends on external command-line tools such as kraken2
+and seqkit, as well as packages from `Additional_repositories`. Since CRAN does
+not support install dependencies from `Additional_repositories`, it is
+impossible to provide fully executable examples. 
 
-5. Non-standard file/directory found at top level: 'rsahmi.Rmd'
-   remote the the file
+Given these constraints, we believe the use of `\dontrun{}` is appropriate to
+prevent execution failures due to missing data and dependencies.
 
-Thank you for your time and consideration.
+2. Small Executable Examples
+The package follows the workflow of the original algorithm, where each step
+corresponds to a function. While we acknowledge CRAN’s preference for runnable
+examples, the lack of small, self-contained input data and external dependencies
+makes this infeasible.
+
+3. Avoiding `install.packages()` in Functions, Examples, and Vignettes The
+`install.packages()` calls in: `R/import-standalone-pkg.R`
+`R/import-standalone-polars.R`
+
+They were included to ensure a user-friendly experience, as `polars` is not yet
+available on `CRAN`. Since there are no runnable examples, we believe this
+approach remains acceptable, as it simplifies installation for users unfamiliar
+with setting up `polars`. We hope `polars` will be available on CRAN in the
+future, as it is widely used by many users.
+
+Once again, I sincerely appreciate your time, patience, and valuable feedback. I
+deeply regret any inconvenience caused and will continue working to align the
+package with CRAN’s best practices.
 
 ## R CMD check results
 
