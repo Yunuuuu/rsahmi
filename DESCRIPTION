@@ -19,7 +19,7 @@ SystemRequirements: kraken2, seqkit
 Imports: 
     blit (>= 0.1.0),
     cli,
-    rlang (>= 1.1.0),
+    rlang,
     ShortRead,
     utils
 Suggests: 
