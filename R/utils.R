@@ -1,13 +1,7 @@
-`%||%` <- function(x, y) if (is.null(x)) y else x
-
 # mimic polars str methods ---------------------------
 # https://rpolars.github.io/man/ExprStr_contains_any.html
 str_contains_any <- function(string, patterns, ...) {
     str_detect(string = string, pattern = paste0(patterns, collapse = "|"))
-}
-
-internal_file <- function(...) {
-    system.file(..., package = pkg_nm(), mustWork = TRUE)
 }
 
 is_scalar <- function(x) length(x) == 1L

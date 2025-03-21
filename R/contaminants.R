@@ -25,7 +25,7 @@
 #' # `paths` should be the output directory for each sample from
 #' # `blit::kraken2()`
 #' truly_microbe <- remove_contaminants(
-#'     kraken_reports = file.path(paths, "kraken_report.txt"), 
+#'     kraken_reports = file.path(paths, "kraken_report.txt"),
 #'     quantile = 0.99, exclusive = FALSE
 #' )
 #' microbe_for_plot <- attr(truly_microbe, "truly")[
@@ -66,9 +66,7 @@ remove_contaminants <- function(kraken_reports, study = "current study",
     kreports <- pl$concat(kreports, how = "vertical")
 
     # prepare celllines data ----------------------
-    celllines <- pl$read_parquet(
-        internal_file("extdata", "cell_lines.parquet")
-    )$
+    celllines <- pl$read_parquet(pkg_extdata("cell_lines.parquet"))$
         select(pl$col("taxid", "rpmm"))
     celllines <- kreports$select(pl$col("taxid", "taxa"))$
         join(celllines, on = "taxid", how = "inner")

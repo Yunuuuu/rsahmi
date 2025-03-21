@@ -35,7 +35,7 @@
 #' @param overwrite A bool indicates whether to overwrite the files in `odir`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @examples
-#' # for sequence from umi-tools, we can use following function
+#' # for sequence from `umi-tools`, we can use following function
 #' cb_and_umi <- function(sequence_id, read1, read2) {
 #'     out <- lapply(
 #'         strsplit(sequence_id, "_", fixed = TRUE),
