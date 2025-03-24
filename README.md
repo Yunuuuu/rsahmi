@@ -6,6 +6,11 @@ Single-cell Analysis of Host-Microbiome Interactions
 
 [![CRAN
 status](https://www.r-pkg.org/badges/version/rsahmi)](https://CRAN.R-project.org/package=rsahmi)
+[![Project Status: Active - The project has reached a stable, usable
+state and is being actively
+developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![](https://cranlogs.r-pkg.org/badges/rsahmi)](https://cran.r-project.org/package=rsahmi)
+[![DOI](https://zenodo.org/badge/605180683.svg)](https://doi.org/10.5281/zenodo.15076675)
 <!-- badges: end -->
 
 A computational resource designed to accurately detect microbial nucleic
