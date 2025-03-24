@@ -3,6 +3,9 @@ Single-cell Analysis of Host-Microbiome Interactions
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 <!-- badges: start -->
+
+[![CRAN
+status](https://www.r-pkg.org/badges/version/rsahmi)](https://CRAN.R-project.org/package=rsahmi)
 <!-- badges: end -->
 
 A computational resource designed to accurately detect microbial nucleic
@@ -62,10 +65,6 @@ If you use this package, please cite:
   anti-bacterial immunity and ant-itumor immunity. International Journal
   of Surgery 111(1):p 972-987, January 2025. \| DOI:
   10.1097/JS9.0000000000001901.
-- Ghaddar B, Biswas A, Harris C, Omary MB, Carpizo DR, Blaser MJ, De S.
-  Tumor microbiome links cellular programs and immunity in pancreatic
-  cancer. Cancer Cell. 2022 Oct 10;40(10):1240-1253.e5. doi:
-  10.1016/j.ccell.2022.09.009. PMID: 36220074; PMCID: PMC9556978.
 - Ghaddar B, Blaser MJ, De S. Denoising sparse microbial signals from
   single-cell sequencing of mammalian host tissues. Nat Comput Sci. 2023
   Sep;3(9):741-747. doi: 10.1038/s43588-023-00507-1. Epub 2023 Sep 18.
