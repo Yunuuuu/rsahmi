@@ -16,7 +16,6 @@ OS_type: unix
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 SystemRequirements: kraken2, seqkit
-Config/runiverse/noindex: true
 Imports: 
     blit (>= 0.1.0),
     cli,

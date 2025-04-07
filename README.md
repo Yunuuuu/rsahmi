@@ -25,23 +25,22 @@ recovery and denoising from host tissue genomic sequencing.
 You can install `rsahmi` from `CRAN` using:
 
 ``` r
-install.packages("rsahmi")
+# install.packages("pak")
+pak::pak("rsahmi")
 ```
 
 Alternatively, install the development version from
 [r-universe](https://yunuuuu.r-universe.dev/rsahmi) with:
 
 ``` r
-install.packages("rsahmi",
-    repos = c("https://yunuuuu.r-universe.dev", "https://cloud.r-project.org")
-)
+pak::repo_add("https://yunuuuu.r-universe.dev")
+pak::pak("rsahmi")
 ```
 
 or from [GitHub](https://github.com/Yunuuuu/rsahmi) with:
 
 ``` r
-# install.packages("remotes")
-remotes::install_github("Yunuuuu/rsahmi")
+pak::pak("Yunuuuu/rsahmi")
 ```
 
 You must also install [seqkit](https://bioinf.shenwei.me/seqkit/) and
