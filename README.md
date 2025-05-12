@@ -65,9 +65,9 @@ odir <- "rsahmi"
 # didn't give any information for this. In this way, I prefer using `umi-tools`
 # to transform the `umi` into fq2 and then run `rsahmi` with only fq2.
 fq1 <-
-    fq2 <- # can be `NULL`
-    kraken_db <- # specify the kraken database
-    if (dir.exists(odir)) dir.create(odir, recursive = TRUE)
+fq2 <- # can be `NULL`
+kraken_db <- # specify the kraken database
+if (dir.exists(odir)) dir.create(odir, recursive = TRUE)
 ```
 
 ### Taxonomic sequence classifier
