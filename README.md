@@ -55,7 +55,6 @@ package.
 
 ``` r
 library(ggplot2)
-library(polars)
 ```
 
 Prepare the output directory and input data
@@ -66,9 +65,9 @@ odir <- "rsahmi"
 # didn't give any information for this. In this way, I prefer using `umi-tools`
 # to transform the `umi` into fq2 and then run `rsahmi` with only fq2.
 fq1 <-
-fq2 <-       # can be `NULL`
-kraken_db <- # specify the kraken database
-if (dir.exists(odir)) dir.create(odir, recursive = TRUE)
+    fq2 <- # can be `NULL`
+    kraken_db <- # specify the kraken database
+    if (dir.exists(odir)) dir.create(odir, recursive = TRUE)
 ```
 
 ### Taxonomic sequence classifier
@@ -86,7 +85,7 @@ blit::kraken2(
     blit::arg("--db", kraken_db),
     "--use-names", "--report-minimizer-data",
     # Note: you should change `sample` into your sample name
-    odir = file.path(odir, sample) 
+    odir = file.path(odir, sample)
 ) |> blit::cmd_run()
 ```
 
@@ -151,6 +150,7 @@ sahmi_datasets <- lapply(paths, function(dir) {
 ### Identify contaminants
 
 ``` r
+library(polars) # rsahmi dependents on `polars`
 truly_microbe <- rsahmi::remove_contaminants(
     file.path(paths, "kraken_report.txt"),
     quantile = 0.99, exclusive = FALSE
@@ -264,7 +264,7 @@ sessionInfo()
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
 #> other attached packages:
-#> [1] polars_0.22.1      ggplot2_3.5.2.9000
+#> [1] ggplot2_3.5.2.9000
 #> 
 #> loaded via a namespace (and not attached):
 #>  [1] vctrs_0.6.5        cli_3.6.3          knitr_1.49         rlang_1.1.4       
