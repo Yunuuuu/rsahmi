@@ -15,8 +15,8 @@ extract_taxids(
 extract_kraken_output(
   kraken_out,
   taxids,
-  odir,
   ofile = "kraken_microbiome_output.txt",
+  odir = getwd(),
   ...
 )
 
@@ -42,9 +42,15 @@ scientific name of the taxon (e.g., "d__Viruses")}
 
 \item{taxids}{A character specify NCBI taxonony identifier to extract.}
 
-\item{odir}{A string of directory to save the \code{ofile}.}
+\item{ofile}{Output file:
+\itemize{
+\item \code{extract_kraken_output}: A string of file save the kraken output of
+specified \code{taxids}.
+\item \code{extract_kraken_reads}: File path to save the sequence reads of
+specified \code{taxids}.
+}}
 
-\item{ofile}{A string of file save the kraken output of specified \code{taxids}.}
+\item{odir}{A string of directory to save the \code{ofile}.}
 
 \item{...}{\itemize{
 \item \code{extract_kraken_output}: Additional arguments passed to

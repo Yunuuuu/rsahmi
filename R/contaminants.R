@@ -17,7 +17,7 @@
 #' 1. `pvalues`: Quantile test pvalue.
 #' 2. `exclusive`: taxids in current study but not found in cellline data.
 #' 3. `significant`: significant taxids with `pvalues < alpha`.
-#' 3. `truly`: truly taxids based on `alpha` and `exclusive`. If `exclusive` is
+#' 4. `truly`: truly taxids based on `alpha` and `exclusive`. If `exclusive` is
 #'    `TRUE`, this should be the union of `exclusive` and `significant`,
 #'    otherwise, this should be the same with `significant`.
 #' @examples

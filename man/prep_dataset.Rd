@@ -95,10 +95,10 @@ cb_and_umi <- function(sequence_id, read1, read2) {
 
 \dontrun{
 # 1. `fa1` and `fa2` should be the output of `extract_kraken_reads()`
-# 2. `kraken_report` should be the output of `blit::kraken2()`
+# 2. `kraken_report` should be the output of `blit::kraken2()`/`kraken2_microbiome()`
 # 3. `kraken_out` should be the output of `extract_kraken_output()`
-# 4. `dir`: you may want to specify the output directory since this process 
-#           is time-consuming
+# 4. `odir`: you may want to specify the output directory since this process
+#            is time-consuming
 sahmi_dataset <- prep_dataset(
     fa1 = "kraken_microbiome_reads.fa",
     # if you have paired sequence, please also specify `fa2`,

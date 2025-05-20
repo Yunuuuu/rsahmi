@@ -1,0 +1,17 @@
+[package]
+name = 'rsahmi'
+publish = false
+version = '0.1.0'
+edition = '2021'
+rust-version = '1.65'
+
+[lib]
+crate-type = ['staticlib']
+name = 'rsahmi'
+
+[dependencies]
+extendr-api = '*'
+futures = { version = "*" }
+tokio = { version = "*", features = ["io-util", "rt"] }
+noodles-fasta = { version = "*", features = ["async"] }
+noodles-fastq = { version = "*", features = ["async"] }

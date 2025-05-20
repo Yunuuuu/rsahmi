@@ -63,6 +63,10 @@ NULL
 extract_taxids <- function(kraken_report,
                            taxon = c("d__Bacteria", "d__Fungi", "d__Viruses")) {
     use_polars()
+    taxon <- as.character(taxon)
+    if (length(taxon) == 0L) {
+        cli::cli_abort("empty {.arg taxon} provided")
+    }
     parse_kraken_report(kraken_report)$
         explode(pl$col("ranks", "taxon"))$
         filter(
@@ -78,14 +82,19 @@ extract_taxids <- function(kraken_report,
 
 #' @param kraken_out The path to kraken output file.
 #' @param taxids A character specify NCBI taxonony identifier to extract.
-#' @param ofile A string of file save the kraken output of specified `taxids`.
+#' @param ofile Output file:
+#'  - `extract_kraken_output`: A string of file save the kraken output of
+#'    specified `taxids`.
+#'  - `extract_kraken_reads`: File path to save the sequence reads of
+#'    specified `taxids`.
 #' @param odir A string of directory to save the `ofile`.
 #' @return
 #'  - `extract_kraken_output`: A polars [DataFrame][polars::DataFrame_class].
 #' @export
 #' @rdname extractor
-extract_kraken_output <- function(kraken_out, taxids, odir,
-                                  ofile = "kraken_microbiome_output.txt", ...) {
+extract_kraken_output <- function(kraken_out, taxids,
+                                  ofile = "kraken_microbiome_output.txt",
+                                  odir = getwd(), ...) {
     use_polars()
     dir_create(odir)
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
@@ -173,4 +182,8 @@ extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads,
     )
     command <- blit::cmd_envpath(command, envpath)
     blit::cmd_run(command, ...)
+}
+
+extract_matching_sequence <- function(fq, ofile, id_file) {
+    rust_call("extract_matching_sequence", fq, ofile, id_file)
 }
