@@ -11,7 +11,5 @@ name = 'rsahmi'
 
 [dependencies]
 extendr-api = '*'
-futures = { version = "*" }
-tokio = { version = "*", features = ["io-util", "rt"] }
-noodles-fasta = { version = "*", features = ["async"] }
-noodles-fastq = { version = "*", features = ["async"] }
+noodles-fasta = { version = "*" }
+noodles-fastq = { version = "*" }

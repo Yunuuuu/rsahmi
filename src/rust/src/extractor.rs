@@ -1,55 +1,107 @@
 use std::collections::HashSet;
-use std::io::{self, BufRead};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 use extendr_api::prelude::*;
-use futures::TryStreamExt;
-use noodles_fasta::r#async::io::Writer;
-use noodles_fasta::record::{definition, sequence};
-use noodles_fasta::Record;
-use noodles_fastq::r#async::io::Reader;
-use tokio::fs::File;
-use tokio::io::{AsyncWriteExt, BufReader, BufWriter};
-use tokio::runtime::Builder;
+use noodles_fasta::io::Writer;
+use noodles_fasta::record::{definition, sequence, Record};
+use noodles_fastq::io::Reader;
 
-async fn write_matching_reads<P>(
-    fq: P,
-    ofile: P,
-    id_file: P,
+#[extendr]
+fn extract_matching_sequence(
+    fq1: &str,
+    ofile1: &str,
+    fq2: Option<&str>,
+    ofile2: Option<&str>,
+    koutput_file: &str,
+    buffersize: usize,
+) -> io::Result<()> {
+    write_matching_reads(fq1, ofile1, fq2, ofile2, koutput_file, buffersize)
+}
+
+fn write_matching_reads<P>(
+    fq1: P,
+    ofile1: P,
+    fq2: Option<P>,
+    ofile2: Option<P>,
+    koutput_file: P,
     buffersize: usize,
 ) -> io::Result<()>
 where
     P: AsRef<Path>,
 {
-    // Open input FASTQ
-    let in_file = File::open(fq).await?;
+    // Collect IDs into a HashSet for fast lookup
+    let id_set = read_sequence_id_from_koutput(koutput_file, buffersize)?;
 
-    let in_buf = BufReader::with_capacity(buffersize, in_file);
-    let mut reader = Reader::new(in_buf);
+    // Open input FASTQ
+    let in_file1 = File::open(fq1)?;
+    let in_buf1 = BufReader::with_capacity(buffersize, in_file1);
+    let mut reader1 = Reader::new(in_buf1);
 
     // Open output FASTA
-    let out_file = File::create(ofile).await?;
-    let out_buf = BufWriter::with_capacity(buffersize, out_file);
-    let mut writer = Writer::new(out_buf);
+    let out_file1 = File::create(ofile1)?;
+    let out_buf1 = BufWriter::with_capacity(buffersize, out_file1);
+    let mut writer1 = Writer::new(out_buf1);
 
-    // Collect IDs into a HashSet for fast lookup
-    let id_file = std::fs::File::open(id_file)?;
-    let id_buf = std::io::BufReader::with_capacity(buffersize, id_file);
-    let id_set = id_buf
+    // Iterate all FASTQ records
+    write_matching_records(&mut reader1, &mut writer1, &id_set)?;
+
+    if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
+        // Open input FASTQ
+        let in_file2 = File::open(in_file)?;
+        let in_buf2 = BufReader::with_capacity(buffersize, in_file2);
+        let mut reader2 = Reader::new(in_buf2);
+
+        // Open output FASTA
+        let out_file2 = File::create(out_file)?;
+        let out_buf2 = BufWriter::with_capacity(buffersize, out_file2);
+        let mut writer2 = Writer::new(out_buf2);
+        write_matching_records(&mut reader2, &mut writer2, &id_set)?;
+    }
+    Ok(())
+}
+
+fn read_sequence_id_from_koutput<P>(
+    file: P,
+    buffersize: usize,
+) -> io::Result<HashSet<Vec<u8>>>
+where
+    P: AsRef<Path>,
+{
+    let opened = File::open(file)?;
+    let buffer = BufReader::with_capacity(buffersize, opened);
+    let id_set = buffer
         .lines()
-        .filter_map(|str| {
-            str.ok().and_then(|str| {
-                if str.is_empty() {
-                    None
-                } else {
-                    Some(str.as_bytes().to_vec())
-                }
+        .filter_map(|line| {
+            line.ok().and_then(|str| {
+                // we selected the second column
+                str.split("\t").nth(1).and_then(|c| {
+                    // we remove empty sequence IDs
+                    if c.is_empty() {
+                        None
+                    } else {
+                        Some(c.as_bytes().to_vec())
+                    }
+                })
             })
         })
         .collect::<HashSet<Vec<u8>>>();
+    Ok(id_set)
+}
 
+fn write_matching_records<R, W>(
+    reader: &mut noodles_fastq::Reader<R>,
+    writer: &mut noodles_fasta::Writer<W>,
+    id_set: &HashSet<Vec<u8>>,
+) -> io::Result<()>
+where
+    R: BufRead,
+    W: Write,
+{
     // Iterate all FASTQ records
-    while let Some(record) = reader.records().try_next().await? {
+    while let Some(read) = reader.records().next() {
+        let record = read?;
         if id_set.contains(<&[u8]>::from(record.name())) {
             // convert FASTQ to FASTA record and write
             let definition = definition::Definition::new(
@@ -59,22 +111,11 @@ where
             let sequence =
                 sequence::Sequence::from(record.sequence().to_owned());
             let fasta_record = Record::new(definition, sequence);
-            writer.write_record(&fasta_record).await?;
+            writer.write_record(&fasta_record)?;
         }
     }
-    writer.into_inner().flush().await?;
+    writer.get_mut().flush()?;
     Ok(())
-}
-
-#[extendr]
-fn extract_matching_sequence(
-    fq: &str,
-    ofile: &str,
-    id_file: &str,
-    buffersize: usize,
-) -> io::Result<()> {
-    let rt = Builder::new_current_thread().build()?;
-    rt.block_on(write_matching_reads(fq, ofile, id_file, buffersize))
 }
 
 extendr_module! {

@@ -113,7 +113,7 @@ extract_kraken_output(
     kraken_out = "kraken_output.txt",
     taxids = taxids,
     odir = # specify the output directory
-)
+    )
 
 # 1. `kraken_out` should be the output of `extract_kraken_output()`
 # 2. `fq1` and `fq2` should be the same with `blit::kraken2()`

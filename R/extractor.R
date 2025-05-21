@@ -185,7 +185,7 @@ extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads,
 }
 
 extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
-                                      odir = getwd(), buffer_size = NULL) {
+                                      buffer_size = NULL, odir = getwd()) {
     use_polars()
     if (length(reads) < 1L || length(reads) > 2L) {
         cli::cli_abort("{.arg reads} must be of length 1 or 2")
@@ -204,27 +204,31 @@ extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
     ofile <- file.path(odir, ofile)
-    cli::cli_inform(c(
-        ">" = "Extracting sequence IDs from {.path {kraken_out}}"
-    ))
-    file <- tempfile("kraken_sequence_id")
-    pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
-        # second column is the sequence id
-        select(pl$col("column_2"))$unique()$
-        sink_csv(path = file, include_header = FALSE, separator = "\t")
-    on.exit(file.remove(file))
-    for (i in seq_along(reads)) {
-        cli::cli_inform(c(
-            ">" = "Extracting matching sequence {.path {reads[[i]]}}"
-        ))
-        extract_matching_sequence(
-            fq = reads[[i]], ofile = ofile[[i]],
-            id_file = file, buffer_size = buffer_size
-        )
+    if (is_scalar(ofile)) {
+        fq1 <- reads[[1L]]
+        fq2 <- NULL
+        ofile1 <- ofile[[1L]]
+        ofile2 <- NULL
+    } else {
+        fq1 <- reads[[1L]]
+        fq2 <- reads[[2L]]
+        ofile1 <- ofile[[1L]]
+        ofile2 <- ofile[[2L]]
     }
+    extract_matching_sequence(
+        fq1 = fq1, ofile1 = ofile1,
+        fq2 = fq2, ofile2 = ofile2,
+        koutput_file = kraken_out,
+        buffer_size = buffer_size
+    )
     cli::cli_inform("v" = "Finished")
 }
 
-extract_matching_sequence <- function(fq, ofile, id_file, buffer_size) {
-    rust_call("extract_matching_sequence", fq, ofile, id_file, buffer_size)
+extract_matching_sequence <- function(fq1, ofile1, fq2, ofile2,
+                                      koutput_file, buffer_size) {
+    rust_call(
+        "extract_matching_sequence",
+        fq1, ofile1, fq2, ofile2,
+        koutput_file, buffer_size
+    )
 }
