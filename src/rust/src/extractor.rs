@@ -80,12 +80,12 @@ where
         .filter_map(|line| {
             line.ok().and_then(|str| {
                 // we selected the second column
-                str.split("\t").nth(1).and_then(|c| {
+                str.split("\t").nth(1).and_then(|second| {
                     // we remove empty sequence IDs
-                    if c.is_empty() {
+                    if second.is_empty() {
                         None
                     } else {
-                        Some(c.as_bytes().to_vec())
+                        Some(second.as_bytes().to_vec())
                     }
                 })
             })
@@ -125,4 +125,40 @@ where
 extendr_module! {
     mod extractor;
     fn extract_matching_sequence;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::collections::HashSet;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_read_sequence_id_from_koutput() -> io::Result<()> {
+        // Create a temporary file with tab-separated values
+        let mut tmpfile = NamedTempFile::new()?;
+        writeln!(tmpfile, "r1\tSEQ001\tdata1")?;
+        writeln!(tmpfile, "r2\t\tdata2")?;
+        writeln!(tmpfile, "r3\tSEQ002\tdata3")?;
+        writeln!(tmpfile, "r4\tSEQ003\tdata4")?;
+        writeln!(tmpfile, "r5\t\tdata5")?;
+        writeln!(tmpfile, "r6\tSEQ001\tduplicate")?; // Duplicate value
+
+        // Read the file back using your function
+        let id_set = read_sequence_id_from_koutput(tmpfile.path(), 1024)?;
+
+        // Define expected results
+        let expected: HashSet<Vec<u8>> = vec![
+            b"SEQ001".to_vec(),
+            b"SEQ002".to_vec(),
+            b"SEQ003".to_vec(),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(id_set, expected);
+
+        Ok(())
+    }
 }
