@@ -45,7 +45,7 @@ NULL
 #'     kraken_out = "kraken_output.txt",
 #'     taxids = taxids,
 #'     odir = # specify the output directory
-#' )
+#'     )
 #'
 #' # 1. `kraken_out` should be the output of `extract_kraken_output()`
 #' # 2. `fq1` and `fq2` should be the same with `blit::kraken2()`
@@ -204,19 +204,25 @@ extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     buffer_size <- buffer_size %||% 8000L
     ofile <- file.path(odir, ofile)
+    cli::cli_inform(c(
+        ">" = "Extracting sequence IDs from {.path {kraken_out}}"
+    ))
     file <- tempfile("kraken_sequence_id")
     pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
         # second column is the sequence id
         select(pl$col("column_2"))$unique()$
         sink_csv(path = file, include_header = FALSE, separator = "\t")
     on.exit(file.remove(file))
-    status <- vapply(seq_along(reads), function(i) {
+    for (i in seq_along(reads)) {
+        cli::cli_inform(c(
+            ">" = "Extracting matching sequence {.path {reads[[i]]}}"
+        ))
         extract_matching_sequence(
             fq = reads[[i]], ofile = ofile[[i]],
             id_file = file, buffer_size = buffer_size
         )
-    }, integer(1L))
-    invisible(status)
+    }
+    cli::cli_inform("v" = "Finished")
 }
 
 extract_matching_sequence <- function(fq, ofile, id_file, buffer_size) {
