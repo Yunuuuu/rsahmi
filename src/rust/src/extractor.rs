@@ -12,23 +12,29 @@ use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufReader, BufWriter};
 use tokio::runtime::Builder;
 
-async fn write_matching_reads<P>(fq: P, ofile: P, id_file: P) -> io::Result<()>
+async fn write_matching_reads<P>(
+    fq: P,
+    ofile: P,
+    id_file: P,
+    buffersize: usize,
+) -> io::Result<()>
 where
     P: AsRef<Path>,
 {
     // Open input FASTQ
     let in_file = File::open(fq).await?;
-    let in_buf = BufReader::new(in_file);
+
+    let in_buf = BufReader::with_capacity(buffersize, in_file);
     let mut reader = Reader::new(in_buf);
 
     // Open output FASTA
     let out_file = File::create(ofile).await?;
-    let out_buf = BufWriter::new(out_file);
+    let out_buf = BufWriter::with_capacity(buffersize, out_file);
     let mut writer = Writer::new(out_buf);
 
     // Collect IDs into a HashSet for fast lookup
     let id_file = std::fs::File::open(id_file)?;
-    let id_buf = std::io::BufReader::new(id_file);
+    let id_buf = std::io::BufReader::with_capacity(buffersize, id_file);
     let id_set = id_buf
         .lines()
         .filter_map(|str| {
@@ -65,9 +71,10 @@ fn extract_matching_sequence(
     fq: &str,
     ofile: &str,
     id_file: &str,
+    buffersize: usize,
 ) -> io::Result<()> {
     let rt = Builder::new_current_thread().build()?;
-    rt.block_on(write_matching_reads(fq, ofile, id_file))
+    rt.block_on(write_matching_reads(fq, ofile, id_file, buffersize))
 }
 
 extendr_module! {

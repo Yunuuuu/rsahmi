@@ -184,6 +184,41 @@ extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads,
     blit::cmd_run(command, ...)
 }
 
-extract_matching_sequence <- function(fq, ofile, id_file) {
-    rust_call("extract_matching_sequence", fq, ofile, id_file)
+extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
+                                      odir = getwd(), buffer_size = NULL) {
+    use_polars()
+    if (length(reads) < 1L || length(reads) > 2L) {
+        cli::cli_abort("{.arg reads} must be of length 1 or 2")
+    }
+    if (is.null(ofile)) {
+        if (is_scalar(reads)) {
+            ofile <- "kraken_microbiome_reads.fa"
+        } else {
+            ofile <- sprintf("kraken_microbiome_reads_%d.fa", seq_along(reads))
+        }
+    } else if (length(ofile) != length(reads)) {
+        cli::cli_abort("{.arg ofile} must have the same length of {.arg reads}")
+    }
+    assert_string(odir, allow_empty = FALSE)
+    dir_create(odir)
+    assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    buffer_size <- buffer_size %||% 8000L
+    ofile <- file.path(odir, ofile)
+    file <- tempfile("kraken_sequence_id")
+    pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
+        # second column is the sequence id
+        select(pl$col("column_2"))$unique()$
+        sink_csv(path = file, include_header = FALSE, separator = "\t")
+    on.exit(file.remove(file))
+    status <- vapply(seq_along(reads), function(i) {
+        extract_matching_sequence(
+            fq = reads[[i]], ofile = ofile[[i]],
+            id_file = file, buffer_size = buffer_size
+        )
+    }, integer(1L))
+    invisible(status)
+}
+
+extract_matching_sequence <- function(fq, ofile, id_file, buffer_size) {
+    rust_call("extract_matching_sequence", fq, ofile, id_file, buffer_size)
 }
