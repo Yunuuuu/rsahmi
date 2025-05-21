@@ -81,7 +81,7 @@ kraken2_microbiome <- function(fq1, ..., fq2 = NULL, db = NULL,
         cli::cli_inform("Using files exist: {.path {kraken2_files}}")
     }
     microbiome_koutput_file <- file.path(odir, microbiome_koutput)
-    if (overwrite || all(file.exists(microbiome_koutput_file))) {
+    if (overwrite || !all(file.exists(microbiome_koutput_file))) {
         cli::cli_inform("Extracting microbiome kraken output")
         taxids <- extract_taxids(file.path(odir, kreport), taxon = taxon)
         # then we extract the kraken2 output for these taxon.
@@ -95,7 +95,7 @@ kraken2_microbiome <- function(fq1, ..., fq2 = NULL, db = NULL,
         cli::cli_inform("Using file exist: {.path {microbiome_koutput_file}}")
     }
     microbiome_reads_file <- file.path(odir, microbiome_reads)
-    if (overwrite || all(file.exists(microbiome_reads_file))) {
+    if (overwrite || !all(file.exists(microbiome_reads_file))) {
         cli::cli_inform("Extracting microbiome sequence reads")
         extract_kraken_reads(
             kraken_out = file.path(odir, microbiome_koutput),
