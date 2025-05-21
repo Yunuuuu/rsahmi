@@ -80,7 +80,7 @@ two paired-end files directly.}
 }
 
 \itemize{
-\item \code{extract_kraken_reads}: Exit status invisiblely.
+\item \code{extract_kraken_reads}: NULL
 }
 }
 \description{

@@ -121,7 +121,7 @@ extract_kraken_output <- function(kraken_out, taxids,
 #' `PATH`.
 #' @inheritParams blit::seqkit
 #' @return
-#'  - `extract_kraken_reads`: Exit status invisiblely.
+#'  - `extract_kraken_reads`: NULL
 #' @export
 #' @rdname extractor
 extract_kraken_reads <- function(kraken_out, reads, ofile = NULL,
@@ -228,7 +228,7 @@ extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
         koutput_file = kraken_out,
         buffer_size = buffer_size
     )
-    cli::cli_inform("v" = "Finished")
+    cli::cli_inform(c("v" = "Finished"))
 }
 
 extract_matching_sequence <- function(fq1, ofile1, fq2, ofile2,
