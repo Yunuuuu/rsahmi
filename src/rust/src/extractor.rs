@@ -104,7 +104,7 @@ where
     W: Write,
 {
     // Iterate all FASTQ records
-    while let Some(read) = reader.records().next() {
+    for read in reader.records() {
         let record = read?;
         if id_set.contains(<&[u8]>::from(record.name())) {
             // convert FASTQ to FASTA record and write
