@@ -202,7 +202,7 @@ extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
     assert_string(odir, allow_empty = FALSE)
     dir_create(odir)
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
-    buffer_size <- buffer_size %||% 8000L
+    buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
     ofile <- file.path(odir, ofile)
     cli::cli_inform(c(
         ">" = "Extracting sequence IDs from {.path {kraken_out}}"
