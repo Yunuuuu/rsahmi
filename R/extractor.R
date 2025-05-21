@@ -187,6 +187,8 @@ extract_sequence_id <- function(fq, ofile, sequence_id, ..., threads,
 extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
                                       buffer_size = NULL, odir = getwd()) {
     use_polars()
+    assert_string(kraken_out, allow_empty = FALSE)
+    reads <- as.character(reads)
     if (length(reads) < 1L || length(reads) > 2L) {
         cli::cli_abort("{.arg reads} must be of length 1 or 2")
     }
@@ -196,8 +198,13 @@ extract_kraken_reads_rust <- function(kraken_out, reads, ofile = NULL,
         } else {
             ofile <- sprintf("kraken_microbiome_reads_%d.fa", seq_along(reads))
         }
-    } else if (length(ofile) != length(reads)) {
-        cli::cli_abort("{.arg ofile} must have the same length of {.arg reads}")
+    } else {
+        ofile <- as.character(ofile)
+        if (length(ofile) != length(reads)) {
+            cli::cli_abort(
+                "{.arg ofile} must have the same length of {.arg reads}"
+            )
+        }
     }
     assert_string(odir, allow_empty = FALSE)
     dir_create(odir)
