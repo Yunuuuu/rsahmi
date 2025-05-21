@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
@@ -29,12 +30,14 @@ fn write_matching_reads<P>(
     buffersize: usize,
 ) -> io::Result<()>
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + Display,
 {
     // Collect IDs into a HashSet for fast lookup
+    rprintln!("Extracting sequence IDs from {}", koutput_file);
     let id_set = read_sequence_id_from_koutput(koutput_file, buffersize)?;
 
     // Open input FASTQ
+    rprintln!("Extracting matching sequence from {}", fq1);
     let in_file1 = File::open(fq1)?;
     let in_buf1 = BufReader::with_capacity(buffersize, in_file1);
     let mut reader1 = Reader::new(in_buf1);
@@ -48,6 +51,7 @@ where
     write_matching_records(&mut reader1, &mut writer1, &id_set)?;
 
     if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
+        rprintln!("Extracting matching sequence from {}", in_file);
         // Open input FASTQ
         let in_file2 = File::open(in_file)?;
         let in_buf2 = BufReader::with_capacity(buffersize, in_file2);
