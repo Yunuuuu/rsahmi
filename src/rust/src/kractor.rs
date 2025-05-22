@@ -1,28 +1,70 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 
 use extendr_api::prelude::*;
+use memchr::memmem;
 use noodles_fasta::io::Writer;
 use noodles_fasta::record::{definition, sequence, Record};
 use noodles_fastq::io::Reader;
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
-fn extract_matching_reads(
+fn kractor(
     koutput: &str,
+    taxids: Robj,
+    ofile: &str,
     fq1: &str,
     ofile1: &str,
     fq2: Option<&str>,
     ofile2: Option<&str>,
     buffersize: usize,
 ) -> std::result::Result<(), String> {
-    let id_set = read_sequence_id_from_koutput(koutput, buffersize)
+    let patterns: Vec<&str> = taxids
+        .as_str_vector()
+        .ok_or("`taxids` must be a character vector")?;
+    write_matching_output(koutput, &patterns, ofile, buffersize)
+        .map_err(|e| e.to_string())?;
+    let id_set = read_sequence_id_from_koutput(ofile, buffersize)
         .map_err(|e| e.to_string())?;
     write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, buffersize)
         .map_err(|e| e.to_string())
+}
+
+fn write_matching_output<P>(
+    koutput: P,
+    patterns: &[&str],
+    ofile: P,
+    buffersize: usize,
+) -> io::Result<()>
+where
+    P: AsRef<Path> + Display,
+{
+    rprintln!("Extracting matching kraken2 output from: {}", koutput);
+    let mut input = BufReader::with_capacity(buffersize, File::open(koutput)?);
+    let mut output = BufWriter::with_capacity(buffersize, File::create(ofile)?);
+    let needles: Vec<_> = patterns
+        .iter()
+        .map(|s| memmem::Finder::new(s.as_bytes()))
+        .collect();
+    let mut line = Vec::new();
+    while let Ok(bytes_read) = input.read_until(b'\n', &mut line) {
+        if bytes_read == 0 {
+            break;
+        }
+        let mut fields = line.split(|str| *str == b'\t');
+        // second field; // sequence ID
+        // third field; // taxids
+        if let Some(taxid) = fields.nth(2) {
+            if needles.iter().any(|needle| needle.find(taxid).is_some()) {
+                output.write_all(&line)?;
+            }
+        }
+        line.clear()
+    }
+    Ok(())
 }
 
 fn read_sequence_id_from_koutput<P>(
@@ -33,7 +75,7 @@ where
     P: AsRef<Path> + Display,
 {
     // Collect IDs into a HashSet for fast lookup
-    rprintln!("Extracting sequence IDs from {}", file);
+    rprintln!("Extracting sequence IDs from: {}", file);
     let opened = File::open(file)?;
     let buffer = BufReader::with_capacity(buffersize, opened);
     let id_set = buffer
@@ -70,7 +112,7 @@ where
     write_matching_records(fq1, ofile1, buffersize, id_set)?;
 
     if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
-        rprintln!("Extracting the matching sequence from {}", in_file);
+        rprintln!("Extracting the matching sequence from: {}", in_file);
         write_matching_records(in_file, out_file, buffersize, id_set)?;
     }
     Ok(())
@@ -116,5 +158,5 @@ where
 
 extendr_module! {
     mod kractor;
-    fn extract_matching_reads;
+    fn kractor;
 }

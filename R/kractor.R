@@ -98,6 +98,49 @@ kractor <- function(kreport, koutput, reads,
         select(pl$col("taxids")$list$last())$
         to_series()$unique()
 
+    rust_kractor(
+        koutput, reads, taxids, buffer_size,
+        extract_reads, extract_koutput, odir
+    )
+    cli::cli_inform(c("v" = "Finished"))
+}
+
+rust_kractor <- function(koutput, reads, taxids, buffer_size,
+                         extract_reads, extract_koutput, odir) {
+    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
+    # take care of taxid: "A"
+    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
+        taxids <- taxids$append(c("81077", "A"))
+    }
+    # the third column of kraken2 output:
+    # Using (taxid ****)
+    taxids <- paste0("(taxid ", as.character(taxids), ")")
+
+    buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
+    extract_koutput <- file.path(odir, extract_koutput)
+    extract_reads <- file.path(odir, extract_reads)
+    if (is_scalar(extract_reads)) {
+        fq1 <- reads[[1L]]
+        fq2 <- NULL
+        extract_read1 <- extract_reads[[1L]]
+        extract_read2 <- NULL
+    } else {
+        fq1 <- reads[[1L]]
+        fq2 <- reads[[2L]]
+        extract_read1 <- extract_reads[[1L]]
+        extract_read2 <- extract_reads[[2L]]
+    }
+    rust_call(
+        "kractor", koutput, taxids,
+        ofile = extract_koutput,
+        fq1 = fq1, ofile1 = extract_read1,
+        fq2 = fq2, ofile2 = extract_read2,
+        buffer_size = buffer_size
+    )
+}
+
+polars_kractor <- function(koutput, reads, taxids, buffer_size,
+                           extract_reads, extract_koutput, odir) {
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
     extract_matching_output(
@@ -113,12 +156,12 @@ kractor <- function(kreport, koutput, reads,
         buffer_size = buffer_size,
         odir = odir
     )
-    cli::cli_inform(c("v" = "Finished"))
 }
 
 extract_matching_output <- function(koutput, taxids, ofile, ..., odir) {
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
+    cli::cli_inform("Extracting the matching kraken2 output from {koutput}")
     if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
         taxids <- taxids$append(c("81077", "A"))
     }

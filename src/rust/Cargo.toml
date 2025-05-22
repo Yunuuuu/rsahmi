@@ -13,6 +13,7 @@ name = 'rsahmi'
 extendr-api = '*'
 noodles-fasta = { version = "*" }
 noodles-fastq = { version = "*" }
+memchr = { version = "*" }
 
 [lints.clippy]
 needless_late_init = "allow"
