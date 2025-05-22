@@ -29,7 +29,7 @@
 #'
 #' @param buffer_size Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during
-#' processing. Default is `10MB`.
+#' processing. Default is `1MB`.
 #'
 #' @param batch_size Integer. Number of lines to write per batch. Default is
 #'   `100`.
@@ -156,7 +156,7 @@ rust_kractor <- function(koutput, reads, taxids,
     # Using (taxid ****)
     patterns <- paste0("(taxid ", as.character(taxids), ")")
     io_buffer <- io_buffer %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
-    buffer_size <- buffer_size %||% (10L * 1024L * 1024L) # 10MB
+    buffer_size <- buffer_size %||% (1 * 1024L * 1024L) # 1MB
     batch_size <- batch_size %||% 100L
     queue_capacity <- queue_capacity %||% 100L
     extract_koutput <- file.path(odir, extract_koutput)

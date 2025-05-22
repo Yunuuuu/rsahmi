@@ -46,7 +46,7 @@ allocated to accommodate in-flight data. Default is \verb{8KB}.}
 
 \item{buffer_size}{Integer specifying the size in bytes of the intermediate
 buffer used for splitting and distributing chunks to worker threads during
-processing. Default is \verb{10MB}.}
+processing. Default is \verb{1MB}.}
 
 \item{batch_size}{Integer. Number of lines to write per batch. Default is
 \code{100}.}
