@@ -11,6 +11,7 @@ kractor(
   extract_koutput = NULL,
   extract_reads = NULL,
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+  io_buffer = NULL,
   buffer_size = NULL,
   batch_size = NULL,
   queue_capacity = NULL,
@@ -38,9 +39,14 @@ Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}}
 the kraken style, connected by rank codes, two underscores, and the
 scientific name of the taxon (e.g., "d__Viruses").}
 
-\item{buffer_size}{Integer specifying the buffer size in bytes for reading
-and writing files. Note that more than twice the specified \code{buffer_size} will
-be used internally.}
+\item{io_buffer}{Integer specifying the I/O buffer size in bytes
+used for reading from and writing to disk. This controls the capacity of the
+buffered file reader and writer. Internally, more than twice this size may be
+allocated to accommodate in-flight data.}
+
+\item{buffer_size}{Integer specifying the size in bytes of the intermediate
+buffer used for splitting and distributing chunks to worker threads during
+processing.}
 
 \item{batch_size}{Integer. Number of lines to write per batch.}
 

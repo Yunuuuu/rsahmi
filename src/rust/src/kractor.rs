@@ -21,6 +21,7 @@ fn kractor(
     ofile1: &str,
     fq2: Option<&str>,
     ofile2: Option<&str>,
+    io_buffer: usize,
     buffersize: usize,
     batchsize: usize,
     queue_capacity: usize,
@@ -33,19 +34,22 @@ fn kractor(
         koutput,
         &patterns,
         ofile,
+        io_buffer,
         buffersize,
         batchsize,
         queue_capacity,
         threads,
     )?;
-    let id_set = read_sequence_id_from_koutput(ofile, buffersize)?;
-    write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, buffersize)
+    let id_set = read_sequence_id_from_koutput(ofile, io_buffer)?;
+    write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, io_buffer)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_matching_output<P>(
     koutput: P,
     patterns: &[&str],
     ofile: P,
+    io_buffer: usize,
     buffersize: usize,
     batchsize: usize,
     queue_capacity: usize,
@@ -58,11 +62,11 @@ where
     // one thread is kept for writer
     let threads = if threads <= 2 { 1 } else { threads - 1 };
     let mut input = BufReader::with_capacity(
-        buffersize,
+        io_buffer,
         File::open(koutput).map_err(|e| e.to_string())?,
     );
     let mut output = BufWriter::with_capacity(
-        buffersize,
+        io_buffer,
         File::create(ofile).map_err(|e| e.to_string())?,
     );
     let patterns: Vec<_> = patterns

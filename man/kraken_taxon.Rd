@@ -57,9 +57,9 @@ Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}}
 the kraken style, connected by rank codes, two underscores, and the
 scientific name of the taxon (e.g., "d__Viruses").}
 
-\item{buffer_size}{Integer specifying the buffer size in bytes for reading
-and writing files. Note that more than twice the specified \code{buffer_size} will
-be used internally.}
+\item{buffer_size}{Integer specifying the size in bytes of the intermediate
+buffer used for splitting and distributing chunks to worker threads during
+processing.}
 
 \item{queue_capacity}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or writing.
