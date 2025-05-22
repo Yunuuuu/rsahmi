@@ -3,7 +3,6 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
-use std::sync::Arc;
 
 use crossbeam_channel::bounded;
 use extendr_api::prelude::*;
@@ -52,28 +51,30 @@ fn write_matching_output<P>(
 where
     P: AsRef<Path> + Display,
 {
+    rprintln!("Extracting matching kraken2 output from: {}", koutput);
     // one thread is kept for writer
     let threads = if threads <= 2 { 1 } else { threads - 1 };
-    rprintln!("Extracting matching kraken2 output from: {}", koutput);
-    std::thread::scope(|scope| {
-        let mut input = BufReader::with_capacity(
-            buffersize,
-            File::open(koutput).map_err(|e| e.to_string())?,
-        );
-        let mut output = BufWriter::with_capacity(
-            buffersize,
-            File::create(ofile).map_err(|e| e.to_string())?,
-        );
-        let patterns: Vec<_> = patterns
-            .iter()
-            .map(|s| memmem::Finder::new(s.as_bytes()))
-            .collect();
-        let patterns = Arc::new(patterns);
+    let mut input = BufReader::with_capacity(
+        buffersize,
+        File::open(koutput).map_err(|e| e.to_string())?,
+    );
+    let mut output = BufWriter::with_capacity(
+        buffersize,
+        File::create(ofile).map_err(|e| e.to_string())?,
+    );
+    let patterns: Vec<_> = patterns
+        .iter()
+        .map(|s| memmem::Finder::new(s.as_bytes()))
+        .collect();
+    let needles = &patterns;
 
-        // Start the processor threads
-        let (writer_tx, writer_rx) =
-            bounded::<Box<[u8]>>(threads * queue_capacity);
-        let (work_tx, work_rx) = bounded::<Box<[u8]>>(threads * queue_capacity);
+    // Start the processor threads
+    let (writer_tx, ref writer_rx) =
+        bounded::<Box<[u8]>>(threads * queue_capacity);
+    let (work_tx, ref work_rx) = bounded::<Box<[u8]>>(threads * queue_capacity);
+
+    std::thread::scope(|scope| {
+        // let patterns = Arc::new(patterns);
 
         // Writer thread: write data to the file
         // accept lines from `writer_rx`
@@ -91,12 +92,10 @@ where
         // Spawn workers, will send each passed lines to `writer`
         let mut worker_handles = Vec::with_capacity(threads);
         for _ in 0 .. threads {
-            let rx = work_rx.clone();
             let tx = writer_tx.clone();
-            let needles = patterns.clone();
             let handle =
                 scope.spawn(move || -> std::result::Result<(), String> {
-                    for line in rx.iter() {
+                    for line in work_rx.iter() {
                         let mut fields = line.split(|b| *b == b'\t');
                         if let Some(taxid) = fields.nth(2) {
                             if needles
