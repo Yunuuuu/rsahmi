@@ -42,13 +42,14 @@ scientific name of the taxon (e.g., "d__Viruses").}
 \item{io_buffer}{Integer specifying the I/O buffer size in bytes
 used for reading from and writing to disk. This controls the capacity of the
 buffered file reader and writer. Internally, more than twice this size may be
-allocated to accommodate in-flight data.}
+allocated to accommodate in-flight data. Default is \verb{8KB}.}
 
 \item{buffer_size}{Integer specifying the size in bytes of the intermediate
 buffer used for splitting and distributing chunks to worker threads during
-processing.}
+processing. Default is \verb{10MB}.}
 
-\item{batch_size}{Integer. Number of lines to write per batch.}
+\item{batch_size}{Integer. Number of lines to write per batch. Default is
+\code{100}.}
 
 \item{queue_capacity}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or writing.

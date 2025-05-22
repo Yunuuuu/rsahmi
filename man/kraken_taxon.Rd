@@ -59,7 +59,7 @@ scientific name of the taxon (e.g., "d__Viruses").}
 
 \item{buffer_size}{Integer specifying the size in bytes of the intermediate
 buffer used for splitting and distributing chunks to worker threads during
-processing.}
+processing. Default is \verb{10MB}.}
 
 \item{queue_capacity}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or writing.
