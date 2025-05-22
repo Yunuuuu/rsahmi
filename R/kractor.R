@@ -70,7 +70,6 @@ kractor <- function(kreport, koutput, reads,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                     buffer_size = NULL, queue_capacity = NULL,
                     threads = NULL, odir = getwd()) {
-    use_polars()
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
     reads <- as.character(reads)
