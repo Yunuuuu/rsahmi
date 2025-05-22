@@ -38,6 +38,11 @@
 #' @param odir A string of directory to save the `ofile`.
 #'
 #' @seealso [`kraken_taxon()`]
+#' @return None. This function generates the following files:
+#' - `extract_koutput`: Kraken2 output entries corresponding to the specified
+#'   `taxon`, extracted from koutput.
+#' - `extract_reads`: Sequence file(s) containing reads assigned to the
+#'   specified `taxon`.
 #' @examples
 #' \dontrun{
 #' # For 10x Genomic data, `fq1` only contain barcode and umi, but the official

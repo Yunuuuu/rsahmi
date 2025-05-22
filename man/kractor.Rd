@@ -52,6 +52,15 @@ threads.}
 
 \item{odir}{A string of directory to save the \code{ofile}.}
 }
+\value{
+None. This function generates the following files:
+\itemize{
+\item \code{extract_koutput}: Kraken2 output entries corresponding to the specified
+\code{taxon}, extracted from koutput.
+\item \code{extract_reads}: Sequence file(s) containing reads assigned to the
+specified \code{taxon}.
+}
+}
 \description{
 This function extracts reads and classification results from Kraken2 output,
 based on a set of specified taxonomic IDs.
