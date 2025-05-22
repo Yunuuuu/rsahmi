@@ -48,8 +48,7 @@ or from [GitHub](https://github.com/Yunuuuu/rsahmi) with:
 pak::pak("Yunuuuu/rsahmi")
 ```
 
-You must also install [seqkit](https://bioinf.shenwei.me/seqkit/) and
-[kraken2](https://github.com/DerrickWood/kraken2/wiki/Manual).
+You must also install [kraken2](https://github.com/DerrickWood/kraken2/wiki/Manual).
 
 Additionally, `rsahmi` relies on [polars](https://rpolars.github.io/index.html).
 If you call any functions that require `polars`, you will be prompted to install
@@ -76,11 +75,11 @@ for each of your samples. The function will generate the following files in the
 - `kreport`: the `kraken2` report file.
 - `koutput`: the `kraken2` output file.
 - `classified_out`: the classified sequence file(s) from `kraken2`.
-- `microbiome_koutput`: the microbiome output file extracted from `koutput`.
-- `microbiome_reads`: the microbiome sequence reads file(s)
+- `extract_koutput`: Kraken2 output entries corresponding to the specified `taxon`, extracted from koutput.
+- `extract_reads`: Sequence file(s) containing reads assigned to the specified `taxon`.
 
 ```{r, eval=FALSE}
-kraken2_microbiome(
+kraken_taxon(
     fq1 = fq1,
     fq2 = fq2,
     # kraken2 database
