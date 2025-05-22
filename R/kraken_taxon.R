@@ -1,7 +1,25 @@
-#' Extracting microbiome kraken2 output and sequence reads
+#' Extract microbiome Kraken2 output and sequence reads
 #'
 #' @inheritParams blit::kraken2
+#' @param db Path to the Kraken2 database. You can download prebuilt databases
+#'   from <https://benlangmead.github.io/aws-indexes/k2>, or build your own by
+#'   following the instructions at
+#'   <https://github.com/DerrickWood/kraken2/wiki/Manual#kraken-2-databases>.
 #' @inheritParams kractor
+#' @param threads Integer. Number of threads to use.
+#' @param envpath String. Additional path to include in the PATH environment
+#' variable.
+#' @param overwrite Logical. Whether to overwrite existing files in `odir`.
+#' @return None. This function generates the following files:
+#' - `kreport`: the `kraken2` report file.
+#' - `koutput`: the `kraken2` output file.
+#' - `classified_out`: the classified sequence file(s) from `kraken2`.
+#' - `unclassified_out`: the unclassified sequence file(s) from `kraken2`.
+#' - `extract_koutput`: Kraken2 output entries corresponding to the specified
+#'   `taxon`, extracted from koutput.
+#' - `extract_reads`: Sequence file(s) containing reads assigned to the
+#'   specified `taxon`.
+#'
 #' @export
 kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
                          kreport = "kraken_report.txt",
@@ -12,9 +30,8 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
                          extract_reads = NULL,
                          taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                          buffer_size = NULL, threads = NULL,
-                         odir = getwd(),
                          kraken2 = NULL, envpath = NULL,
-                         overwrite = FALSE) {
+                         overwrite = FALSE, odir = getwd()) {
     assert_string(fq1, allow_empty = FALSE)
     assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
     assert_string(kreport, allow_empty = FALSE)
@@ -52,6 +69,7 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
         allow_null = TRUE
     )
     threads <- threads %||% parallel::detectCores()
+    assert_bool(overwrite)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     if (is.null(odir)) odir <- getwd()
     if (!is.null(db)) db <- sprintf("--db %s", db)

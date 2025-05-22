@@ -89,7 +89,7 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
                          },
                          ranks = c("G", "S"), kmer_len = 35L,
                          min_frac = 0.5, exclude = "9606",
-                         threads = NULL, overwrite = TRUE, odir = NULL) {
+                         threads = NULL, overwrite = FALSE, odir = NULL) {
     use_polars()
     assert_string(fa1, allow_empty = FALSE)
     assert_string(fa2, allow_empty = FALSE, allow_null = TRUE)
@@ -100,6 +100,7 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
         allow_null = TRUE
     )
     threads <- threads %||% parallel::detectCores()
+    assert_bool(overwrite)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     if (is.null(odir)) odir <- getwd()
     ofiles <- paste0(file.path(odir, c("kreport", "kmer", "umi")), ".parquet")

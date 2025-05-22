@@ -19,7 +19,7 @@ prep_dataset(
   min_frac = 0.5,
   exclude = "9606",
   threads = NULL,
-  overwrite = TRUE,
+  overwrite = FALSE,
   odir = NULL
 )
 

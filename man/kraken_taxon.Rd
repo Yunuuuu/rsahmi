@@ -2,7 +2,7 @@
 % Please edit documentation in R/kraken_taxon.R
 \name{kraken_taxon}
 \alias{kraken_taxon}
-\title{Extracting microbiome kraken2 output and sequence reads}
+\title{Extract microbiome Kraken2 output and sequence reads}
 \usage{
 kraken_taxon(
   fq1,
@@ -18,16 +18,21 @@ kraken_taxon(
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   buffer_size = NULL,
   threads = NULL,
-  odir = getwd(),
   kraken2 = NULL,
   envpath = NULL,
-  overwrite = FALSE
+  overwrite = FALSE,
+  odir = getwd()
 )
 }
 \arguments{
 \item{fq1, fq2}{A string of fastq file path.}
 
 \item{...}{<\link[rlang:dyn-dots]{dynamic dots}> Additional arguments passed to \code{kraken2} command. Empty arguments are automatically trimmed. If a single argument, such as a file path, contains spaces, it must be quoted, for example using \code{\link[=shQuote]{shQuote()}}. Details see: \code{cmd_help(kraken2())}.}
+
+\item{db}{Path to the Kraken2 database. You can download prebuilt databases
+from \url{https://benlangmead.github.io/aws-indexes/k2}, or build your own by
+following the instructions at
+\url{https://github.com/DerrickWood/kraken2/wiki/Manual#kraken-2-databases}.}
 
 \item{kreport}{Path to the Kraken2 report file.}
 
@@ -55,10 +60,30 @@ scientific name of the taxon (e.g., "d__Viruses").}
 and writing files. Note that more than twice the specified \code{buffer_size} will
 be used internally.}
 
-\item{odir}{A string of path to the output directory.}
+\item{threads}{Integer. Number of threads to use.}
 
 \item{kraken2}{A string of path to \code{kraken2} command.}
+
+\item{envpath}{String. Additional path to include in the PATH environment
+variable.}
+
+\item{overwrite}{Logical. Whether to overwrite existing files in \code{odir}.}
+
+\item{odir}{A string of path to the output directory.}
+}
+\value{
+None. This function generates the following files:
+\itemize{
+\item \code{kreport}: the \code{kraken2} report file.
+\item \code{koutput}: the \code{kraken2} output file.
+\item \code{classified_out}: the classified sequence file(s) from \code{kraken2}.
+\item \code{unclassified_out}: the unclassified sequence file(s) from \code{kraken2}.
+\item \code{extract_koutput}: Kraken2 output entries corresponding to the specified
+\code{taxon}, extracted from koutput.
+\item \code{extract_reads}: Sequence file(s) containing reads assigned to the
+specified \code{taxon}.
+}
 }
 \description{
-Extracting microbiome kraken2 output and sequence reads
+Extract microbiome Kraken2 output and sequence reads
 }
