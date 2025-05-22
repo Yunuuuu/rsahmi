@@ -39,7 +39,7 @@ fn write_matching_output<P>(
 where
     P: AsRef<Path> + Display,
 {
-    rprintln!("Extracting matching kraken2 output {}", koutput);
+    rprintln!("Extracting the matching kraken2 output from {}", koutput);
     let input = BufReader::with_capacity(buffersize, File::open(koutput)?);
     let mut output = BufWriter::with_capacity(buffersize, File::create(ofile)?);
 
@@ -96,7 +96,7 @@ where
     write_matching_records(fq1, ofile1, buffersize, id_set)?;
 
     if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
-        rprintln!("Extracting matching sequence from {}", in_file);
+        rprintln!("Extracting the matching sequence from {}", in_file);
         write_matching_records(in_file, out_file, buffersize, id_set)?;
     }
     Ok(())
