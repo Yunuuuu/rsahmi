@@ -23,12 +23,20 @@ fn kractor(
     fq2: Option<&str>,
     ofile2: Option<&str>,
     buffersize: usize,
+    queue_capacity: usize,
     threads: usize,
 ) -> std::result::Result<(), String> {
     let patterns: Vec<&str> = patterns
         .as_str_vector()
         .ok_or("`patterns` must be a character vector")?;
-    write_matching_output(koutput, &patterns, ofile, buffersize, threads)?;
+    write_matching_output(
+        koutput,
+        &patterns,
+        ofile,
+        buffersize,
+        queue_capacity,
+        threads,
+    )?;
     let id_set = read_sequence_id_from_koutput(ofile, buffersize)?;
     write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, buffersize)
 }
@@ -38,11 +46,14 @@ fn write_matching_output<P>(
     patterns: &[&str],
     ofile: P,
     buffersize: usize,
+    queue_capacity: usize,
     threads: usize,
 ) -> std::result::Result<(), String>
 where
     P: AsRef<Path> + Display,
 {
+    // one thread is kept for writer
+    let threads = if threads <= 2 { 1 } else { threads - 1 };
     rprintln!("Extracting matching kraken2 output from: {}", koutput);
     std::thread::scope(|scope| {
         let mut input = BufReader::with_capacity(
@@ -60,11 +71,12 @@ where
         let patterns = Arc::new(patterns);
 
         // Start the processor threads
-        let (writer_tx, writer_rx) = bounded::<Box<[u8]>>(1_000);
-        let (work_tx, work_rx) = bounded::<Box<[u8]>>(1_000);
+        let (writer_tx, writer_rx) =
+            bounded::<Box<[u8]>>(threads * queue_capacity);
+        let (work_tx, work_rx) = bounded::<Box<[u8]>>(threads * queue_capacity);
 
         // Writer thread: write data to the file
-        // accept lines from reader
+        // accept lines from `writer_rx`
         let writer_handle =
             scope.spawn(move || -> std::result::Result<(), String> {
                 for line in writer_rx.iter() {
@@ -102,6 +114,7 @@ where
             worker_handles.push(handle);
         }
 
+        // read files and pass lines
         let mut line = Vec::new();
         while let Ok(bytes_read) = input.read_until(b'\n', &mut line) {
             if bytes_read == 0 {
@@ -112,6 +125,7 @@ where
                 .map_err(|e| format!("Send to workers failed: {e}"))?;
             line.clear();
         }
+
         // close work channel to stop workers
         drop(work_tx);
 

@@ -12,6 +12,7 @@ kractor(
   extract_reads = NULL,
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   buffer_size = NULL,
+  queue_capacity = NULL,
   threads = NULL,
   odir = getwd()
 )
@@ -39,6 +40,15 @@ scientific name of the taxon (e.g., "d__Viruses").}
 \item{buffer_size}{Integer specifying the buffer size in bytes for reading
 and writing files. Note that more than twice the specified \code{buffer_size} will
 be used internally.}
+
+\item{queue_capacity}{Integer specifying the maximum number of lines or
+records buffered per thread. This controls how many entries can be
+in-flight (pending processing or writing) at a time. Larger values may
+improve throughput by reducing thread blocking but will increase memory
+usage. Tune according to workload and available memory. Default is \code{1000}.}
+
+\item{threads}{Integer. Number of threads to use. Defaults to all available
+threads.}
 
 \item{odir}{A string of directory to save the \code{ofile}.}
 }

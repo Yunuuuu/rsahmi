@@ -6,8 +6,6 @@
 #'   following the instructions at
 #'   <https://github.com/DerrickWood/kraken2/wiki/Manual#kraken-2-databases>.
 #' @inheritParams kractor
-#' @param threads Integer. Number of threads to use. Defaults to all available
-#' threads.
 #' @param envpath String. Additional path to include in the `PATH` environment
 #'   variable. Used to locate the `kraken2` executable.
 #' @param overwrite Logical. Whether to overwrite existing files in `odir`.
@@ -30,7 +28,8 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
                          extract_koutput = NULL,
                          extract_reads = NULL,
                          taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                         buffer_size = NULL, threads = NULL,
+                         buffer_size = NULL, queue_capacity = NULL,
+                         threads = NULL,
                          kraken2 = NULL, envpath = NULL,
                          overwrite = FALSE, odir = getwd()) {
     assert_string(fq1, allow_empty = FALSE)
@@ -65,6 +64,7 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
         cli::cli_abort("empty {.arg taxon} provided")
     }
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    assert_number_whole(queue_capacity, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = parallel::detectCores(),
         allow_null = TRUE
@@ -109,6 +109,8 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
             extract_reads = extract_reads,
             taxon = taxon,
             buffer_size = buffer_size,
+            queue_capacity = queue_capacity,
+            threads = threads,
             odir = odir
         )
     } else {

@@ -4,22 +4,39 @@
 #' based on a set of specified taxonomic IDs.
 #'
 #' @param kreport Path to the Kraken2 report file.
+#'
 #' @param koutput Path to the Kraken2 output file.
+#'
 #' @param reads A character vector of FASTQ files used as input to Kraken2.
 #' Can be one file (single-end) or two files (paired-end).
+#'
 #' @param extract_koutput Path to the file where the extracted Kraken2 output
 #' matching the specified `taxon` will be saved. Defaults to
 #' `"kraken_microbiome_output.txt"`.
+#'
 #' @param extract_reads A character vector of the same length as `reads`,
 #' specifying the output FASTQ file(s) where the matching reads will be saved.
 #' Defaults to `"kraken_microbiome_reads(_1|2).txt"`
+#'
 #' @param taxon An atomic character specify the taxa name wanted. Should follow
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses").
+#'
 #' @param buffer_size Integer specifying the buffer size in bytes for reading
 #' and writing files. Note that more than twice the specified `buffer_size` will
 #' be used internally.
+#'
+#' @param queue_capacity Integer specifying the maximum number of lines or
+#'   records buffered per thread. This controls how many entries can be
+#'   in-flight (pending processing or writing) at a time. Larger values may
+#'   improve throughput by reducing thread blocking but will increase memory
+#'   usage. Tune according to workload and available memory. Default is `1000`.
+#'
+#' @param threads Integer. Number of threads to use. Defaults to all available
+#' threads.
+#'
 #' @param odir A string of directory to save the `ofile`.
+#'
 #' @seealso [`kraken_taxon()`]
 #' @examples
 #' \dontrun{
@@ -51,7 +68,8 @@
 kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                    buffer_size = NULL, threads = NULL, odir = getwd()) {
+                    buffer_size = NULL, queue_capacity = NULL,
+                    threads = NULL, odir = getwd()) {
     use_polars()
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
@@ -83,6 +101,7 @@ kractor <- function(kreport, koutput, reads,
         cli::cli_abort("empty {.arg taxon} provided")
     }
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    assert_number_whole(queue_capacity, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = parallel::detectCores(),
         allow_null = TRUE
@@ -104,13 +123,13 @@ kractor <- function(kreport, koutput, reads,
         to_series()$unique()
 
     rust_kractor(
-        koutput, reads, taxids, buffer_size,
+        koutput, reads, taxids, buffer_size, queue_capacity,
         extract_reads, extract_koutput, threads, odir
     )
     cli::cli_inform(c("v" = "Finished"))
 }
 
-rust_kractor <- function(koutput, reads, taxids, buffer_size,
+rust_kractor <- function(koutput, reads, taxids, buffer_size, queue_capacity,
                          extract_reads, extract_koutput, threads, odir) {
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
@@ -122,6 +141,7 @@ rust_kractor <- function(koutput, reads, taxids, buffer_size,
     patterns <- paste0("(taxid ", as.character(taxids), ")")
 
     buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
+    queue_capacity <- queue_capacity %||% 1000L
     extract_koutput <- file.path(odir, extract_koutput)
     extract_reads <- file.path(odir, extract_reads)
     if (is_scalar(extract_reads)) {
@@ -141,68 +161,7 @@ rust_kractor <- function(koutput, reads, taxids, buffer_size,
         fq1 = fq1, ofile1 = extract_read1,
         fq2 = fq2, ofile2 = extract_read2,
         buffer_size = buffer_size,
+        queue_capacity = queue_capacity,
         threads = threads
-    )
-}
-
-polars_kractor <- function(koutput, reads, taxids, buffer_size,
-                           extract_reads, extract_koutput, odir) {
-    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
-    # take care of taxid: "A"
-    extract_matching_output(
-        koutput,
-        taxids,
-        ofile = extract_koutput,
-        odir = odir
-    )
-    extract_matching_reads(
-        file.path(odir, extract_koutput),
-        reads = reads,
-        extract_reads = extract_reads,
-        buffer_size = buffer_size,
-        odir = odir
-    )
-}
-
-extract_matching_output <- function(koutput, taxids, ofile, ..., odir) {
-    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
-    # take care of taxid: "A"
-    cli::cli_inform("Extracting the matching kraken2 output from {koutput}")
-    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
-        taxids <- taxids$append(c("81077", "A"))
-    }
-    pl$scan_csv(koutput, has_header = FALSE, separator = "\t")$
-        filter(
-        pl$col("column_3")$str$
-            extract(pl$lit("\\s*(.+)\\s*\\(taxid\\s*(\\d+|A)\\s*\\)"), 2L)$
-            is_in(taxids)
-    )$
-        sink_csv(
-        path = file.path(odir, ofile),
-        include_header = FALSE,
-        separator = "\t", ...
-    )
-}
-
-extract_matching_reads <- function(koutput, reads, extract_reads,
-                                   buffer_size, odir) {
-    buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
-    extract_reads <- file.path(odir, extract_reads)
-    if (is_scalar(extract_reads)) {
-        fq1 <- reads[[1L]]
-        fq2 <- NULL
-        extract_read1 <- extract_reads[[1L]]
-        extract_read2 <- NULL
-    } else {
-        fq1 <- reads[[1L]]
-        fq2 <- reads[[2L]]
-        extract_read1 <- extract_reads[[1L]]
-        extract_read2 <- extract_reads[[2L]]
-    }
-    rust_call(
-        "extract_matching_reads", koutput,
-        fq1 = fq1, ofile1 = extract_read1,
-        fq2 = fq2, ofile2 = extract_read2,
-        buffer_size = buffer_size
     )
 }
