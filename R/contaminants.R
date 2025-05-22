@@ -1,9 +1,9 @@
 #' Identifying contaminants and false positives taxa (cell line quantile test)
 #'
-#' @param kraken_reports A character of path to all kraken report files.
+#' @param kreports A character of path to all kraken report files.
 #' @param study A string of the study name, used to differentiate with cell line
 #' data.
-#' @inheritParams extractor
+#' @inheritParams kractor
 #' @param quantile Probabilities with values in `[0, 1]` specifying the quantile
 #' to calculate.
 #' @param alpha Level of significance.
@@ -25,7 +25,7 @@
 #' # `paths` should be the output directory for each sample from
 #' # `blit::kraken2()`
 #' truly_microbe <- remove_contaminants(
-#'     kraken_reports = file.path(paths, "kraken_report.txt"),
+#'     kreports = file.path(paths, "kraken_report.txt"),
 #'     quantile = 0.99, exclusive = FALSE
 #' )
 #' microbe_for_plot <- attr(truly_microbe, "truly")[
@@ -52,7 +52,7 @@
 #'     )
 #' }
 #' @export
-remove_contaminants <- function(kraken_reports, study = "current study",
+remove_contaminants <- function(kreports, study = "current study",
                                 taxon = c(
                                     "d__Bacteria", "d__Fungi", "d__Viruses"
                                 ),
@@ -62,7 +62,7 @@ remove_contaminants <- function(kraken_reports, study = "current study",
     use_polars()
     alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
     cli::cli_alert_info("Parsing reads per million microbiome reads (rpmm)")
-    kreports <- lapply(kraken_reports, parse_rpmm, taxon = taxon)
+    kreports <- lapply(kreports, parse_rpmm, taxon = taxon)
     kreports <- pl$concat(kreports, how = "vertical")
 
     # prepare celllines data ----------------------

@@ -16,6 +16,3 @@ noodles-fastq = { version = "*" }
 
 [lints.clippy]
 needless_late_init = "allow"
-
-[dev-dependencies]
-tempfile ={ version = "*"}

@@ -1,6 +1,6 @@
 use extendr_api::prelude::*;
 
-mod extractor;
+mod kractor; // kraken extractor
 
 // https://extendr.github.io/extendr/extendr_api/#returning-resultt-e-to-r
 // https://github.com/extendr/extendr/blob/master/extendr-api/src/robj/into_robj.rs#L100
@@ -19,5 +19,5 @@ mod extractor;
 // For methods, we'll call it directly with R function `call_rust_method`
 extendr_module! {
     mod rsahmi;
-    use extractor;
+    use kractor;
 }

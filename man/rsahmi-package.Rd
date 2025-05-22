@@ -6,7 +6,7 @@
 \alias{rsahmi-package}
 \title{rsahmi: Single-Cell Analysis of Host-Microbiome Interactions}
 \description{
-A computational resource designed to accurately detect microbial nucleic acids while filtering out contaminants and false-positive taxonomic assignments from standard transcriptomic sequencing of mammalian tissues. For more details, see Ghaddar (2023) \doi{10.1038/s43588-023-00507-1}. This implementation leverages the 'polars' package for fast and systematic microbial signal recovery and denoising from host tissue genomic sequencing.
+A computational resource designed to accurately detect microbial nucleic acids while filtering out contaminants and false-positive taxonomic assignments from standard transcriptomic sequencing of mammalian tissues. For more details, see Ghaddar (2023) \doi{10.1038/s43588-023-00507-1}. This implementation leverages rust for fast and systematic microbial signal recovery and denoising from host tissue genomic sequencing.
 }
 \seealso{
 Useful links:

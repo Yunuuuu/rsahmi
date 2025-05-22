@@ -1,0 +1,132 @@
+#' Extract Reads and Output from Kraken2 (kraken2 extractor)
+#'
+#' This function extracts reads and classification results from Kraken2 output,
+#' based on a set of specified taxonomic IDs.
+#'
+#' @param kreport Path to the Kraken2 report file.
+#' @param koutput Path to the Kraken2 output file.
+#' @param reads A character vector of FASTQ files used as input to Kraken2.
+#' Can be one file (single-end) or two files (paired-end).
+#' @param extract_koutput Path to the file where the extracted Kraken2 output
+#' matching the specified `taxon` will be saved. Defaults to
+#' `"kraken_microbiome_output.txt"`.
+#' @param extract_reads A character vector of the same length as `reads`,
+#' specifying the output FASTQ file(s) where the matching reads will be saved.
+#' Defaults to `"kraken_microbiome_reads(_1|2).txt"`
+#' @param taxon An atomic character specify the taxa name wanted. Should follow
+#' the kraken style, connected by rank codes, two underscores, and the
+#' scientific name of the taxon (e.g., "d__Viruses").
+#' @param buffer_size Integer specifying the buffer size in bytes for reading
+#' and writing files. Note that more than twice the specified `buffer_size` will
+#' be used internally.
+#' @param odir A string of directory to save the `ofile`.
+#' @seealso
+#' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
+#' @examples
+#' \dontrun{
+#' # For 10x Genomic data, `fq1` only contain barcode and umi, but the official
+#' # didn't give any information for this. In this way, I prefer using
+#' # `umi-tools` to transform the `umi` into fq2 and then run `rsahmi` with
+#' # only fq2.
+#' blit::kraken2(
+#'     fq1 = fq1,
+#'     fq2 = fq2,
+#'     classified_out = "classified.fq",
+#'     # Number of threads to use
+#'     blit::arg("--threads", 10L, format = "%d"),
+#'     # the kraken database
+#'     blit::arg("--db", kraken_db),
+#'     "--use-names", "--report-minimizer-data",
+#' ) |> blit::cmd_run()
+#'
+#' # 1. `kreport` should be the kraken2 report file of `blit::kraken2()`
+#' # 2. `koutput` should be the kraken2 output file of `blit::kraken2()`
+#' # 3. `reads` should be the same with `fq1` and `fq2` in `blit::kraken2()`
+#' kractor(
+#'     kreport = "kraken_report.txt",
+#'     koutput = "kraken_output.txt",
+#'     reads = c(fq1, fq2)
+#' )
+#' }
+#' @export
+kractor <- function(kreport, koutput, reads,
+                    extract_koutput = NULL, extract_reads = NULL,
+                    taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+                    buffer_size = NULL, odir = getwd()) {
+    use_polars()
+    assert_string(kreport, allow_empty = FALSE)
+    assert_string(koutput, allow_empty = FALSE)
+    reads <- as.character(reads)
+    if (length(reads) < 1L || length(reads) > 2L) {
+        cli::cli_abort("{.arg reads} must be of length 1 or 2")
+    }
+    assert_string(extract_koutput, allow_empty = FALSE, allow_null = TRUE)
+    if (is.null(extract_reads)) {
+        if (is_scalar(reads)) {
+            extract_reads <- "kraken_microbiome_reads.fa"
+        } else {
+            extract_reads <- sprintf(
+                "kraken_microbiome_reads_%d.fa",
+                seq_along(reads)
+            )
+        }
+    } else {
+        extract_reads <- as.character(extract_reads)
+        if (length(extract_reads) != length(reads)) {
+            cli::cli_abort(
+                "{.arg extract_reads} must have the same length of {.arg reads}"
+            )
+        }
+    }
+    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
+    taxon <- as.character(taxon)
+    if (length(taxon) == 0L) {
+        cli::cli_abort("empty {.arg taxon} provided")
+    }
+    assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    assert_string(odir, allow_empty = FALSE)
+    dir_create(odir)
+
+    taxids <- parse_kraken_report(kreport)$
+        explode(pl$col("ranks", "taxon"))$
+        filter(
+        pl$concat_str(
+            pl$col("ranks")$str$to_lowercase(),
+            pl$col("taxon"),
+            separator = "__"
+        )$is_in(pl$lit(taxon))
+    )$
+        select(pl$col("taxids")$list$last())$
+        to_series()$unique()
+
+    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
+    # take care of taxid: "A"
+    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
+        taxids <- taxids$append(c("81077", "A"))
+    }
+    # the third column of kraken2 output:
+    # Using (taxid ****)
+    taxids <- paste0("(taxid ", as.character(taxids), ")")
+
+    buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
+    extract_reads <- file.path(odir, extract_reads)
+    if (is_scalar(extract_reads)) {
+        fq1 <- reads[[1L]]
+        fq2 <- NULL
+        extract_read1 <- extract_reads[[1L]]
+        extract_read2 <- NULL
+    } else {
+        fq1 <- reads[[1L]]
+        fq2 <- reads[[2L]]
+        extract_read1 <- extract_reads[[1L]]
+        extract_read2 <- extract_reads[[2L]]
+    }
+    rust_call(
+        "kractor", koutput, taxids,
+        ofile = extract_koutput,
+        fq1 = fq1, ofile1 = extract_read1,
+        fq2 = fq2, ofile2 = extract_read2,
+        buffer_size = buffer_size
+    )
+    cli::cli_inform(c("v" = "Finished"))
+}
