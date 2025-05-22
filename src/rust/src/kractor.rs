@@ -29,10 +29,8 @@ fn kractor(
         .as_str_vector()
         .ok_or("`patterns` must be a character vector")?;
     write_matching_output(koutput, &patterns, ofile, buffersize, threads)?;
-    let id_set = read_sequence_id_from_koutput(ofile, buffersize)
-        .map_err(|e| e.to_string())?;
+    let id_set = read_sequence_id_from_koutput(ofile, buffersize)?;
     write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, buffersize)
-        .map_err(|e| e.to_string())
 }
 
 fn write_matching_output<P>(
