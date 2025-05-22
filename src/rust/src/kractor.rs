@@ -14,7 +14,7 @@ use noodles_fastq::io::Reader;
 #[allow(clippy::too_many_arguments)]
 fn kractor(
     koutput: &str,
-    taxids: Robj,
+    patterns: Robj,
     ofile: &str,
     fq1: &str,
     ofile1: &str,
@@ -22,9 +22,9 @@ fn kractor(
     ofile2: Option<&str>,
     buffersize: usize,
 ) -> std::result::Result<(), String> {
-    let patterns: Vec<&str> = taxids
+    let patterns: Vec<&str> = patterns
         .as_str_vector()
-        .ok_or("`taxids` must be a character vector")?;
+        .ok_or("`patterns` must be a character vector")?;
     write_matching_output(koutput, &patterns, ofile, buffersize)
         .map_err(|e| e.to_string())?;
     let id_set = read_sequence_id_from_koutput(ofile, buffersize)

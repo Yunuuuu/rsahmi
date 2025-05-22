@@ -114,7 +114,7 @@ rust_kractor <- function(koutput, reads, taxids, buffer_size,
     }
     # the third column of kraken2 output:
     # Using (taxid ****)
-    taxids <- paste0("(taxid ", as.character(taxids), ")")
+    patterns <- paste0("(taxid ", as.character(taxids), ")")
 
     buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
     extract_koutput <- file.path(odir, extract_koutput)
@@ -131,7 +131,7 @@ rust_kractor <- function(koutput, reads, taxids, buffer_size,
         extract_read2 <- extract_reads[[2L]]
     }
     rust_call(
-        "kractor", koutput, taxids,
+        "kractor", koutput, patterns,
         ofile = extract_koutput,
         fq1 = fq1, ofile1 = extract_read1,
         fq2 = fq2, ofile2 = extract_read2,
