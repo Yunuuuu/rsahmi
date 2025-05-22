@@ -120,7 +120,6 @@ where
             if bytes_read == 0 {
                 break;
             }
-            // Move the old buffer back for reuse
             let line = std::mem::take(&mut buf);
             work_tx
                 .send(line.into_boxed_slice())
