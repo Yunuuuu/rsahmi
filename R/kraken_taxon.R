@@ -6,10 +6,12 @@
 #'   following the instructions at
 #'   <https://github.com/DerrickWood/kraken2/wiki/Manual#kraken-2-databases>.
 #' @inheritParams kractor
-#' @param threads Integer. Number of threads to use.
-#' @param envpath String. Additional path to include in the PATH environment
-#' variable.
+#' @param threads Integer. Number of threads to use. Defaults to all available
+#' threads.
+#' @param envpath String. Additional path to include in the `PATH` environment
+#'   variable. Used to locate the `kraken2` executable.
 #' @param overwrite Logical. Whether to overwrite existing files in `odir`.
+#' @seealso [`kractor()`]
 #' @return None. This function generates the following files:
 #' - `kreport`: the `kraken2` report file.
 #' - `koutput`: the `kraken2` output file.
@@ -19,7 +21,6 @@
 #'   `taxon`, extracted from koutput.
 #' - `extract_reads`: Sequence file(s) containing reads assigned to the
 #'   specified `taxon`.
-#'
 #' @export
 kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
                          kreport = "kraken_report.txt",

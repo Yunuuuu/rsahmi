@@ -60,12 +60,13 @@ scientific name of the taxon (e.g., "d__Viruses").}
 and writing files. Note that more than twice the specified \code{buffer_size} will
 be used internally.}
 
-\item{threads}{Integer. Number of threads to use.}
+\item{threads}{Integer. Number of threads to use. Defaults to all available
+threads.}
 
 \item{kraken2}{A string of path to \code{kraken2} command.}
 
-\item{envpath}{String. Additional path to include in the PATH environment
-variable.}
+\item{envpath}{String. Additional path to include in the \code{PATH} environment
+variable. Used to locate the \code{kraken2} executable.}
 
 \item{overwrite}{Logical. Whether to overwrite existing files in \code{odir}.}
 
@@ -86,4 +87,7 @@ specified \code{taxon}.
 }
 \description{
 Extract microbiome Kraken2 output and sequence reads
+}
+\seealso{
+\code{\link[=kractor]{kractor()}}
 }

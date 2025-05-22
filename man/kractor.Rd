@@ -73,5 +73,5 @@ kractor(
 }
 }
 \seealso{
-\url{https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown}
+\code{\link[=kraken_taxon]{kraken_taxon()}}
 }

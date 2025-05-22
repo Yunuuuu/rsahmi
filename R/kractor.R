@@ -20,8 +20,7 @@
 #' and writing files. Note that more than twice the specified `buffer_size` will
 #' be used internally.
 #' @param odir A string of directory to save the `ofile`.
-#' @seealso
-#' <https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown>
+#' @seealso [`kraken_taxon()`]
 #' @examples
 #' \dontrun{
 #' # For 10x Genomic data, `fq1` only contain barcode and umi, but the official
