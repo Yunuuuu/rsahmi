@@ -51,7 +51,7 @@
 kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                    buffer_size = NULL, odir = getwd()) {
+                    buffer_size = NULL, threads = NULL, odir = getwd()) {
     use_polars()
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
@@ -83,6 +83,11 @@ kractor <- function(kreport, koutput, reads,
         cli::cli_abort("empty {.arg taxon} provided")
     }
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    assert_number_whole(threads,
+        min = 1, max = parallel::detectCores(),
+        allow_null = TRUE
+    )
+    threads <- threads %||% parallel::detectCores()
     assert_string(odir, allow_empty = FALSE)
     dir_create(odir)
 
@@ -100,13 +105,13 @@ kractor <- function(kreport, koutput, reads,
 
     rust_kractor(
         koutput, reads, taxids, buffer_size,
-        extract_reads, extract_koutput, odir
+        extract_reads, extract_koutput, threads, odir
     )
     cli::cli_inform(c("v" = "Finished"))
 }
 
 rust_kractor <- function(koutput, reads, taxids, buffer_size,
-                         extract_reads, extract_koutput, odir) {
+                         extract_reads, extract_koutput, threads, odir) {
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
     if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
@@ -135,7 +140,8 @@ rust_kractor <- function(koutput, reads, taxids, buffer_size,
         ofile = extract_koutput,
         fq1 = fq1, ofile1 = extract_read1,
         fq2 = fq2, ofile2 = extract_read2,
-        buffer_size = buffer_size
+        buffer_size = buffer_size,
+        threads = threads
     )
 }
 

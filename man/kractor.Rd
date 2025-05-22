@@ -12,6 +12,7 @@ kractor(
   extract_reads = NULL,
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   buffer_size = NULL,
+  threads = NULL,
   odir = getwd()
 )
 }

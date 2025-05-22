@@ -211,6 +211,7 @@ dependencies = [
 name = "rsahmi"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
  "extendr-api",
  "memchr",
  "noodles-fasta",
