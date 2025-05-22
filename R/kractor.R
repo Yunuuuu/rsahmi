@@ -25,11 +25,11 @@
 #' @param io_buffer Integer specifying the I/O buffer size in bytes
 #' used for reading from and writing to disk. This controls the capacity of the
 #' buffered file reader and writer. Internally, more than twice this size may be
-#' allocated to accommodate in-flight data. Default is `8KB`.
+#' allocated to accommodate in-flight data. Default is `8 * 1024`.
 #'
 #' @param buffer_size Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during
-#' processing. Default is `1MB`.
+#' processing. Default is `256 * 1024`.
 #'
 #' @param batch_size Integer. Number of lines to write per batch. Default is
 #'   `100`.
@@ -156,7 +156,7 @@ rust_kractor <- function(koutput, reads, taxids,
     # Using (taxid ****)
     patterns <- paste0("(taxid ", as.character(taxids), ")")
     io_buffer <- io_buffer %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
-    buffer_size <- buffer_size %||% (1 * 1024L * 1024L) # 1MB
+    buffer_size <- buffer_size %||% (256 * 1024L) # 1MB
     batch_size <- batch_size %||% 100L
     queue_capacity <- queue_capacity %||% 100L
     extract_koutput <- file.path(odir, extract_koutput)
