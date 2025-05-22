@@ -115,15 +115,16 @@ where
         }
 
         // read files and pass lines
-        let mut line = Vec::new();
-        while let Ok(bytes_read) = input.read_until(b'\n', &mut line) {
+        let mut buf: Vec<u8> = Vec::new();
+        while let Ok(bytes_read) = input.read_until(b'\n', &mut buf) {
             if bytes_read == 0 {
                 break;
             }
+            // Move the old buffer back for reuse
+            let line = std::mem::take(&mut buf);
             work_tx
-                .send(Box::<[u8]>::from(&line[..]))
+                .send(line.into_boxed_slice())
                 .map_err(|e| format!("Send to workers failed: {e}"))?;
-            line.clear();
         }
 
         // close work channel to stop workers
@@ -149,7 +150,7 @@ where
     P: AsRef<Path> + Display,
 {
     // Collect IDs into a HashSet for fast lookup
-    rprintln!("Extracting sequence IDs from: {}", file);
+    rprintln!("Extracting sequence IDs");
     let opened =
         File::open(file).map_err(|e| format!("Open file failed: {}", e))?;
     let buffer = BufReader::with_capacity(buffersize, opened);
