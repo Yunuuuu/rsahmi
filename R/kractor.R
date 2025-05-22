@@ -100,13 +100,43 @@ kractor <- function(kreport, koutput, reads,
 
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
+    extract_matching_output(
+        koutput,
+        taxids,
+        ofile = extract_koutput,
+        odir = odir
+    )
+    extract_matching_reads(
+        file.path(odir, extract_koutput),
+        reads = reads,
+        extract_reads = extract_reads,
+        buffer_size = buffer_size,
+        odir = odir
+    )
+    cli::cli_inform(c("v" = "Finished"))
+}
+
+extract_matching_output <- function(koutput, taxids, ofile, ..., odir) {
+    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
+    # take care of taxid: "A"
     if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
         taxids <- taxids$append(c("81077", "A"))
     }
-    # the third column of kraken2 output:
-    # Using (taxid ****)
-    taxids <- paste0("(taxid ", as.character(taxids), ")")
+    pl$scan_csv(koutput, has_header = FALSE, separator = "\t")$
+        filter(
+        pl$col("column_3")$str$
+            extract(pl$lit("\\s*(.+)\\s*\\(taxid\\s*(\\d+|A)\\s*\\)"), 2L)$
+            is_in(taxids)
+    )$
+        sink_csv(
+        path = file.path(odir, ofile),
+        include_header = FALSE,
+        separator = "\t", ...
+    )
+}
 
+extract_matching_reads <- function(koutput, reads, extract_reads,
+                                   buffer_size, odir) {
     buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
     extract_reads <- file.path(odir, extract_reads)
     if (is_scalar(extract_reads)) {
@@ -121,11 +151,9 @@ kractor <- function(kreport, koutput, reads,
         extract_read2 <- extract_reads[[2L]]
     }
     rust_call(
-        "kractor", koutput, taxids,
-        ofile = extract_koutput,
+        "extract_matching_reads", koutput,
         fq1 = fq1, ofile1 = extract_read1,
         fq2 = fq2, ofile2 = extract_read2,
         buffer_size = buffer_size
     )
-    cli::cli_inform(c("v" = "Finished"))
 }

@@ -11,73 +11,47 @@ use noodles_fastq::io::Reader;
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
-fn kractor(
+fn extract_matching_reads(
     koutput: &str,
-    taxids: Robj,
-    ofile: &str,
     fq1: &str,
     ofile1: &str,
     fq2: Option<&str>,
     ofile2: Option<&str>,
     buffersize: usize,
 ) -> std::result::Result<(), String> {
-    let taxids: Vec<&str> = taxids
-        .as_str_vector()
-        .ok_or("`taxids` must be a character vector")?;
-    let id_set = write_matching_output(koutput, &taxids, ofile, buffersize)
+    let id_set = read_sequence_id_from_koutput(koutput, buffersize)
         .map_err(|e| e.to_string())?;
     write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, buffersize)
         .map_err(|e| e.to_string())
 }
 
-fn write_matching_output<P>(
-    koutput: P,
-    taxids: &[&str],
-    ofile: P,
+fn read_sequence_id_from_koutput<P>(
+    file: P,
     buffersize: usize,
 ) -> io::Result<HashSet<Vec<u8>>>
 where
     P: AsRef<Path> + Display,
 {
-    rprintln!("Extracting the matching kraken2 output from {}", koutput);
-    let input = BufReader::with_capacity(buffersize, File::open(koutput)?);
-    let mut output = BufWriter::with_capacity(buffersize, File::create(ofile)?);
-
-    // Preallocate with expected number of sequence IDs
-    let id_set: HashSet<Vec<u8>> = input
+    // Collect IDs into a HashSet for fast lookup
+    rprintln!("Extracting sequence IDs from {}", file);
+    let opened = File::open(file)?;
+    let buffer = BufReader::with_capacity(buffersize, opened);
+    let id_set = buffer
         .lines()
-        .filter_map(|read| {
-            match read {
-                Ok(line) => {
-                    let mut fields = line.split('\t');
-                    fields.next(); // Just omit the first item
-                    let second = fields.next(); // sequence ID
-                    let third = fields.next(); // taxids
-                    match third {
-                        Some(taxid)
-                            if taxids.iter().any(|p| taxid.contains(p)) =>
-                        {
-                            // write the matching output
-                            let _ = writeln!(output, "{line}");
-
-                            // extract the sequence id
-                            second.and_then(|seq_id| {
-                                // we remove empty sequence IDs
-                                if !seq_id.is_empty() {
-                                    Some(seq_id.as_bytes().to_vec())
-                                } else {
-                                    None
-                                }
-                            })
-                        }
-                        _ => None,
+        .filter_map(|line| {
+            line.ok().and_then(|str| {
+                // we selected the second column
+                str.split("\t").nth(1).and_then(|second| {
+                    // we remove empty sequence IDs
+                    if second.is_empty() {
+                        None
+                    } else {
+                        Some(second.as_bytes().to_vec())
                     }
-                }
-                _ => None,
-            }
+                })
+            })
         })
         .collect::<HashSet<Vec<u8>>>();
-    output.flush()?;
     Ok(id_set)
 }
 
@@ -142,5 +116,5 @@ where
 
 extendr_module! {
     mod kractor;
-    fn kractor;
+    fn extract_matching_reads;
 }
