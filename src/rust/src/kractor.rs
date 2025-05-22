@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 
 use crossbeam_channel::bounded;
@@ -22,6 +22,7 @@ fn kractor(
     fq2: Option<&str>,
     ofile2: Option<&str>,
     buffersize: usize,
+    batchsize: usize,
     queue_capacity: usize,
     threads: usize,
 ) -> std::result::Result<(), String> {
@@ -33,6 +34,7 @@ fn kractor(
         &patterns,
         ofile,
         buffersize,
+        batchsize,
         queue_capacity,
         threads,
     )?;
@@ -45,6 +47,7 @@ fn write_matching_output<P>(
     patterns: &[&str],
     ofile: P,
     buffersize: usize,
+    batchsize: usize,
     queue_capacity: usize,
     threads: usize,
 ) -> std::result::Result<(), String>
@@ -70,8 +73,8 @@ where
 
     // Start the processor threads
     let (writer_tx, ref writer_rx) =
-        bounded::<Box<[u8]>>(threads * queue_capacity);
-    let (work_tx, ref work_rx) = bounded::<Box<[u8]>>(threads * queue_capacity);
+        bounded::<Vec<Vec<u8>>>(threads * queue_capacity);
+    let (work_tx, ref work_rx) = bounded::<Vec<u8>>(threads * queue_capacity);
 
     std::thread::scope(|scope| {
         // let patterns = Arc::new(patterns);
@@ -80,33 +83,57 @@ where
         // accept lines from `writer_rx`
         let writer_handle =
             scope.spawn(move || -> std::result::Result<(), String> {
-                for line in writer_rx.iter() {
-                    output
-                        .write_all(&line)
-                        .map_err(|e| format!("Write failed: {e}"))?;
+                for batch in writer_rx.iter() {
+                    for line in batch {
+                        output
+                            .write_all(&line)
+                            .map_err(|e| format!("Write failed: {e}"))?;
+                    }
                 }
                 output.flush().map_err(|e| format!("Flush failed: {e}"))?;
                 Ok(())
             });
 
-        // Spawn workers, will send each passed lines to `writer`
+        // Worker threads, will send each passed lines to `writer`
         let mut worker_handles = Vec::with_capacity(threads);
         for _ in 0 .. threads {
             let tx = writer_tx.clone();
             let handle =
                 scope.spawn(move || -> std::result::Result<(), String> {
-                    for line in work_rx.iter() {
-                        let mut fields = line.split(|b| *b == b'\t');
-                        if let Some(taxid) = fields.nth(2) {
-                            if needles
-                                .iter()
-                                .any(|needle| needle.find(taxid).is_some())
-                            {
-                                tx.send(line).map_err(|e| {
-                                    format!("Send to writer failed: {e}")
-                                })?;
+                    let mut batch_buffer = Vec::with_capacity(batchsize);
+                    for mut chunk in work_rx.iter() {
+                        while let Some(pos) =
+                            chunk.iter().position(|&b| b == b'\n')
+                        {
+                            // This drains (moves out) the bytes up to including newline
+                            let line: Vec<u8> = chunk.drain(..= pos).collect();
+                            let mut fields = line.splitn(3, |b| *b == b'\t');
+                            if let Some(taxid) = fields.nth(2) {
+                                if needles
+                                    .iter()
+                                    .any(|needle| needle.find(taxid).is_some())
+                                {
+                                    batch_buffer.push(line);
+                                    if batch_buffer.len()
+                                        == batch_buffer.capacity()
+                                    {
+                                        // Send batch by moving it, avoid cloning
+                                        let send_batch =
+                                            std::mem::take(&mut batch_buffer);
+                                        tx.send(send_batch).map_err(|e| {
+                                            format!(
+                                                "Send to writer failed: {e}"
+                                            )
+                                        })?;
+                                    }
+                                }
                             }
                         }
+                    }
+                    if !batch_buffer.is_empty() {
+                        tx.send(batch_buffer).map_err(|e| {
+                            format!("Send to writer failed: {e}")
+                        })?;
                     }
                     Ok(())
                 });
@@ -114,15 +141,54 @@ where
         }
 
         // read files and pass lines
-        let mut buf: Vec<u8> = Vec::new();
-        while let Ok(bytes_read) = input.read_until(b'\n', &mut buf) {
-            if bytes_read == 0 {
+        let mut buffer = vec![0; buffersize]; // 128 KB
+        let mut offset: usize = 0;
+        loop {
+            let read_bytes = input
+                .read(&mut buffer[offset ..])
+                .map_err(|e| format!("Read failed: {e}"))?;
+            if read_bytes == 0 {
+                // ensure all buffer has been send
+                if offset > 0 {
+                    let mut chunk =
+                        buffer.drain(..= offset).collect::<Vec<u8>>();
+                    // always ensure the last line has `\n`
+                    if !chunk.ends_with(b"\n") {
+                        chunk.push(b'\n');
+                    }
+                    work_tx
+                        .send(chunk)
+                        .map_err(|e| format!("Send to workers failed: {e}"))?;
+                }
                 break;
             }
-            let line = std::mem::take(&mut buf);
-            work_tx
-                .send(line.into_boxed_slice())
-                .map_err(|e| format!("Send to workers failed: {e}"))?;
+            offset += read_bytes;
+            match buffer[.. offset].iter().rposition(|b| *b == b'\n') {
+                Some(pos) => {
+                    offset -= pos + 1;
+                    let chunk = buffer.drain(..= pos).collect::<Vec<u8>>();
+                    work_tx
+                        .send(chunk)
+                        .map_err(|e| format!("Send to workers failed: {e}"))?;
+                    unsafe {
+                        buffer.set_len(buffer.capacity());
+                    }
+                }
+                None => {
+                    if buffer.capacity() < offset {
+                        buffer
+                            .try_reserve(
+                                buffer.capacity() - buffer.len() + buffersize,
+                            )
+                            .map_err(|e| {
+                                format!("Increase buffer failed: {e}")
+                            })?;
+                        unsafe {
+                            buffer.set_len(buffer.capacity());
+                        }
+                    }
+                }
+            };
         }
 
         // close work channel to stop workers

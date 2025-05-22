@@ -26,11 +26,12 @@
 #' and writing files. Note that more than twice the specified `buffer_size` will
 #' be used internally.
 #'
-#' @param queue_capacity Integer specifying the maximum number of lines or
-#'   records buffered per thread. This controls how many entries can be
-#'   in-flight (pending processing or writing) at a time. Larger values may
-#'   improve throughput by reducing thread blocking but will increase memory
-#'   usage. Tune according to workload and available memory. Default is `1000`.
+#' @param batch_size Integer. Number of lines to write per batch.
+#'
+#' @param queue_capacity Integer. Maximum number of buffers per thread,
+#'   controlling the amount of in-flight data awaiting processing or writing.
+#'   Higher values can improve throughput but increase memory use. Default is
+#'   `100`.
 #'
 #' @param threads Integer. Number of threads to use. Defaults to all available
 #' threads.
@@ -73,7 +74,8 @@
 kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                    buffer_size = NULL, queue_capacity = NULL,
+                    buffer_size = NULL, batch_size = NULL,
+                    queue_capacity = NULL,
                     threads = NULL, odir = getwd()) {
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
@@ -105,6 +107,7 @@ kractor <- function(kreport, koutput, reads,
         cli::cli_abort("empty {.arg taxon} provided")
     }
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
     assert_number_whole(queue_capacity, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = parallel::detectCores(),
@@ -127,14 +130,15 @@ kractor <- function(kreport, koutput, reads,
         to_series()$unique()
 
     rust_kractor(
-        koutput, reads, taxids, buffer_size, queue_capacity,
-        extract_reads, extract_koutput, threads, odir
+        koutput, reads, taxids, buffer_size, batch_size,
+        queue_capacity, extract_reads, extract_koutput, threads, odir
     )
     cli::cli_inform(c("v" = "Finished"))
 }
 
-rust_kractor <- function(koutput, reads, taxids, buffer_size, queue_capacity,
-                         extract_reads, extract_koutput, threads, odir) {
+rust_kractor <- function(koutput, reads, taxids, buffer_size, batch_size,
+                         queue_capacity, extract_reads, extract_koutput,
+                         threads, odir) {
     # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
     # take care of taxid: "A"
     if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
@@ -144,8 +148,9 @@ rust_kractor <- function(koutput, reads, taxids, buffer_size, queue_capacity,
     # Using (taxid ****)
     patterns <- paste0("(taxid ", as.character(taxids), ")")
 
-    buffer_size <- buffer_size %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
-    queue_capacity <- queue_capacity %||% 1000L
+    buffer_size <- buffer_size %||% (128L * 1024L) # DEFAULT_BUF_SIZE 8KB
+    batch_size <- batch_size %||% 100L
+    queue_capacity <- queue_capacity %||% 100L
     extract_koutput <- file.path(odir, extract_koutput)
     extract_reads <- file.path(odir, extract_reads)
     if (is_scalar(extract_reads)) {
@@ -164,7 +169,8 @@ rust_kractor <- function(koutput, reads, taxids, buffer_size, queue_capacity,
         ofile = extract_koutput,
         fq1 = fq1, ofile1 = extract_read1,
         fq2 = fq2, ofile2 = extract_read2,
-        buffer_size = buffer_size,
+        buffersize = buffer_size,
+        batchsize = batch_size,
         queue_capacity = queue_capacity,
         threads = threads
     )
