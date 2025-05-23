@@ -14,6 +14,7 @@ extendr-api = '*'
 noodles-fasta = { version = "*" }
 noodles-fastq = { version = "*" }
 crossbeam-channel = { version = "*" }
+memchr = { version = "*" }
 aho-corasick = { version = "*" }
 
 [lints.clippy]

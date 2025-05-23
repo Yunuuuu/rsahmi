@@ -223,6 +223,7 @@ dependencies = [
  "aho-corasick",
  "crossbeam-channel",
  "extendr-api",
+ "memchr",
  "noodles-fasta",
  "noodles-fastq",
 ]

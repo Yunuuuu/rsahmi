@@ -6,11 +6,101 @@ use std::path::Path;
 use aho_corasick::AhoCorasick;
 use crossbeam_channel::bounded;
 use extendr_api::prelude::*;
+use memchr::memchr;
+
+struct KOutputChunkParser {
+    // size of the buffer to read
+    buffersize: usize,
+    // buffer to store lines
+    buffer: Vec<Vec<u8>>,
+    // used to send lines to writer
+    // we use a channel to avoid blocking the worker threads
+    sender: crossbeam_channel::Sender<Vec<Vec<u8>>>,
+}
+
+impl KOutputChunkParser {
+    fn new(
+        buffersize: usize,
+        sender: crossbeam_channel::Sender<Vec<Vec<u8>>>,
+    ) -> Self {
+        Self {
+            buffersize,
+            buffer: Vec::with_capacity(buffersize),
+            sender,
+        }
+    }
+
+    fn close(self) -> std::result::Result<(), String> {
+        if !self.buffer.is_empty() {
+            self.sender
+                .send(self.buffer)
+                .map_err(|e| format!("Flush failed: {e}"))?;
+        }
+        Ok(())
+    }
+
+    fn send(&mut self) -> std::result::Result<(), String> {
+        if self.buffer.is_empty() {
+            return Ok(());
+        }
+        let mut out = Vec::with_capacity(self.buffer.capacity());
+        std::mem::swap(&mut out, &mut self.buffer);
+        self.sender
+            .send(out)
+            .map_err(|e| format!("Send to writer failed: {e}"))
+    }
+
+    fn push(&mut self, line: Vec<u8>) -> std::result::Result<(), String> {
+        if self.buffer.len() >= self.buffersize {
+            self.send()?;
+        }
+        self.buffer.push(line);
+        Ok(())
+    }
+
+    fn import_chunk(
+        &mut self,
+        chunk: &[u8],
+        matcher: &AhoCorasick,
+    ) -> std::result::Result<(), String> {
+        let mut start = 0;
+        while let Some(line_pos) = memchr(b'\n', &chunk[start ..]) {
+            // we include the last `\n` for writing
+            let line = &chunk[start ..= start + line_pos];
+            self.import_line(line, matcher)?;
+            start += line_pos + 1;
+        }
+        Ok(())
+    }
+
+    fn import_line(
+        &mut self,
+        line: &[u8],
+        matcher: &AhoCorasick,
+    ) -> std::result::Result<(), String> {
+        // Efficient 3rd column parsing
+        let mut field_start = 0usize;
+        let mut field_count = 0usize;
+        while let Some(tab_pos) = memchr(b'\t', &line[field_start ..]) {
+            if field_count == 2 {
+                // we don't include the last `\t`
+                let taxid = &line[field_start .. field_start + tab_pos];
+                if matcher.find(taxid).is_some() {
+                    self.push(line.to_vec())?;
+                }
+                break;
+            }
+            field_start = tab_pos + 1;
+            field_count += 1;
+        }
+        Ok(())
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn write_matching_output<P>(
     koutput: P,
-    needles: &AhoCorasick,
+    matcher: &AhoCorasick,
     ofile: P,
     io_buffer: usize,
     buffersize: usize,
@@ -59,41 +149,12 @@ where
             let tx = writer_tx.clone();
             let handle =
                 scope.spawn(move || -> std::result::Result<(), String> {
-                    let mut batch_buffer = Vec::with_capacity(batchsize);
-                    for mut chunk in work_rx.iter() {
-                        while let Some(pos) =
-                            chunk.iter().position(|&b| b == b'\n')
-                        {
-                            let line: Vec<u8> = chunk.drain(..= pos).collect();
-                            let mut fields = line.splitn(3, |b| *b == b'\t');
-                            if let Some(taxid) = fields.nth(2) {
-                                if needles.find(taxid).is_some() {
-                                    batch_buffer.push(line);
-                                    if batch_buffer.len()
-                                        == batch_buffer.capacity()
-                                    {
-                                        // Send batch by moving it, avoid cloning
-                                        tx.send(std::mem::take(
-                                            &mut batch_buffer,
-                                        ))
-                                        .map_err(|e| {
-                                            format!(
-                                                "Send to writer failed: {e}"
-                                            )
-                                        })?;
-                                        batch_buffer =
-                                            Vec::with_capacity(batchsize)
-                                    }
-                                }
-                            }
-                        }
+                    let mut processor = KOutputChunkParser::new(batchsize, tx);
+                    for chunk in work_rx.iter() {
+                        // we don't include the last `\n`
+                        processor.import_chunk(&chunk, matcher)?;
                     }
-                    if !batch_buffer.is_empty() {
-                        tx.send(batch_buffer).map_err(|e| {
-                            format!("Send to writer failed: {e}")
-                        })?;
-                    }
-                    Ok(())
+                    processor.close()
                 });
             worker_handles.push(handle);
         }

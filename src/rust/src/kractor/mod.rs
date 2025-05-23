@@ -25,12 +25,12 @@ fn kractor(
     let pattern_vec = patterns
         .as_str_vector()
         .ok_or("`patterns` must be a character vector")?;
-    let ac = AhoCorasick::new(pattern_vec).map_err(|e| {
+    let matcher = AhoCorasick::new(pattern_vec).map_err(|e| {
         format!("Failed to create Aho-Corasick automaton: {}", e)
     })?;
     write_matching_output(
         koutput,
-        &ac,
+        &matcher,
         ofile,
         io_buffer,
         buffersize,
