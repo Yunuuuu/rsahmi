@@ -32,7 +32,7 @@
 #' processing. Default is `256 * 1024`.
 #'
 #' @param batch_size Integer. Number of lines to write per batch. Default is
-#'   `100`.
+#'   `10`.
 #'
 #' @param queue_capacity Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or writing.
@@ -155,9 +155,9 @@ rust_kractor <- function(koutput, reads, taxids,
     # the third column of kraken2 output:
     # Using (taxid ****)
     patterns <- paste0("(taxid ", as.character(taxids), ")")
-    io_buffer <- io_buffer %||% (8L * 1024L) # DEFAULT_BUF_SIZE 8KB
-    buffer_size <- buffer_size %||% (256 * 1024L) # 1MB
-    batch_size <- batch_size %||% 100L
+    io_buffer <- io_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
+    buffer_size <- buffer_size %||% (256 * 1024L) # 256KB
+    batch_size <- batch_size %||% 10L
     queue_capacity <- queue_capacity %||% 100L
     extract_koutput <- file.path(odir, extract_koutput)
     extract_reads <- file.path(odir, extract_reads)

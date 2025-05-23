@@ -49,7 +49,7 @@ buffer used for splitting and distributing chunks to worker threads during
 processing. Default is \code{256 * 1024}.}
 
 \item{batch_size}{Integer. Number of lines to write per batch. Default is
-\code{100}.}
+\code{10}.}
 
 \item{queue_capacity}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or writing.

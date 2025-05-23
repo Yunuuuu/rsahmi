@@ -13,8 +13,8 @@ name = 'rsahmi'
 extendr-api = '*'
 noodles-fasta = { version = "*" }
 noodles-fastq = { version = "*" }
-memchr = { version = "*" }
 crossbeam-channel = { version = "*" }
+aho-corasick = { version = "*" }
 
 [lints.clippy]
 needless_late_init = "allow"
