@@ -44,6 +44,30 @@ fn kractor(
     write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, io_buffer)
 }
 
+unsafe fn split_chunk_inclusive<T>(chunk: &mut Vec<T>, pos: usize) -> Vec<T> {
+    let len = chunk.len();
+    let cap = chunk.capacity();
+    let head_len = pos + 1;
+
+    // Get raw pointer to the buffer start
+    let ptr = chunk.as_mut_ptr();
+
+    // SAFETY: We are creating a new Vec from raw parts.
+    // First, create head Vec from 0..pos
+    let head = unsafe { Vec::from_raw_parts(ptr, head_len, head_len) };
+
+    // Now adjust the original vec to point at tail (pos..len)
+    // Calculate new pointer offset by pos
+    let tail_ptr = unsafe { ptr.add(head_len) };
+
+    // Replace original vec with new Vec from tail_ptr
+    *chunk = unsafe {
+        Vec::from_raw_parts(tail_ptr, len - head_len, cap - head_len)
+    };
+
+    head
+}
+
 #[allow(clippy::too_many_arguments)]
 fn write_matching_output<P>(
     koutput: P,
@@ -61,10 +85,7 @@ where
     rprintln!("Extracting matching kraken2 output from: {}", koutput);
     // one thread is kept for writer
     let threads = if threads <= 2 { 1 } else { threads - 1 };
-    let mut input = BufReader::with_capacity(
-        io_buffer,
-        File::open(koutput).map_err(|e| e.to_string())?,
-    );
+    let mut input = File::open(koutput).map_err(|e| e.to_string())?;
     let mut output = BufWriter::with_capacity(
         io_buffer,
         File::create(ofile).map_err(|e| e.to_string())?,
@@ -109,8 +130,10 @@ where
                         while let Some(pos) =
                             chunk.iter().position(|&b| b == b'\n')
                         {
-                            // This drains (moves out) the bytes up to including newline
-                            let line: Vec<u8> = chunk.drain(..= pos).collect();
+                            // SAFETY: pos is always in chunk
+                            let line: Vec<u8> = unsafe {
+                                split_chunk_inclusive(&mut chunk, pos)
+                            };
                             let mut fields = line.splitn(3, |b| *b == b'\t');
                             if let Some(taxid) = fields.nth(2) {
                                 if needles
@@ -174,9 +197,7 @@ where
                     work_tx
                         .send(chunk)
                         .map_err(|e| format!("Send to workers failed: {e}"))?;
-                    unsafe {
-                        buffer.set_len(buffer.capacity());
-                    }
+                    buffer.resize(buffer.capacity(), 0);
                 }
                 None => {
                     if buffer.capacity() < offset {
@@ -187,9 +208,7 @@ where
                             .map_err(|e| {
                                 format!("Increase buffer failed: {e}")
                             })?;
-                        unsafe {
-                            buffer.set_len(buffer.capacity());
-                        }
+                        buffer.resize(buffer.capacity(), 0);
                     }
                 }
             };
