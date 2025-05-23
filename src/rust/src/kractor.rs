@@ -59,11 +59,10 @@ unsafe fn split_chunk_inclusive<T>(chunk: &mut Vec<T>, pos: usize) -> Vec<T> {
     // Now adjust the original vec to point at tail (pos..len)
     // Calculate new pointer offset by pos
     let tail_ptr = unsafe { ptr.add(head_len) };
+    let tail = Vec::from_raw_parts(tail_ptr, len - head_len, cap - head_len);
 
-    // Replace original vec with new Vec from tail_ptr
-    *chunk = unsafe {
-        Vec::from_raw_parts(tail_ptr, len - head_len, cap - head_len)
-    };
+    // Prevent old chunk from dropping the full allocation (since now head and tail own pieces)
+    std::mem::forget(std::mem::replace(chunk, tail));
 
     head
 }
