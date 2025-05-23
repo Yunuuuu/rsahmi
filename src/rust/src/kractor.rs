@@ -10,7 +10,6 @@ use memchr::memmem;
 use noodles_fasta::io::Writer;
 use noodles_fasta::record::{definition, sequence, Record};
 use noodles_fastq::io::Reader;
-use crate::utils::*;
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
@@ -108,9 +107,7 @@ where
                             chunk.iter().position(|&b| b == b'\n')
                         {
                             // SAFETY: pos is always in chunk
-                            let line: Vec<u8> = unsafe {
-                                split_chunk_inclusive(&mut chunk, pos)
-                            };
+                            let line: Vec<u8> = chunk.drain(..= pos).collect();
                             let mut fields = line.splitn(3, |b| *b == b'\t');
                             if let Some(taxid) = fields.nth(2) {
                                 if needles
