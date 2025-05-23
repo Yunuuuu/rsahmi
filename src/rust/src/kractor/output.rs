@@ -73,9 +73,10 @@ where
                                         == batch_buffer.capacity()
                                     {
                                         // Send batch by moving it, avoid cloning
-                                        let send_batch =
-                                            std::mem::take(&mut batch_buffer);
-                                        tx.send(send_batch).map_err(|e| {
+                                        tx.send(std::mem::take(
+                                            &mut batch_buffer,
+                                        ))
+                                        .map_err(|e| {
                                             format!(
                                                 "Send to writer failed: {e}"
                                             )
