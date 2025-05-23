@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::default;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
@@ -11,6 +10,7 @@ use memchr::memmem;
 use noodles_fasta::io::Writer;
 use noodles_fasta::record::{definition, sequence, Record};
 use noodles_fastq::io::Reader;
+use crate::utils::*;
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
@@ -43,30 +43,6 @@ fn kractor(
     )?;
     let id_set = read_sequence_id_from_koutput(ofile, io_buffer)?;
     write_matching_reads(fq1, ofile1, fq2, ofile2, &id_set, io_buffer)
-}
-
-unsafe fn split_chunk_inclusive<T>(chunk: &mut Vec<T>, pos: usize) -> Vec<T> {
-    let len = chunk.len();
-    let cap = chunk.capacity();
-    let ptr = chunk.as_mut_ptr();
-
-    // Take ownership of chunk without dropping it on scope exit
-    let _ = std::mem::ManuallyDrop::new(std::mem::take(chunk));
-
-    // Create head Vec from start to pos (inclusive)
-    let head_len = pos + 1;
-    let head = Vec::from_raw_parts(ptr, head_len, head_len);
-
-    // Create tail Vec from pos+1 to end
-    let tail_ptr = ptr.add(head_len);
-    let tail_len = len - head_len;
-    let tail_cap = cap - head_len;
-    let tail = Vec::from_raw_parts(tail_ptr, tail_len, tail_cap);
-
-    // Now assign tail back to chunk
-    *chunk = tail;
-
-    head
 }
 
 #[allow(clippy::too_many_arguments)]
