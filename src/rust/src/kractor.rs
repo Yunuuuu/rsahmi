@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::default;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
@@ -48,21 +49,22 @@ unsafe fn split_chunk_inclusive<T>(chunk: &mut Vec<T>, pos: usize) -> Vec<T> {
     let len = chunk.len();
     let cap = chunk.capacity();
     let head_len = pos + 1;
-
-    // Get raw pointer to the buffer start
     let ptr = chunk.as_mut_ptr();
 
-    // SAFETY: We are creating a new Vec from raw parts.
-    // First, create head Vec from 0..pos
-    let head = unsafe { Vec::from_raw_parts(ptr, head_len, head_len) };
+    // Take ownership of chunk without dropping it on scope exit
+    let _ = std::mem::ManuallyDrop::new(std::mem::take(chunk));
 
-    // Now adjust the original vec to point at tail (pos..len)
-    // Calculate new pointer offset by pos
-    let tail_ptr = unsafe { ptr.add(head_len) };
-    let tail = Vec::from_raw_parts(tail_ptr, len - head_len, cap - head_len);
+    // Create head Vec from start to pos (inclusive)
+    let head = Vec::from_raw_parts(ptr, head_len, cap);
 
-    // Prevent old chunk from dropping the full allocation (since now head and tail own pieces)
-    std::mem::forget(std::mem::replace(chunk, tail));
+    // Create tail Vec from pos+1 to end
+    let tail_ptr = ptr.add(head_len);
+    let tail_len = len - head_len;
+    let tail_cap = cap - head_len;
+    let tail = Vec::from_raw_parts(tail_ptr, tail_len, tail_cap);
+
+    // Now assign tail back to chunk
+    *chunk = tail;
 
     head
 }
