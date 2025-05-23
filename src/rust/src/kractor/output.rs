@@ -8,6 +8,94 @@ use crossbeam_channel::bounded;
 use extendr_api::prelude::*;
 use memchr::memchr;
 
+#[allow(clippy::too_many_arguments)]
+pub fn write_matching_output<P>(
+    koutput: P,
+    matcher: &AhoCorasick,
+    ofile: P,
+    io_buffer: usize,
+    buffersize: usize,
+    batchsize: usize,
+    queue_capacity: usize,
+    threads: usize,
+) -> std::result::Result<(), String>
+where
+    P: AsRef<Path> + Display,
+{
+    rprintln!("Extracting matching kraken2 output from: {}", koutput);
+    // one thread is kept for writer
+    let threads = if threads <= 2 { 1 } else { threads - 1 };
+    let input = File::open(koutput).map_err(|e| e.to_string())?;
+    let mut output = BufWriter::with_capacity(
+        io_buffer,
+        File::create(ofile).map_err(|e| e.to_string())?,
+    );
+
+    // Start the processor threads
+    let (writer_tx, ref writer_rx) =
+        bounded::<Vec<Vec<u8>>>(threads * queue_capacity);
+    let (work_tx, ref work_rx) = bounded::<Vec<u8>>(threads * queue_capacity);
+
+    std::thread::scope(|scope| {
+        // let patterns = Arc::new(patterns);
+
+        // Writer thread: write data to the file
+        // accept lines from `writer_rx`
+        let writer_handle =
+            scope.spawn(move || -> std::result::Result<(), String> {
+                for batch in writer_rx.iter() {
+                    for line in batch {
+                        output
+                            .write_all(&line)
+                            .map_err(|e| format!("Write failed: {e}"))?;
+                    }
+                }
+                output.flush().map_err(|e| format!("Flush failed: {e}"))?;
+                Ok(())
+            });
+
+        // Worker threads, will send each passed lines to `writer`
+        let mut worker_handles = Vec::with_capacity(threads);
+        for _ in 0 .. threads {
+            let tx = writer_tx.clone();
+            let handle =
+                scope.spawn(move || -> std::result::Result<(), String> {
+                    let mut processor = KOutputChunkParser::new(batchsize, tx);
+                    for chunk in work_rx.iter() {
+                        // we don't include the last `\n`
+                        processor.import_chunk(&chunk, matcher)?;
+                    }
+                    processor.close()
+                });
+            worker_handles.push(handle);
+        }
+
+        // read files and pass lines
+        let mut reader = BytesReader::new(buffersize, input, work_tx.clone());
+        loop {
+            let read_bytes = reader.read_buffer()?;
+            if read_bytes == 0 {
+                reader.close()?;
+                break;
+            }
+            reader.send_buffer()?;
+        }
+
+        // close work channel to stop workers
+        drop(work_tx);
+
+        // we ensure no lines to send
+        for handler in worker_handles {
+            let _ = handler.join().map_err(|_| "worker thread panicked")?;
+        }
+        drop(writer_tx); // close writer channel to stop writer
+
+        // we ensure all lines have been writen
+        let _ = writer_handle.join().map_err(|_| "writer thread panicked")?;
+        Ok(())
+    })
+}
+
 struct KOutputChunkParser {
     // size of the buffer to read
     buffersize: usize,
@@ -97,126 +185,98 @@ impl KOutputChunkParser {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn write_matching_output<P>(
-    koutput: P,
-    matcher: &AhoCorasick,
-    ofile: P,
-    io_buffer: usize,
-    buffersize: usize,
-    batchsize: usize,
-    queue_capacity: usize,
-    threads: usize,
-) -> std::result::Result<(), String>
+struct BytesReader<R>
 where
-    P: AsRef<Path> + Display,
+    R: Read,
 {
-    rprintln!("Extracting matching kraken2 output from: {}", koutput);
-    // one thread is kept for writer
-    let threads = if threads <= 2 { 1 } else { threads - 1 };
-    let mut input = File::open(koutput).map_err(|e| e.to_string())?;
-    let mut output = BufWriter::with_capacity(
-        io_buffer,
-        File::create(ofile).map_err(|e| e.to_string())?,
-    );
+    reader: R,
+    // size of the buffer to read
+    buffersize: usize,
+    // buffer to store lines
+    buffer: Vec<u8>,
+    // used to store the byte from where to read
+    offset: usize,
+    // used to send bytes
+    channel: crossbeam_channel::Sender<Vec<u8>>,
+}
 
-    // Start the processor threads
-    let (writer_tx, ref writer_rx) =
-        bounded::<Vec<Vec<u8>>>(threads * queue_capacity);
-    let (work_tx, ref work_rx) = bounded::<Vec<u8>>(threads * queue_capacity);
-
-    std::thread::scope(|scope| {
-        // let patterns = Arc::new(patterns);
-
-        // Writer thread: write data to the file
-        // accept lines from `writer_rx`
-        let writer_handle =
-            scope.spawn(move || -> std::result::Result<(), String> {
-                for batch in writer_rx.iter() {
-                    for line in batch {
-                        output
-                            .write_all(&line)
-                            .map_err(|e| format!("Write failed: {e}"))?;
-                    }
-                }
-                output.flush().map_err(|e| format!("Flush failed: {e}"))?;
-                Ok(())
-            });
-
-        // Worker threads, will send each passed lines to `writer`
-        let mut worker_handles = Vec::with_capacity(threads);
-        for _ in 0 .. threads {
-            let tx = writer_tx.clone();
-            let handle =
-                scope.spawn(move || -> std::result::Result<(), String> {
-                    let mut processor = KOutputChunkParser::new(batchsize, tx);
-                    for chunk in work_rx.iter() {
-                        // we don't include the last `\n`
-                        processor.import_chunk(&chunk, matcher)?;
-                    }
-                    processor.close()
-                });
-            worker_handles.push(handle);
+impl<R> BytesReader<R>
+where
+    R: Read,
+{
+    fn new(
+        buffersize: usize,
+        reader: R,
+        channel: crossbeam_channel::Sender<Vec<u8>>,
+    ) -> Self {
+        Self {
+            buffersize,
+            buffer: vec![0; buffersize],
+            offset: 0,
+            reader,
+            channel,
         }
+    }
 
-        // read files and pass lines
-        let mut buffer = vec![0; buffersize]; // 128 KB
-        let mut offset: usize = 0;
-        loop {
-            let read_bytes = input
-                .read(&mut buffer[offset ..])
-                .map_err(|e| format!("Read failed: {e}"))?;
-            if read_bytes == 0 {
-                // ensure all buffer has been send
-                if offset > 0 {
-                    let mut chunk =
-                        buffer.drain(..= offset).collect::<Vec<u8>>();
-                    // always ensure the last line has `\n`
-                    if !chunk.ends_with(b"\n") {
-                        chunk.push(b'\n');
-                    }
-                    work_tx
-                        .send(chunk)
-                        .map_err(|e| format!("Send to workers failed: {e}"))?;
-                }
-                break;
+    fn read_buffer(&mut self) -> std::result::Result<usize, String> {
+        let read_bytes = self
+            .reader
+            .read(&mut self.buffer[self.offset ..])
+            .map_err(|e| format!("Read failed: {e}"))?;
+        self.offset += read_bytes;
+        Ok(read_bytes)
+    }
+
+    fn send_buffer(&mut self) -> std::result::Result<(), String> {
+        match self.buffer[.. self.offset]
+            .iter()
+            .rposition(|b| *b == b'\n')
+        {
+            Some(pos) => {
+                let chunk = self.buffer.drain(..= pos).collect::<Vec<u8>>();
+                self.channel
+                    .send(chunk)
+                    .map_err(|e| format!("Send to workers failed: {e}"))?;
+                // drain won't reduce the capacity of the buffer but will remove the data
+                self.fill_buffer();
+                // we need to move the offset to the end of the remaing buffer
+                self.offset -= pos + 1;
             }
-            offset += read_bytes;
-            match buffer[.. offset].iter().rposition(|b| *b == b'\n') {
-                Some(pos) => {
-                    offset -= pos + 1;
-                    let chunk = buffer.drain(..= pos).collect::<Vec<u8>>();
-                    work_tx
-                        .send(chunk)
-                        .map_err(|e| format!("Send to workers failed: {e}"))?;
-                    buffer.resize(buffer.capacity(), 0);
+            None => {
+                if self.offset == self.buffer.capacity() {
+                    self.extend_buffer()?;
                 }
-                None => {
-                    if buffer.capacity() < offset {
-                        buffer
-                            .try_reserve(
-                                buffer.capacity() - buffer.len() + buffersize,
-                            )
-                            .map_err(|e| {
-                                format!("Increase buffer failed: {e}")
-                            })?;
-                        buffer.resize(buffer.capacity(), 0);
-                    }
-                }
-            };
-        }
-
-        // close work channel to stop workers
-        drop(work_tx);
-
-        // we ensure no lines to send
-        for handler in worker_handles {
-            let _ = handler.join().map_err(|_| "worker thread panicked")?;
-        }
-        drop(writer_tx); // close writer channel to stop writer
-
-        // we ensure all lines have been writen
-        let _ = writer_handle.join().map_err(|_| "writer thread panicked")?;
+            }
+        };
         Ok(())
-    })
+    }
+
+    fn close(&mut self) -> std::result::Result<(), String> {
+        // ensure all buffer has been send
+        if self.offset > 0 {
+            let mut chunk =
+                self.buffer.drain(..= self.offset).collect::<Vec<u8>>();
+            // always ensure the last line has `\n`
+            if !chunk.ends_with(b"\n") {
+                chunk.push(b'\n');
+            }
+            self.channel
+                .send(chunk)
+                .map_err(|e| format!("Send to workers failed: {e}"))?;
+        }
+        Ok(())
+    }
+
+    // everytime we increase the buffer, we need to fill it with 0
+    fn fill_buffer(&mut self) {
+        self.buffer.resize(self.buffer.capacity(), 0);
+    }
+
+    fn extend_buffer(&mut self) -> std::result::Result<(), String> {
+        self.buffer
+            .try_reserve(self.buffersize)
+            .map_err(|e| format!("Increase buffer failed: {e}"))?;
+        self.fill_buffer();
+        Ok(())
+    }
 }
