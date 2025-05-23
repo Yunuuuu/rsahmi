@@ -48,14 +48,14 @@ fn kractor(
 unsafe fn split_chunk_inclusive<T>(chunk: &mut Vec<T>, pos: usize) -> Vec<T> {
     let len = chunk.len();
     let cap = chunk.capacity();
-    let head_len = pos + 1;
     let ptr = chunk.as_mut_ptr();
 
     // Take ownership of chunk without dropping it on scope exit
     let _ = std::mem::ManuallyDrop::new(std::mem::take(chunk));
 
     // Create head Vec from start to pos (inclusive)
-    let head = Vec::from_raw_parts(ptr, head_len, cap);
+    let head_len = pos + 1;
+    let head = Vec::from_raw_parts(ptr, head_len, head_len);
 
     // Create tail Vec from pos+1 to end
     let tail_ptr = ptr.add(head_len);
