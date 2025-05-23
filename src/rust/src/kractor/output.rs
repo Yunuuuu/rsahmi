@@ -210,10 +210,10 @@ where
         channel: crossbeam_channel::Sender<Vec<u8>>,
     ) -> Self {
         Self {
+            reader,
             buffersize,
             buffer: vec![0; buffersize],
             offset: 0,
-            reader,
             channel,
         }
     }

@@ -37,7 +37,7 @@
 #' @param queue_capacity Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or writing.
 #'   Higher values can improve throughput but increase memory use. Default is
-#'   `100`.
+#'   `2`.
 #'
 #' @param threads Integer. Number of threads to use. Defaults to all available
 #' threads.
@@ -158,7 +158,7 @@ rust_kractor <- function(koutput, reads, taxids,
     io_buffer <- io_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
     buffer_size <- buffer_size %||% (256 * 1024L) # 256KB
     batch_size <- batch_size %||% 10L
-    queue_capacity <- queue_capacity %||% 100L
+    queue_capacity <- queue_capacity %||% 2L
     extract_koutput <- file.path(odir, extract_koutput)
     extract_reads <- file.path(odir, extract_reads)
     if (is_scalar(extract_reads)) {
