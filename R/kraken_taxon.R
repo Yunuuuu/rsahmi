@@ -66,7 +66,7 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     assert_number_whole(queue_capacity, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
-        min = 1, max = parallel::detectCores(),
+        min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
     threads <- threads %||% parallel::detectCores()
