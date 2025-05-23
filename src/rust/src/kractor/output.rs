@@ -128,7 +128,7 @@ impl KOutputChunkParser {
         if self.buffer.is_empty() {
             return Ok(());
         }
-        let mut out = Vec::with_capacity(self.buffer.capacity());
+        let mut out = Vec::with_capacity(self.buffersize);
         std::mem::swap(&mut out, &mut self.buffer);
         self.channel
             .send(out)
@@ -151,7 +151,7 @@ impl KOutputChunkParser {
         let mut start = 0;
         while let Some(line_pos) = memchr(b'\n', &chunk[start ..]) {
             // we include the last `\n` for writing
-            let line = &chunk[start ..= start + line_pos];
+            let line = &chunk[start ..= (start + line_pos)];
             self.import_line(line, matcher)?;
             start += line_pos + 1;
         }
@@ -169,16 +169,66 @@ impl KOutputChunkParser {
         while let Some(tab_pos) = memchr(b'\t', &line[field_start ..]) {
             if field_count == 2 {
                 // we don't include the last `\t`
-                let taxid = &line[field_start .. field_start + tab_pos];
+                let taxid = &line[field_start .. (field_start + tab_pos)];
                 if matcher.find(taxid).is_some() {
                     self.push(line.to_vec())?;
                 }
                 break;
             }
-            field_start = tab_pos + 1;
+            field_start += tab_pos + 1;
             field_count += 1;
         }
         Ok(())
+    }
+}
+#[cfg(test)]
+mod test_chunk_parser {
+    use aho_corasick::AhoCorasick;
+    use crossbeam_channel::bounded;
+
+    use super::*;
+    #[test]
+    fn test_import_line_match_and_non_match() {
+        let (tx, rx) = bounded::<Vec<Vec<u8>>>(10);
+        let mut parser = KOutputChunkParser::new(10, tx);
+        let matcher = AhoCorasick::new(["123"]).unwrap();
+
+        // Should match taxid `123` (3rd column)
+        parser
+            .import_line(b"id1\tname\t123\textra\n", &matcher)
+            .unwrap();
+        // Should not match taxid `999`
+        parser
+            .import_line(b"id2\tname\t999\textra\n", &matcher)
+            .unwrap();
+
+        parser.close().unwrap();
+        let batch = rx.recv().unwrap();
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0], b"id1\tname\t123\textra\n".to_vec());
+    }
+
+    #[test]
+    fn test_import_chunk_multiple_lines() {
+        let (tx, rx) = bounded::<Vec<Vec<u8>>>(10);
+        let mut parser = KOutputChunkParser::new(10, tx);
+        let matcher = AhoCorasick::new(["888"]).unwrap();
+
+        let chunk = b"id1\tx\t123\t...\n\
+                     id2\tx\t888\t...\n\
+                     id3\tx\t999\t...\n\
+                     id4\tx\t888\t...\n";
+
+        parser.import_chunk(chunk, &matcher).unwrap();
+        parser.close().unwrap();
+        let batch = rx.recv().unwrap();
+        // eprintln!("{:?}", String::from_utf8(batch.clone().unwrap()));
+        // eprintln!("{:?}", &chunk);
+        let expected = vec![
+            b"id2\tx\t888\t...\n".to_vec(),
+            b"id4\tx\t888\t...\n".to_vec(),
+        ];
+        assert_eq!(batch, expected);
     }
 }
 
@@ -279,7 +329,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod test_chunk_reader {
     use std::io::Cursor;
 
     use crossbeam_channel::unbounded;
