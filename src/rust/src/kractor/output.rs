@@ -71,7 +71,7 @@ where
         }
 
         // read files and pass lines
-        let mut reader = ChunkReader::new(buffersize, input, work_tx.clone());
+        let mut reader = ChunkReader::new(input, buffersize, work_tx);
         loop {
             let read_bytes = reader.read_buffer()?;
             if read_bytes == 0 {
@@ -80,9 +80,6 @@ where
             }
             reader.send_buffer()?;
         }
-
-        // close work channel to stop workers
-        drop(work_tx);
 
         // we ensure no lines to send
         for handler in worker_handles {
@@ -103,7 +100,7 @@ struct KOutputChunkParser {
     buffer: Vec<Vec<u8>>,
     // used to send lines to writer
     // we use a channel to avoid blocking the worker threads
-    sender: crossbeam_channel::Sender<Vec<Vec<u8>>>,
+    channel: crossbeam_channel::Sender<Vec<Vec<u8>>>,
 }
 
 impl KOutputChunkParser {
@@ -114,13 +111,13 @@ impl KOutputChunkParser {
         Self {
             buffersize,
             buffer: Vec::with_capacity(buffersize),
-            sender,
+            channel: sender,
         }
     }
 
     fn close(self) -> std::result::Result<(), String> {
         if !self.buffer.is_empty() {
-            self.sender
+            self.channel
                 .send(self.buffer)
                 .map_err(|e| format!("Flush failed: {e}"))?;
         }
@@ -133,7 +130,7 @@ impl KOutputChunkParser {
         }
         let mut out = Vec::with_capacity(self.buffer.capacity());
         std::mem::swap(&mut out, &mut self.buffer);
-        self.sender
+        self.channel
             .send(out)
             .map_err(|e| format!("Send to writer failed: {e}"))
     }
@@ -205,8 +202,8 @@ where
     R: Read,
 {
     fn new(
-        buffersize: usize,
         reader: R,
+        buffersize: usize,
         channel: crossbeam_channel::Sender<Vec<u8>>,
     ) -> Self {
         Self {
@@ -251,11 +248,11 @@ where
         Ok(())
     }
 
-    fn close(&mut self) -> std::result::Result<(), String> {
+    fn close(mut self) -> std::result::Result<(), String> {
         // ensure all buffer has been send
         if self.offset > 0 {
             let mut chunk =
-                self.buffer.drain(..= self.offset).collect::<Vec<u8>>();
+                self.buffer.drain(.. self.offset).collect::<Vec<u8>>();
             // always ensure the last line has `\n`
             if !chunk.ends_with(b"\n") {
                 chunk.push(b'\n');
@@ -278,5 +275,75 @@ where
             .map_err(|e| format!("Increase buffer failed: {e}"))?;
         self.fill_buffer();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use crossbeam_channel::unbounded;
+
+    use super::*;
+
+    fn run_chunk_reader_test(input: &str, buffer_size: usize) -> Vec<Vec<u8>> {
+        let (tx, rx) = unbounded();
+        let cursor = Cursor::new(input.as_bytes().to_vec());
+
+        let mut reader = ChunkReader::new(cursor, buffer_size, tx);
+        loop {
+            let read_bytes = reader.read_buffer().unwrap();
+            if read_bytes == 0 {
+                reader.close().unwrap();
+                break;
+            }
+            reader.send_buffer().unwrap();
+        }
+
+        rx.into_iter().collect()
+    }
+
+    #[test]
+    fn test_chunk_reader_basic_lines() {
+        let input = "a\tb\tc\n1\t2\t3\nx\ty\tz\n";
+        let chunks = run_chunk_reader_test(input, 10);
+
+        let output: String =
+            chunks.concat().into_iter().map(|b| b as char).collect();
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn test_chunk_reader_partial_line_at_end() {
+        let input = "a\tb\tc\n1\t2\t3\nx\ty\tz";
+        let expected = "a\tb\tc\n1\t2\t3\nx\ty\tz\n"; // should append \n
+        let chunks = run_chunk_reader_test(input, 10);
+
+        let output: String =
+            chunks.concat().into_iter().map(|b| b as char).collect();
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_chunk_reader_large_line_split_across_buffers() {
+        let long_line =
+            "field1\tfield2\t".to_owned() + &"a".repeat(10000) + "\n";
+        let input = long_line.clone();
+        let chunks = run_chunk_reader_test(&input, 1024);
+
+        let output: String =
+            chunks.concat().into_iter().map(|b| b as char).collect();
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn test_chunk_reader_buffer_expansion() {
+        // Long line without newlines to trigger buffer expansion
+        let input = "x".repeat(5000);
+        let expected = format!("{}\n", input); // ChunkReader adds \n if missing
+        let chunks = run_chunk_reader_test(&input, 1024);
+        let output: String =
+            chunks.concat().into_iter().map(|b| b as char).collect();
+        assert_eq!(output, expected);
     }
 }
