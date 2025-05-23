@@ -60,18 +60,18 @@ where
             let tx = writer_tx.clone();
             let handle =
                 scope.spawn(move || -> std::result::Result<(), String> {
-                    let mut processor = KOutputChunkParser::new(batchsize, tx);
+                    let mut worker = KOutputChunkParser::new(batchsize, tx);
                     for chunk in work_rx.iter() {
                         // we don't include the last `\n`
-                        processor.import_chunk(&chunk, matcher)?;
+                        worker.import_chunk(&chunk, matcher)?;
                     }
-                    processor.close()
+                    worker.close()
                 });
             worker_handles.push(handle);
         }
 
         // read files and pass lines
-        let mut reader = BytesReader::new(buffersize, input, work_tx.clone());
+        let mut reader = ChunkReader::new(buffersize, input, work_tx.clone());
         loop {
             let read_bytes = reader.read_buffer()?;
             if read_bytes == 0 {
@@ -185,7 +185,7 @@ impl KOutputChunkParser {
     }
 }
 
-struct BytesReader<R>
+struct ChunkReader<R>
 where
     R: Read,
 {
@@ -200,7 +200,7 @@ where
     channel: crossbeam_channel::Sender<Vec<u8>>,
 }
 
-impl<R> BytesReader<R>
+impl<R> ChunkReader<R>
 where
     R: Read,
 {
