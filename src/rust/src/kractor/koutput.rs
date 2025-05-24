@@ -60,7 +60,7 @@ where
             let tx = writer_tx.clone();
             let handle =
                 scope.spawn(move || -> std::result::Result<(), String> {
-                    let mut worker = KOutputChunkParser::new(batchsize, tx);
+                    let mut worker = ChunkParser::new(batchsize, tx);
                     for chunk in work_rx.iter() {
                         // we don't include the last `\n`
                         worker.parse(&chunk, matcher)?;
@@ -93,7 +93,7 @@ where
     })
 }
 
-struct KOutputChunkParser {
+struct ChunkParser {
     // size of the buffer to read
     buffersize: usize,
     // buffer to store lines
@@ -103,7 +103,7 @@ struct KOutputChunkParser {
     channel: crossbeam_channel::Sender<Vec<Vec<u8>>>,
 }
 
-impl KOutputChunkParser {
+impl ChunkParser {
     fn new(
         buffersize: usize,
         sender: crossbeam_channel::Sender<Vec<Vec<u8>>>,
@@ -191,7 +191,7 @@ mod test_chunk_parser {
     #[test]
     fn test_push_and_send() {
         let (tx, rx) = bounded::<Vec<Vec<u8>>>(10);
-        let mut parser = KOutputChunkParser::new(2, tx);
+        let mut parser = ChunkParser::new(2, tx);
 
         parser.push(b"line1\n".to_vec()).unwrap();
         parser.push(b"line2\n".to_vec()).unwrap();
@@ -211,7 +211,7 @@ mod test_chunk_parser {
     #[test]
     fn test_import_line_match_and_non_match() {
         let (tx, rx) = bounded::<Vec<Vec<u8>>>(10);
-        let mut parser = KOutputChunkParser::new(10, tx);
+        let mut parser = ChunkParser::new(10, tx);
         let matcher = AhoCorasick::new(["123"]).unwrap();
 
         // Should match taxid `123` (3rd column)
@@ -232,7 +232,7 @@ mod test_chunk_parser {
     #[test]
     fn test_import_chunk_multiple_lines() {
         let (tx, rx) = bounded::<Vec<Vec<u8>>>(10);
-        let mut parser = KOutputChunkParser::new(10, tx);
+        let mut parser = ChunkParser::new(10, tx);
         let matcher = AhoCorasick::new(["888"]).unwrap();
 
         let chunk = b"id1\tx\t123\t...\n\
