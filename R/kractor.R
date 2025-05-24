@@ -22,10 +22,9 @@
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses").
 #'
-#' @param io_buffer Integer specifying the I/O buffer size in bytes
-#' used for reading from and writing to disk. This controls the capacity of the
-#' buffered file reader and writer. Internally, more than twice this size may be
-#' allocated to accommodate in-flight data. Default is `1 * 1024 * 1024` (1MB).
+#' @param io_buffer Integer specifying the I/O buffer size in bytes used for
+#' writing to disk. This controls the capacity of the buffered file writer.
+#' Default is `1 * 1024 * 1024` (1MB).
 #'
 #' @param buffer_size Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during

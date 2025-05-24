@@ -6,7 +6,7 @@ use std::path::Path;
 use aho_corasick::AhoCorasick;
 use crossbeam_channel::bounded;
 use extendr_api::prelude::*;
-use memchr::memchr;
+use memchr::{memchr, memrchr};
 
 #[allow(clippy::too_many_arguments)]
 pub fn write_matching_output<P>(
@@ -63,7 +63,7 @@ where
                     let mut worker = KOutputChunkParser::new(batchsize, tx);
                     for chunk in work_rx.iter() {
                         // we don't include the last `\n`
-                        worker.import_chunk(&chunk, matcher)?;
+                        worker.parse(&chunk, matcher)?;
                     }
                     worker.close()
                 });
@@ -73,12 +73,12 @@ where
         // read files and pass lines
         let mut reader = ChunkReader::new(input, buffersize, work_tx);
         loop {
-            let read_bytes = reader.read_buffer()?;
+            let read_bytes = reader.read()?;
             if read_bytes == 0 {
                 reader.close()?;
                 break;
             }
-            reader.send_buffer()?;
+            reader.send()?;
         }
 
         // we ensure no lines to send
@@ -143,7 +143,7 @@ impl KOutputChunkParser {
         Ok(())
     }
 
-    fn import_chunk(
+    fn parse(
         &mut self,
         chunk: &[u8],
         matcher: &AhoCorasick,
@@ -152,13 +152,13 @@ impl KOutputChunkParser {
         while let Some(line_pos) = memchr(b'\n', &chunk[start ..]) {
             // we include the last `\n` for writing
             let line = &chunk[start ..= (start + line_pos)];
-            self.import_line(line, matcher)?;
+            self.parse_line(line, matcher)?;
             start += line_pos + 1;
         }
         Ok(())
     }
 
-    fn import_line(
+    fn parse_line(
         &mut self,
         line: &[u8],
         matcher: &AhoCorasick,
@@ -187,6 +187,27 @@ mod test_chunk_parser {
     use crossbeam_channel::bounded;
 
     use super::*;
+
+    #[test]
+    fn test_push_and_send() {
+        let (tx, rx) = bounded::<Vec<Vec<u8>>>(10);
+        let mut parser = KOutputChunkParser::new(2, tx);
+
+        parser.push(b"line1\n".to_vec()).unwrap();
+        parser.push(b"line2\n".to_vec()).unwrap();
+        // this push should trigger a send due to buffer limit
+        parser.push(b"line3\n".to_vec()).unwrap();
+
+        // Expect first batch to be sent
+        let batch1 = rx.recv().unwrap();
+        assert_eq!(batch1, vec![b"line1\n".to_vec(), b"line2\n".to_vec()]);
+
+        // Close should flush remaining line
+        parser.close().unwrap();
+        let batch2 = rx.recv().unwrap();
+        assert_eq!(batch2, vec![b"line3\n".to_vec()]);
+    }
+
     #[test]
     fn test_import_line_match_and_non_match() {
         let (tx, rx) = bounded::<Vec<Vec<u8>>>(10);
@@ -195,11 +216,11 @@ mod test_chunk_parser {
 
         // Should match taxid `123` (3rd column)
         parser
-            .import_line(b"id1\tname\t123\textra\n", &matcher)
+            .parse_line(b"id1\tname\t123\textra\n", &matcher)
             .unwrap();
         // Should not match taxid `999`
         parser
-            .import_line(b"id2\tname\t999\textra\n", &matcher)
+            .parse_line(b"id2\tname\t999\textra\n", &matcher)
             .unwrap();
 
         parser.close().unwrap();
@@ -219,7 +240,7 @@ mod test_chunk_parser {
                      id3\tx\t999\t...\n\
                      id4\tx\t888\t...\n";
 
-        parser.import_chunk(chunk, &matcher).unwrap();
+        parser.parse(chunk, &matcher).unwrap();
         parser.close().unwrap();
         let batch = rx.recv().unwrap();
         // eprintln!("{:?}", String::from_utf8(batch.clone().unwrap()));
@@ -265,7 +286,7 @@ where
         }
     }
 
-    fn read_buffer(&mut self) -> std::result::Result<usize, String> {
+    fn read(&mut self) -> std::result::Result<usize, String> {
         let read_bytes = self
             .reader
             .read(&mut self.buffer[self.offset ..])
@@ -274,11 +295,8 @@ where
         Ok(read_bytes)
     }
 
-    fn send_buffer(&mut self) -> std::result::Result<(), String> {
-        match self.buffer[.. self.offset]
-            .iter()
-            .rposition(|b| *b == b'\n')
-        {
+    fn send(&mut self) -> std::result::Result<(), String> {
+        match memrchr(b'\n', &self.buffer[.. self.offset]) {
             Some(pos) => {
                 let chunk = self.buffer.drain(..= pos).collect::<Vec<u8>>();
                 self.channel
@@ -342,12 +360,12 @@ mod test_chunk_reader {
 
         let mut reader = ChunkReader::new(cursor, buffer_size, tx);
         loop {
-            let read_bytes = reader.read_buffer().unwrap();
+            let read_bytes = reader.read().unwrap();
             if read_bytes == 0 {
                 reader.close().unwrap();
                 break;
             }
-            reader.send_buffer().unwrap();
+            reader.send().unwrap();
         }
 
         rx.into_iter().collect()
