@@ -16,8 +16,11 @@ kraken_taxon(
   extract_koutput = NULL,
   extract_reads = NULL,
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-  buffer_size = NULL,
-  queue_capacity = NULL,
+  read_buffer = NULL,
+  write_buffer = NULL,
+  parse_buffer = NULL,
+  read_queue = NULL,
+  write_queue = NULL,
   threads = NULL,
   kraken2 = NULL,
   envpath = NULL,
@@ -57,14 +60,20 @@ Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}}
 the kraken style, connected by rank codes, two underscores, and the
 scientific name of the taxon (e.g., "d__Viruses").}
 
-\item{buffer_size}{Integer specifying the size in bytes of the intermediate
+\item{read_buffer}{Integer specifying the size in bytes of the intermediate
 buffer used for splitting and distributing chunks to worker threads during
 processing. Default is \code{2 * 1024 * 1024} (2MB).}
 
-\item{queue_capacity}{Integer. Maximum number of buffers per thread,
-controlling the amount of in-flight data awaiting processing or writing.
-Higher values can improve throughput but increase memory use. Default is
-\code{2}.}
+\item{write_buffer}{Integer specifying the buffer size in bytes used for
+writing to disk. This controls the capacity of the buffered file writer.
+Default is \code{1 * 1024 * 1024} (1MB).}
+
+\item{parse_buffer}{Integer. Number of records to write per batch. Default is
+\code{10}.}
+
+\item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
+controlling the amount of in-flight data awaiting processing or
+writing.Default is \code{2}.}
 
 \item{threads}{Integer. Number of threads to use. Defaults to all available
 threads.}

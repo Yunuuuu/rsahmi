@@ -28,9 +28,10 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
                          extract_koutput = NULL,
                          extract_reads = NULL,
                          taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                         buffer_size = NULL, queue_capacity = NULL,
-                         threads = NULL,
-                         kraken2 = NULL, envpath = NULL,
+                         read_buffer = NULL, write_buffer = NULL,
+                         parse_buffer = NULL,
+                         read_queue = NULL, write_queue = NULL,
+                         threads = NULL, kraken2 = NULL, envpath = NULL,
                          overwrite = FALSE, odir = getwd()) {
     assert_string(fq1, allow_empty = FALSE)
     assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
@@ -63,8 +64,11 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
     if (length(taxon) == 0L) {
         cli::cli_abort("empty {.arg taxon} provided")
     }
-    assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
-    assert_number_whole(queue_capacity, min = 1, allow_null = TRUE)
+    assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(parse_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(read_queue, min = 1, allow_null = TRUE)
+    assert_number_whole(write_queue, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
@@ -108,8 +112,11 @@ kraken_taxon <- function(fq1, ..., fq2 = NULL, db = NULL,
             extract_koutput = extract_koutput,
             extract_reads = extract_reads,
             taxon = taxon,
-            buffer_size = buffer_size,
-            queue_capacity = queue_capacity,
+            read_buffer = read_buffer,
+            write_buffer = write_buffer,
+            parse_buffer = parse_buffer,
+            read_queue = read_queue,
+            write_queue = write_queue,
             threads = threads,
             odir = odir
         )

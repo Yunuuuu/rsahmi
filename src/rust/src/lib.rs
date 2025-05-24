@@ -1,5 +1,6 @@
 use extendr_api::prelude::*;
 
+mod chunk;
 mod kractor; // kraken extractor
 
 // https://extendr.github.io/extendr/extendr_api/#returning-resultt-e-to-r

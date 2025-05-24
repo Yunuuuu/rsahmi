@@ -3,8 +3,10 @@ mod koutput;
 mod reads;
 
 use aho_corasick::AhoCorasick;
-use koutput::write_matching_output;
+use koutput::KOutputProcessor;
 use reads::write_matching_reads;
+
+use crate::chunk::ChunkProcessor;
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
@@ -16,10 +18,11 @@ fn kractor(
     ofile1: &str,
     fq2: Option<&str>,
     ofile2: Option<&str>,
-    io_buffer: usize,
-    buffersize: usize,
-    batchsize: usize,
-    queue_capacity: usize,
+    read_buffer: usize,
+    write_buffer: usize,
+    parse_buffer: usize,
+    read_queue: usize,
+    write_queue: usize,
     threads: usize,
 ) -> std::result::Result<(), String> {
     let pattern_vec = patterns
@@ -28,17 +31,17 @@ fn kractor(
     let matcher = AhoCorasick::new(pattern_vec).map_err(|e| {
         format!("Failed to create Aho-Corasick automaton: {}", e)
     })?;
-    write_matching_output(
+    KOutputProcessor::new(matcher).chunk_io(
         koutput,
-        &matcher,
         ofile,
-        io_buffer,
-        buffersize,
-        batchsize,
-        queue_capacity,
+        read_buffer,
+        write_buffer,
+        parse_buffer,
+        read_queue,
+        write_queue,
         threads,
     )?;
-    write_matching_reads(ofile, fq1, ofile1, fq2, ofile2, io_buffer)
+    write_matching_reads(ofile, fq1, ofile1, fq2, ofile2, write_buffer)
 }
 
 extendr_module! {
