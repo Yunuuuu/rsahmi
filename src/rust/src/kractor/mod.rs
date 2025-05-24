@@ -1,9 +1,9 @@
 use extendr_api::prelude::*;
-mod output;
+mod koutput;
 mod reads;
 
 use aho_corasick::AhoCorasick;
-use output::write_matching_output;
+use koutput::write_matching_output;
 use reads::write_matching_reads;
 
 #[extendr]
