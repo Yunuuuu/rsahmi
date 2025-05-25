@@ -10,17 +10,17 @@ use crate::chunk::ChunkSplitter;
 use crate::chunk::{ChunkParser, ChunkProcessor};
 
 pub struct ReadsProcessor<'a> {
-    sequence_ids: &'a HashSet<Vec<u8>>,
+    sequence_ids: &'a HashSet<&'a [u8]>,
 }
 
 impl<'a> ReadsProcessor<'a> {
-    pub fn new(ids: &'a HashSet<Vec<u8>>) -> Self {
+    pub fn new(ids: &'a HashSet<&'a [u8]>) -> Self {
         Self { sequence_ids: ids }
     }
 }
 
 pub struct ReadsParser<'a> {
-    sequence_ids: &'a HashSet<Vec<u8>>,
+    sequence_ids: &'a HashSet<&'a [u8]>,
 }
 
 impl<'a> ChunkProcessor for ReadsProcessor<'a> {
@@ -116,7 +116,7 @@ impl<'a> ChunkParser for ReadsParser<'a> {
 }
 
 impl<'a> ReadsParser<'a> {
-    fn new(ids: &'a HashSet<Vec<u8>>) -> Self {
+    fn new(ids: &'a HashSet<&[u8]>) -> Self {
         Self { sequence_ids: ids }
     }
 }
@@ -124,14 +124,14 @@ impl<'a> ReadsParser<'a> {
 pub fn read_sequence_id_from_koutput<P>(
     file: P,
     buffersize: usize,
-) -> std::result::Result<HashSet<Vec<u8>>, String>
+) -> std::result::Result<Vec<Vec<u8>>, String>
 where
     P: AsRef<Path> + Display,
 {
     let opened =
         File::open(file).map_err(|e| format!("Open file failed: {}", e))?;
     let buffer = BufReader::with_capacity(buffersize, opened);
-    let id_set = buffer
+    let id_sets = buffer
         .lines()
         .filter_map(|line| {
             line.ok().and_then(|str| {
@@ -146,8 +146,8 @@ where
                 })
             })
         })
-        .collect::<HashSet<Vec<u8>>>();
-    Ok(id_set)
+        .collect::<Vec<Vec<u8>>>();
+    Ok(id_sets)
 }
 
 #[cfg(test)]
@@ -158,10 +158,9 @@ mod tests {
 
     #[test]
     fn test_reads_parser_with_matching_id() {
-        let ids: HashSet<Vec<u8>> = [b"seq1".to_vec(), b"seq2".to_vec()]
-            .iter()
-            .cloned()
-            .collect();
+        let original: Vec<Vec<u8>> = vec![b"seq1".to_vec(), b"seq2".to_vec()];
+        let ids: HashSet<&[u8]> =
+            original.iter().map(|v| v.as_slice()).collect();
         let processor = ReadsProcessor::new(&ids);
         let parser = processor.new_parser();
 
@@ -182,8 +181,9 @@ mod tests {
 
     #[test]
     fn test_reads_parser_with_invalid_format() {
-        let ids: HashSet<Vec<u8>> =
-            [b"seq1".to_vec()].iter().cloned().collect();
+        let original: Vec<Vec<u8>> = vec![b"seq1".to_vec()];
+        let ids: HashSet<&[u8]> =
+            original.iter().map(|v| v.as_slice()).collect();
         let processor = ReadsProcessor::new(&ids);
         let parser = processor.new_parser();
 

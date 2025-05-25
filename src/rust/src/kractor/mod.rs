@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use extendr_api::prelude::*;
 mod koutput;
 mod reads;
@@ -45,11 +47,14 @@ fn kractor(
     rprintln!("Extracting sequence IDs");
     let ids = read_sequence_id_from_koutput(ofile, 126 * 1024)
         .map_err(|e| format!("Failed to read sequence IDs: {}", e))?;
-
+    let id_sets = ids
+        .iter()
+        .map(|id| id.as_slice())
+        .collect::<HashSet<&[u8]>>();
     rprintln!("Extracting the matching sequence from: {}", fq1);
     // Don't use multiple threads for the reads processing
     // as it will disturb the order of reads
-    ReadsProcessor::new(&ids).chunk_io(
+    ReadsProcessor::new(&id_sets).chunk_io(
         fq1,
         ofile1,
         read_buffer,
@@ -61,7 +66,7 @@ fn kractor(
     )?;
     if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
         rprintln!("Extracting the matching sequence from: {}", in_file);
-        ReadsProcessor::new(&ids).chunk_io(
+        ReadsProcessor::new(&id_sets).chunk_io(
             in_file,
             out_file,
             read_buffer,
