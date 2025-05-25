@@ -92,13 +92,9 @@ where
     }
 
     fn take_chunk(&mut self) -> Option<Vec<u8>> {
-        match self.splitter.breakpoint(&self.buffer[.. self.offset]) {
-            Some(pos) => {
-                let chunk = self.take_buffer(pos);
-                Some(chunk)
-            }
-            None => None,
-        }
+        self.splitter
+            .breakpoint(&self.buffer[.. self.offset])
+            .map(|pos| self.take_buffer(pos))
     }
 
     fn take_leftover(&mut self) -> Option<Vec<u8>> {

@@ -4,7 +4,7 @@ mod reads;
 
 use aho_corasick::AhoCorasick;
 use koutput::KOutputProcessor;
-use reads::write_matching_reads;
+use reads::{read_sequence_id_from_koutput, ReadsProcessor};
 
 use crate::chunk::ChunkProcessor;
 
@@ -31,6 +31,7 @@ fn kractor(
     let matcher = AhoCorasick::new(pattern_vec).map_err(|e| {
         format!("Failed to create Aho-Corasick automaton: {}", e)
     })?;
+    rprintln!("Extracting matching kraken2 output from: {}", koutput);
     KOutputProcessor::new(matcher).chunk_io(
         koutput,
         ofile,
@@ -41,7 +42,35 @@ fn kractor(
         write_queue,
         threads,
     )?;
-    write_matching_reads(ofile, fq1, ofile1, fq2, ofile2, write_buffer)
+    rprintln!("Extracting sequence IDs");
+    let ids = read_sequence_id_from_koutput(ofile, 126 * 1024)
+        .map_err(|e| format!("Failed to read sequence IDs: {}", e))?;
+
+    rprintln!("Extracting the matching sequence from: {}", fq1);
+    ReadsProcessor::new(&ids).chunk_io(
+        fq1,
+        ofile1,
+        read_buffer,
+        write_buffer,
+        parse_buffer,
+        read_queue,
+        write_queue,
+        1,
+    )?;
+    if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
+        rprintln!("Extracting the matching sequence from: {}", in_file);
+        ReadsProcessor::new(&ids).chunk_io(
+            in_file,
+            out_file,
+            read_buffer,
+            write_buffer,
+            parse_buffer,
+            read_queue,
+            write_queue,
+            1,
+        )?;
+    }
+    Ok(())
 }
 
 extendr_module! {

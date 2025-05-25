@@ -1,41 +1,137 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use extendr_api::prelude::*;
-use noodles_fasta::io::Writer;
-use noodles_fasta::record::{definition, sequence, Record};
-use noodles_fastq::io::Reader;
+use memchr::memchr;
 
-pub fn write_matching_reads<P>(
-    koutput: P,
-    fq1: P,
-    ofile1: P,
-    fq2: Option<P>,
-    ofile2: Option<P>,
-    buffersize: usize,
-) -> std::result::Result<(), String>
-where
-    P: AsRef<Path> + Display,
-{
-    // Collect IDs into a HashSet for fast lookup
-    rprintln!("Extracting sequence IDs");
-    let id_set = read_sequence_id_from_koutput(koutput, buffersize)?;
+use crate::chunk::ChunkSplitter;
+use crate::chunk::{ChunkParser, ChunkProcessor};
 
-    // Iterate all FASTQ records
-    rprintln!("Extracting the matching sequence from: {}", fq1);
-    write_matching_records(fq1, ofile1, buffersize, &id_set)?;
-
-    if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
-        rprintln!("Extracting the matching sequence from: {}", in_file);
-        write_matching_records(in_file, out_file, buffersize, &id_set)?;
-    }
-    Ok(())
+pub struct ReadsProcessor<'a> {
+    sequence_ids: &'a HashSet<Vec<u8>>,
 }
 
-fn read_sequence_id_from_koutput<P>(
+impl<'a> ReadsProcessor<'a> {
+    pub fn new(ids: &'a HashSet<Vec<u8>>) -> Self {
+        Self { sequence_ids: ids }
+    }
+}
+
+pub struct ReadsParser<'a> {
+    sequence_ids: &'a HashSet<Vec<u8>>,
+}
+
+impl<'a> ChunkProcessor for ReadsProcessor<'a> {
+    type Parser = ReadsParser<'a>;
+
+    fn new_parser(&self) -> Self::Parser {
+        ReadsParser::new(self.sequence_ids)
+    }
+    fn new_splitter(&self) -> ChunkSplitter {
+        ChunkSplitter::Bytes(b"\n@")
+    }
+}
+
+#[allow(unused_assignments)]
+impl<'a> ChunkParser for ReadsParser<'a> {
+    fn parse<F>(
+        &self,
+        chunk: Vec<u8>,
+        push: &mut F,
+    ) -> std::result::Result<(), String>
+    where
+        F: FnMut(Vec<u8>) -> std::result::Result<(), String>,
+    {
+        let mut start = 0;
+        let mut record_pos = 0usize;
+        let mut record_start = 0usize;
+        let mut sequence_start = 0usize;
+        let mut sequence_end = 0usize;
+        let mut quality_start = 0usize;
+        let mut quality_end = 0usize;
+        let mut push_record = false;
+        while let Some(line_pos) = memchr(b'\n', &chunk[start ..]) {
+            match record_pos {
+                0 => {
+                    // first line, should be a sequence ID
+                    record_start = start;
+                    // check sequence is valid
+                    if chunk[start] != b'@' {
+                        push_record = false;
+                    } else {
+                        // remove the '@' from the start of the sequence ID
+                        let line = &chunk[(start + 1) ..= (start + line_pos)];
+                        // id and description were split by a space, so we take the first part
+                        let field: Option<&[u8]> =
+                            line.split(|b| *b == b' ').nth(0);
+                        match field {
+                            Some(id) => {
+                                push_record = self.sequence_ids.contains(id);
+                            }
+                            None => {
+                                // no id found, skip this record
+                                push_record = false;
+                            }
+                        }
+                    }
+                    record_pos += 1;
+                    start += line_pos + 1;
+                    continue;
+                }
+                1 => {
+                    // second line, should be the sequence
+                    record_pos += 1;
+                    sequence_start = start;
+                    sequence_end = start + line_pos;
+                    start += line_pos + 1;
+                    continue;
+                }
+                2 => {
+                    // third line, should be a plus line
+                    if chunk[start] != b'+' {
+                        push_record = false;
+                    }
+                    record_pos += 1;
+                    start += line_pos + 1;
+                    continue;
+                }
+                3 => {
+                    // fourth line, should be the quality scores
+                    // It should have the same length as the sequence
+                    quality_start = start;
+                    quality_end = start + line_pos;
+                    if (sequence_end - sequence_start)
+                        != (quality_end - quality_start)
+                    {
+                        // sequence and quality lengths do not match, skip this record
+                        push_record = false;
+                    } else if push_record {
+                        // push the id, description, and sequence
+                        // we remove the '@' from the start of the sequence ID
+                        let record =
+                            &chunk[(record_start + 1) ..= sequence_end];
+                        push(record.to_vec())?;
+                    }
+                    record_pos = 0; // reset for next record
+                    start += line_pos + 1;
+                    continue;
+                }
+                _ => unreachable!(),
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'a> ReadsParser<'a> {
+    fn new(ids: &'a HashSet<Vec<u8>>) -> Self {
+        Self { sequence_ids: ids }
+    }
+}
+
+pub fn read_sequence_id_from_koutput<P>(
     file: P,
     buffersize: usize,
 ) -> std::result::Result<HashSet<Vec<u8>>, String>
@@ -64,48 +160,55 @@ where
     Ok(id_set)
 }
 
-fn write_matching_records<P>(
-    fastq: P,
-    fasta: P,
-    buffersize: usize,
-    id_set: &HashSet<Vec<u8>>,
-) -> std::result::Result<(), String>
-where
-    P: AsRef<Path> + Display,
-{
-    // Open input FASTQ
-    let in_file =
-        File::open(fastq).map_err(|e| format!("Open file failed: {}", e))?;
-    let in_buf = BufReader::with_capacity(buffersize, in_file);
-    let mut reader = Reader::new(in_buf);
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
 
-    // Open output FASTA
-    let out_file =
-        File::create(fasta).map_err(|e| format!("Open file failed: {}", e))?;
-    let out_buf = BufWriter::with_capacity(buffersize, out_file);
-    let mut writer = Writer::new(out_buf);
+    use super::*;
 
-    // Iterate all FASTQ records
-    for read in reader.records() {
-        let record =
-            read.map_err(|e| format!("Parse fastq record failed: {}", e))?;
-        if id_set.contains(<&[u8]>::from(record.name())) {
-            // convert FASTQ to FASTA record and write
-            let definition = definition::Definition::new(
-                record.name(),
-                Some(record.description().to_owned()),
-            );
-            let sequence =
-                sequence::Sequence::from(record.sequence().to_owned());
-            let fasta_record = Record::new(definition, sequence);
-            writer
-                .write_record(&fasta_record)
-                .map_err(|e| format!("Write fastq record failed: {}", e))?;
-        }
+    #[test]
+    fn test_reads_parser_with_matching_id() {
+        let ids: HashSet<Vec<u8>> = [b"seq1".to_vec(), b"seq2".to_vec()]
+            .iter()
+            .cloned()
+            .collect();
+        let processor = ReadsProcessor::new(&ids);
+        let parser = processor.new_parser();
+
+        // Simulate a complete FASTQ record for seq1 and one unmatched record
+        let fastq_data = b"@seq1 description\nACGTACGT\n+\nIIIIIIII\n@seq3\nGATTACA\n+\nIIIIIII\n";
+
+        let mut results = Vec::new();
+        parser
+            .parse(fastq_data.to_vec(), &mut |record| {
+                results.push(record);
+                Ok(())
+            })
+            .unwrap();
+        // Only the first record should be collected
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], b"seq1 description\nACGTACGT\n".to_vec());
     }
-    writer
-        .get_mut()
-        .flush()
-        .map_err(|e| format!("Flush lines failed: {}", e))?;
-    Ok(())
+
+    #[test]
+    fn test_reads_parser_with_invalid_format() {
+        let ids: HashSet<Vec<u8>> =
+            [b"seq1".to_vec()].iter().cloned().collect();
+        let processor = ReadsProcessor::new(&ids);
+        let parser = processor.new_parser();
+
+        // Corrupt FASTQ: missing '+' line
+        let fastq_data = b"@seq1\nACGTACGT\nIIIIIIII\n";
+
+        let mut results = Vec::new();
+        parser
+            .parse(fastq_data.to_vec(), &mut |record| {
+                results.push(record);
+                Ok(())
+            })
+            .unwrap();
+
+        // Should not collect anything
+        assert!(results.is_empty());
+    }
 }

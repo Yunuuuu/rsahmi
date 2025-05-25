@@ -119,15 +119,11 @@ where
 
             // read files and pass chunks to parser
             for bytes in &mut self.reader {
-                match bytes {
-                    Ok(chunk) => {
-                        // send chunk to parser
-                        parser_tx.send(chunk).map_err(|e| {
-                            format!("Send to parser failed: {e}")
-                        })?;
-                    }
-                    Err(e) => return Err(e),
-                }
+                bytes.and_then(|chunk| {
+                    parser_tx
+                        .send(chunk)
+                        .map_err(|e| format!("Send to parser failed: {e}"))
+                })?;
             }
             // close parser channel to stop parsers
             drop(parser_tx);

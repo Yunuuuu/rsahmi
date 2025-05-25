@@ -8,7 +8,7 @@ mod splitter;
 
 use io::ChunkIO;
 use reader::ChunkReader;
-use splitter::ChunkSplitter;
+pub use splitter::ChunkSplitter;
 
 struct ChunkFactory<F>
 where
