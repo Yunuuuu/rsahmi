@@ -112,24 +112,21 @@ where
     }
 
     fn take_buffer(&mut self, pos: usize) -> Vec<u8> {
-        let chunk = self.buffer.drain(..= pos).collect::<Vec<u8>>();
-        // drain won't reduce the capacity of the buffer but will remove the data
-        self.buffer.resize(self.buffer.capacity(), 0);
-        // we need to move the offset to the end of the remaing buffer
-        self.offset -= pos + 1;
+        let chunk = self.buffer[..= pos].to_vec(); // copy out the chunk
+        let remaining = self.offset - (pos + 1); // move remaining bytes to the front
+        if remaining > 0 {
+            self.buffer.copy_within((pos + 1) .. self.offset, 0);
+        }
+        self.offset = remaining;
         chunk
-    }
-
-    // everytime we increase the buffer, we need to fill it with 0
-    fn fill_buffer(&mut self) {
-        self.buffer.resize(self.buffer.capacity(), 0);
     }
 
     fn extend_buffer(&mut self) -> std::result::Result<(), String> {
         self.buffer
             .try_reserve(self.buffersize)
             .map_err(|e| format!("Increase buffer failed: {e}"))?;
-        self.fill_buffer();
+        // everytime we increase the buffer, we need to fill it with 0
+        self.buffer.resize(self.buffer.capacity(), 0);
         Ok(())
     }
 
