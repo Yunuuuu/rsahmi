@@ -35,7 +35,7 @@
 #'
 #' @param read_queue,write_queue Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or
-#'   writing.Default is `2`.
+#'   writing. Default is `2`.
 #'
 #' @param threads Integer. Number of threads to use. Defaults to all available
 #' threads.
