@@ -99,10 +99,11 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                         && (sequence_end - sequence_start) == line_pos
                     {
                         // push the id, description, and sequence
-                        // we remove the '@' from the start of the sequence ID
-                        let record =
-                            &chunk[(record_start + 1) ..= sequence_end];
-                        push(record.to_vec())?;
+                        // we replace the '@' from the start of the sequence ID with '>'
+                        let mut record =
+                            chunk[record_start ..= sequence_end].to_vec();
+                        record[0] = b'>'; // ensure it starts with '@'
+                        push(record)?;
                     }
                     record_pos = 0; // reset for next record
                 }
