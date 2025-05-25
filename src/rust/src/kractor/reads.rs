@@ -79,14 +79,12 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                             .contains(&chunk[(start + 1) ..= end]);
                     }
                     record_pos += 1;
-                    start += line_pos + 1;
                 }
                 1 => {
                     // second line, should be the sequence
                     record_pos += 1;
                     sequence_start = start;
                     sequence_end = start + line_pos;
-                    start += line_pos + 1;
                 }
                 2 => {
                     // third line, should be a plus line
@@ -94,7 +92,6 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                         push_record = false;
                     }
                     record_pos += 1;
-                    start += line_pos + 1;
                 }
                 3 => {
                     // fourth line, should be the quality scores
@@ -113,10 +110,10 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                         push(record.to_vec())?;
                     }
                     record_pos = 0; // reset for next record
-                    start += line_pos + 1;
                 }
                 _ => unreachable!(),
             }
+            start += line_pos + 1;
         }
         Ok(())
     }
