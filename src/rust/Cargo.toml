@@ -14,6 +14,7 @@ extendr-api = '*'
 crossbeam-channel = { version = "*" }
 memchr = { version = "*" }
 aho-corasick = { version = "*" }
+ahash = { version = "*" }
 
 [lints.clippy]
 needless_late_init = "allow"

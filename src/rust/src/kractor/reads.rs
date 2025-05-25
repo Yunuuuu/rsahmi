@@ -1,9 +1,10 @@
-use std::collections::HashSet;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::ops::Add;
 use std::path::Path;
 
+use ahash::AHashSet as HashSet;
 use memchr::memchr;
 
 use crate::chunk::ChunkSplitter;
@@ -66,12 +67,8 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                             b' ',
                             &chunk[(start + 1) ..= (start + line_pos)],
                         )
-                        .map_or_else(
-                            // NO description
-                            || start + line_pos,
-                            // we don't add 1 here since we don't want to include the space
-                            |offset| start + offset,
-                        );
+                        .unwrap_or(line_pos)
+                        .add(start);
                         push_record = self
                             .sequence_ids
                             .contains(&chunk[(start + 1) ..= end]);
@@ -152,7 +149,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use ahash::AHashSet as HashSet;
 
     use super::*;
 

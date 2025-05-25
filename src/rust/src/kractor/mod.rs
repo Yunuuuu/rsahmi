@@ -1,9 +1,8 @@
-use std::collections::HashSet;
-
 use extendr_api::prelude::*;
 mod koutput;
 mod reads;
 
+use ahash::AHashSet as HashSet;
 use aho_corasick::AhoCorasick;
 use koutput::KOutputProcessor;
 use reads::{read_sequence_id_from_koutput, ReadsProcessor};
