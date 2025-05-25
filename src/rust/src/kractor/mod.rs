@@ -47,6 +47,8 @@ fn kractor(
         .map_err(|e| format!("Failed to read sequence IDs: {}", e))?;
 
     rprintln!("Extracting the matching sequence from: {}", fq1);
+    // Don't use multiple threads for the reads processing
+    // as it will disturb the order of reads
     ReadsProcessor::new(&ids).chunk_io(
         fq1,
         ofile1,
