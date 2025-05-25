@@ -120,7 +120,7 @@ kractor <- function(kreport, koutput, reads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    threads <- threads %||% parallel::detectCores()
+    threads <- threads %||% min(2L, parallel::detectCores())
     assert_string(odir, allow_empty = FALSE)
     dir_create(odir)
 
@@ -158,8 +158,10 @@ rust_kractor <- function(koutput, reads, taxids,
     # the third column of kraken2 output:
     # Using (taxid ****)
     patterns <- paste0("(taxid ", as.character(taxids), ")")
-    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 2MB
-    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 1MB
+    # small read buffer, so the worker threads can
+    # accept the data fast
+    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
+    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
     parse_buffer <- parse_buffer %||% 20L
     read_queue <- read_queue %||% 100L
     write_queue <- write_queue %||% 100L
