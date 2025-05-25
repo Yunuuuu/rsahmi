@@ -62,14 +62,14 @@ scientific name of the taxon (e.g., "d__Viruses").}
 
 \item{read_buffer}{Integer specifying the size in bytes of the intermediate
 buffer used for splitting and distributing chunks to worker threads during
-processing. Default is \code{2 * 1024 * 1024} (2MB).}
+processing. Default is \code{1 * 1024 * 1024} (1MB).}
 
 \item{write_buffer}{Integer specifying the buffer size in bytes used for
 writing to disk. This controls the capacity of the buffered file writer.
-Default is \code{1 * 1024 * 1024} (1MB).}
+Default is \code{2 * 1024 * 1024} (2MB).}
 
 \item{parse_buffer}{Integer. Number of records to write per batch. Default is
-\code{10}.}
+\code{20}.}
 
 \item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or

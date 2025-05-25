@@ -22,16 +22,16 @@
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses").
 #'
-#' @param write_buffer Integer specifying the buffer size in bytes used for
-#' writing to disk. This controls the capacity of the buffered file writer.
-#' Default is `1 * 1024 * 1024` (1MB).
-#'
 #' @param read_buffer Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during
-#' processing. Default is `2 * 1024 * 1024` (2MB).
+#' processing. Default is `1 * 1024 * 1024` (1MB).
+#'
+#' @param write_buffer Integer specifying the buffer size in bytes used for
+#' writing to disk. This controls the capacity of the buffered file writer.
+#' Default is `2 * 1024 * 1024` (2MB).
 #'
 #' @param parse_buffer Integer. Number of records to write per batch. Default is
-#'   `10`.
+#'   `20`.
 #'
 #' @param read_queue,write_queue Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or
@@ -158,11 +158,11 @@ rust_kractor <- function(koutput, reads, taxids,
     # the third column of kraken2 output:
     # Using (taxid ****)
     patterns <- paste0("(taxid ", as.character(taxids), ")")
-    read_buffer <- read_buffer %||% (2 * 1024L * 1024L) # DEFAULT_BUF_SIZE 2MB
-    write_buffer <- write_buffer %||% (1 * 1024L * 1024L) # 1MB
-    parse_buffer <- parse_buffer %||% 10L
-    read_queue <- read_queue %||% 2L
-    write_queue <- write_queue %||% 2L
+    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 2MB
+    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 1MB
+    parse_buffer <- parse_buffer %||% 20L
+    read_queue <- read_queue %||% 100L
+    write_queue <- write_queue %||% 100L
     extract_koutput <- file.path(odir, extract_koutput)
     extract_reads <- file.path(odir, extract_reads)
     if (is_scalar(extract_reads)) {
