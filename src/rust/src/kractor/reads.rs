@@ -92,7 +92,7 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                 }
                 2 => {
                     // third line, should be a plus line
-                    if chunk[start] != b'+' {
+                    if push_record && chunk[start] != b'+' {
                         push_record = false;
                     }
                     record_pos += 1;
