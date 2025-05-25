@@ -62,19 +62,21 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                         push_record = false;
                     } else {
                         // remove the '@' from the start of the sequence ID
-                        let line = &chunk[(start + 1) ..= (start + line_pos)];
+                        // ID is after '@' and before first space
                         // id and description were split by a space, so we take the first part
-                        let field: Option<&[u8]> =
-                            line.split(|b| *b == b' ').nth(0);
-                        match field {
-                            Some(id) => {
-                                push_record = self.sequence_ids.contains(id);
-                            }
-                            None => {
-                                // no id found, skip this record
-                                push_record = false;
-                            }
-                        }
+                        let end = memchr(
+                            b' ',
+                            &chunk[(start + 1) ..= (start + line_pos)],
+                        )
+                        .map_or_else(
+                            // NO description
+                            || start + line_pos,
+                            // we don't add 1 here since we don't want to include the space
+                            |offset| start + offset,
+                        );
+                        push_record = self
+                            .sequence_ids
+                            .contains(&chunk[(start + 1) ..= end]);
                     }
                     record_pos += 1;
                     start += line_pos + 1;
@@ -99,15 +101,14 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                 }
                 3 => {
                     // fourth line, should be the quality scores
-                    // It should have the same length as the sequence
                     quality_start = start;
                     quality_end = start + line_pos;
-                    if (sequence_end - sequence_start)
-                        != (quality_end - quality_start)
+                    if push_record
+                    // It should have the same length as the sequence
+                    // sequence and quality lengths do not match, skip this record
+                        && (sequence_end - sequence_start)
+                            == (quality_end - quality_start)
                     {
-                        // sequence and quality lengths do not match, skip this record
-                        push_record = false;
-                    } else if push_record {
                         // push the id, description, and sequence
                         // we remove the '@' from the start of the sequence ID
                         let record =
