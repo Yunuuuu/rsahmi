@@ -33,3 +33,21 @@ list_first <- function(x, USE.NAMES = FALSE) {
 list_contains <- function(x, items) {
     vapply(x, function(xx) any(xx %in% items), logical(1L))
 }
+
+RUST_CALL <- .Call
+
+#' @keywords internal
+rust_method <- function(class, method, ...) {
+    rust_call(sprintf("%s__%s", class, method), ...)
+}
+
+#' @keywords internal
+rust_call <- function(.NAME, ...) {
+    # call the function
+    out <- RUST_CALL(sprintf("wrap__%s", .NAME), ...)
+
+    # propagate error from rust --------------------
+    if (!inherits(out, "extendr_result")) return(out) # styler: off
+    if (is.null(.subset2(out, "ok"))) cli::cli_abort(.subset2(out, "err"))
+    .subset2(out, "ok")
+}

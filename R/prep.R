@@ -14,12 +14,11 @@
 #'
 #' * `umi`: Used by [`taxa_counts()`].
 #'
-#' @param fa1,fa2 The path to microbiome fasta 1 and 2 file (returned by
-#'   [`extract_kraken_reads()`]).
-#' @inheritParams extractor
-#' @param kraken_out The path of microbiome output file. Usually should be
-#'   filtered with [`extract_kraken_output()`].
-#' @param cb_and_umi A function takes sequence id, read1, read2 and return a
+#' @param fa1,fa2 Paths to the extracted FASTA files (from [`kractor()`]).
+#' @inheritParams kractor
+#' @param koutput Path to the extracted Kraken2 output file, typically
+#'   filtered using [`kractor()`].
+#' @param cb_and_umi A function takes sequence IDs, read1, read2 and return a
 #' list of 2 corresponding to cell barcode and UMI respectively., each should
 #' have the same length of the input.
 #' @param ranks Taxa ranks to analyze.
@@ -47,30 +46,31 @@
 #' }
 #'
 #' \dontrun{
-#' # 1. `fa1` and `fa2` should be the output of `extract_kraken_reads()`
-#' # 2. `kraken_report` should be the output of `blit::kraken2()`
-#' # 3. `kraken_out` should be the output of `extract_kraken_output()`
-#' # 4. `dir`: you may want to specify the output directory since this process 
-#' #           is time-consuming
+#' # 1. `fa1` and `fa2` should be the output of `kractor()`
+#' # 2. `kreport` should be the output of `blit::kraken2()`.
+#' # 3. `koutput` should be the extracted kraken2 output by `kractor()`
+#' # 4. `odir`: you may want to specify the output directory since this process
+#' #            is time-consuming
 #' sahmi_dataset <- prep_dataset(
 #'     fa1 = "kraken_microbiome_reads.fa",
 #'     # if you have paired sequence, please also specify `fa2`,
 #'     # !!! Also pay attention to the file name of `fa1` (add suffix `_1`)
 #'     # if you use paired reads.
 #'     # fa2 = "kraken_microbiome_reads_2.fa",
-#'     kraken_report = "kraken_report.txt",
-#'     kraken_out = "kraken_microbiome_output.txt",
+#'     kreport = "kraken_report.txt",
+#'     koutput = "kraken_microbiome_output.txt",
 #'     odir = NULL
 #' )
+#'
 #' # you may want to prepare all datasets for subsequent workflows.
 #' # `paths` should be the output directory for each sample from
-#' # `blit::kraken2()`, `extract_kraken_output()` and `extract_kraken_reads()`.
+#' # `blit::kraken2()` and `kractor()`.
 #' sahmi_datasets <- lapply(paths, function(dir) {
 #'     prep_dataset(
 #'         fa1 = file.path(dir, "kraken_microbiome_reads.fa"),
 #'         # fa2 = file.path(dir, "kraken_microbiome_reads_2.fa"),
-#'         kraken_report = file.path(dir, "kraken_report.txt"),
-#'         kraken_out = file.path(dir, "kraken_microbiome_output.txt"),
+#'         kreport = file.path(dir, "kraken_report.txt"),
+#'         koutput = file.path(dir, "kraken_microbiome_output.txt"),
 #'         odir = dir
 #'     )
 #' })
@@ -80,7 +80,7 @@
 #'  - kmer: Used by [`blsd()`].
 #'  - umi: Used by [`taxa_counts()`].
 #' @export
-prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
+prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
                          cb_and_umi = function(sequence_id, read1, read2) {
                              list(
                                  substring(read1, 1L, 16L),
@@ -89,32 +89,28 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
                          },
                          ranks = c("G", "S"), kmer_len = 35L,
                          min_frac = 0.5, exclude = "9606",
-                         threads = 10L, overwrite = TRUE, odir = NULL) {
+                         threads = NULL, overwrite = FALSE, odir = NULL) {
     use_polars()
-    if (!is.null(odir)) {
-        if (!dir.exists(odir) && file.exists(odir)) {
-            cli::cli_abort(paste(
-                "{.arg odir} must be a directory",
-                "but you specify a file",
-                sep = ", "
-            ))
-        } else if (dir.exists(odir)) {
-            ofiles <- paste0(
-                file.path(odir, c("kreport", "kmer", "umi")), ".parquet"
-            )
-            exists <- ofiles[file.exists(ofiles)]
-            if (!overwrite && length(exists)) {
-                cli::cli_abort(c(
-                    "Found files {.path {ofiles}}",
-                    i = "You can set {.code overwrite = TRUE} if you want to overrite"
-                ))
-            }
-        } else {
-            dir_create(odir)
-        }
+    assert_string(fa1, allow_empty = FALSE)
+    assert_string(fa2, allow_empty = FALSE, allow_null = TRUE)
+    assert_string(kreport, allow_empty = FALSE)
+    assert_string(koutput, allow_empty = FALSE)
+    assert_number_whole(threads,
+        min = 1, max = parallel::detectCores(),
+        allow_null = TRUE
+    )
+    threads <- threads %||% parallel::detectCores()
+    assert_bool(overwrite)
+    assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
+    if (is.null(odir)) odir <- getwd()
+    ofiles <- paste0(file.path(odir, c("kreport", "kmer", "umi")), ".parquet")
+    if (!overwrite && all(file.exists(ofiles))) {
+        cli::cli_inform("Using files exist: {.path {ofiles}}")
+        return(read_dataset(odir))
     }
-    cli::cli_alert_info("Parsing {.path {kraken_report}}")
-    kreport <- parse_kraken_report(kraken_report)
+
+    cli::cli_alert_info("Parsing {.path {kreport}}")
+    kreport <- parse_kraken_report(kreport)
     exclude <- pl$Series(values = exclude)$cast(pl$String)
 
     # extract operated taxon -----------------------------------------
@@ -135,8 +131,8 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     )
 
     # prepare taxid:kmer data ------------------------------------------
-    cli::cli_alert_info("Parsing {.path {kraken_out}}")
-    kout <- pl$scan_csv(kraken_out, has_header = FALSE, separator = "\t")$
+    cli::cli_alert_info("Parsing {.path {koutput}")
+    kout <- pl$scan_csv(koutput, has_header = FALSE, separator = "\t")$
         filter(
         pl$col("column_5")$str$
             contains_any(pl$concat_str(pl$Series(values = ":"), exclude))$
@@ -174,8 +170,8 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
             separator = ""
         )$alias("header")
     )$
+        # pivot method must run with DataFrame instead of LazyDataFrame
         collect()$
-        # pivot method must run with DataFrame
         pivot("LCA",
         index = c("index", "name", "taxid", "sequence_id"),
         columns = "header"
@@ -198,7 +194,7 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     } else if (length(read_nms) == 2L) {
         if (is.null(fa2)) {
             cli::cli_warn(paste(
-                "read2 in {.arg kraken_report} will be ignored",
+                "read2 in {.arg kreport} will be ignored",
                 "since {.arg fa2} was not provided"
             ))
             read_nms <- "read1"
@@ -320,24 +316,21 @@ prep_dataset <- function(fa1, kraken_report, kraken_out, fa2 = NULL,
     # prepare data for blsa ----------------------
     # define kmer ---------------------------------------------------
     cli::cli_alert_info("Calculating {.field kmer}")
-    kmer_list <- series_lapply(
-        taxon_struct, kmer_query,
-        kout = kout, kreport = kreport,
-        read_nms = read_nms, kmer_len = kmer_len,
-        min_frac = min_frac,
-        .progress = list(
-            name = "Defining kmer",
-            format = paste(
-                "{cli::pb_bar} {cli::pb_current}",
-                "{cli::pb_total} [{cli::pb_rate}] | {cli::pb_eta_str}",
-                sep = "/"
-            ),
-            format_done = paste(
-                "Kmer statistic has been tabulated for",
-                "{.val {cli::pb_total}} tax{?a/on} in {cli::pb_elapsed}"
+    with(
+        mirai::daemons(threads, dispatcher = FALSE),
+        {
+            query_mirai <- mirai::mirai_map( # nolint
+                seq_len(taxon_struct$len()),
+                kmer_query,
+                kout = kout,
+                kreport = kreport,
+                taxon_struct = taxon_struct,
+                read_nms = read_nms,
+                kmer_len = kmer_len,
+                min_frac = min_frac
             )
-        ),
-        .threads = threads
+            kmer_list <- query_mirai[.progress]
+        }
     )
     kmer <- pl$concat(kmer_list, how = "vertical")$
         select(
@@ -410,8 +403,9 @@ taxon_children <- function(kreport, taxon) {
         to_series()$unique()
 }
 
-kmer_query <- function(kout, kreport, read_nms, taxa_struct,
+kmer_query <- function(i, kout, kreport, taxon_struct, read_nms,
                        kmer_len, min_frac) {
+    taxa_struct <- taxon_struct$slice(i - 1L, length = 1L)
     taxa <- taxa_struct$struct$field("taxa")
     taxid <- taxa_struct$struct$field("taxid")
     lineage_report <- kreport$filter(pl$col("taxids")$list$contains(taxid))
@@ -467,5 +461,5 @@ kmer_query <- function(kout, kreport, read_nms, taxa_struct,
         pl$col("kmer")$n_unique()$alias("kmer_n_unique")
     )$
         with_columns(taxid = taxid, taxa = taxa)$
-        collect(collect_in_background = TRUE)
+        collect()
 }

@@ -1,0 +1,20 @@
+[package]
+name = 'rsahmi'
+publish = false
+version = '0.1.0'
+edition = '2021'
+rust-version = '1.65'
+
+[lib]
+crate-type = ['staticlib']
+name = 'rsahmi'
+
+[dependencies]
+extendr-api = '*'
+crossbeam-channel = { version = "*" }
+memchr = { version = "*" }
+aho-corasick = { version = "*" }
+ahash = { version = "*" }
+
+[lints.clippy]
+needless_late_init = "allow"

@@ -7,23 +7,26 @@ Description: A computational resource designed to accurately detect microbial
     nucleic acids while filtering out contaminants and false-positive taxonomic
     assignments from standard transcriptomic sequencing of mammalian tissues.
     For more details, see Ghaddar (2023) <doi:10.1038/s43588-023-00507-1>. This
-    implementation leverages the 'polars' package for fast and systematic
-    microbial signal recovery and denoising from host tissue genomic sequencing.
-License: MIT + file LICENSE
-ByteCompile: true
-Encoding: UTF-8
-OS_type: unix
-Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
-SystemRequirements: kraken2, seqkit
+    implementation leverages rust for fast and systematic microbial signal
+    recovery and denoising from host tissue genomic sequencing.
+Depends: 
+    R (>= 4.2)
 Imports: 
     blit (>= 0.1.0),
+    mirai,
     cli,
     rlang,
     ShortRead,
     utils
-Suggests: 
+Suggests:
     polars (>= 0.17.0)
 Additional_repositories: https://community.r-multiverse.org
+SystemRequirements: Cargo (Rust's package manager), rustc, kraken2
+Config/rextendr/version: 0.3.1.9001
+ByteCompile: true
+Encoding: UTF-8
+License: MIT + file LICENSE
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
 URL: https://github.com/Yunuuuu/rsahmi
 BugReports: https://github.com/Yunuuuu/rsahmi/issues

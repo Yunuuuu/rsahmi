@@ -7,8 +7,8 @@
 \usage{
 prep_dataset(
   fa1,
-  kraken_report,
-  kraken_out,
+  kreport,
+  koutput,
   fa2 = NULL,
   cb_and_umi = function(sequence_id, read1, read2) {
      list(substring(read1, 1L, 16L),
@@ -18,23 +18,22 @@ prep_dataset(
   kmer_len = 35L,
   min_frac = 0.5,
   exclude = "9606",
-  threads = 10L,
-  overwrite = TRUE,
+  threads = NULL,
+  overwrite = FALSE,
   odir = NULL
 )
 
 read_dataset(dir)
 }
 \arguments{
-\item{fa1, fa2}{The path to microbiome fasta 1 and 2 file (returned by
-\code{\link[=extract_kraken_reads]{extract_kraken_reads()}}).}
+\item{fa1, fa2}{Paths to the extracted FASTA files (from \code{\link[=kractor]{kractor()}}).}
 
-\item{kraken_report}{The path to kraken report file.}
+\item{kreport}{Path to the Kraken2 report file.}
 
-\item{kraken_out}{The path of microbiome output file. Usually should be
-filtered with \code{\link[=extract_kraken_output]{extract_kraken_output()}}.}
+\item{koutput}{Path to the extracted Kraken2 output file, typically
+filtered using \code{\link[=kractor]{kractor()}}.}
 
-\item{cb_and_umi}{A function takes sequence id, read1, read2 and return a
+\item{cb_and_umi}{A function takes sequence IDs, read1, read2 and return a
 list of 2 corresponding to cell barcode and UMI respectively., each should
 have the same length of the input.}
 
@@ -94,30 +93,31 @@ cb_and_umi <- function(sequence_id, read1, read2) {
 }
 
 \dontrun{
-# 1. `fa1` and `fa2` should be the output of `extract_kraken_reads()`
-# 2. `kraken_report` should be the output of `blit::kraken2()`
-# 3. `kraken_out` should be the output of `extract_kraken_output()`
-# 4. `dir`: you may want to specify the output directory since this process 
-#           is time-consuming
+# 1. `fa1` and `fa2` should be the output of `kractor()`
+# 2. `kreport` should be the output of `blit::kraken2()`.
+# 3. `koutput` should be the extracted kraken2 output by `kractor()`
+# 4. `odir`: you may want to specify the output directory since this process
+#            is time-consuming
 sahmi_dataset <- prep_dataset(
     fa1 = "kraken_microbiome_reads.fa",
     # if you have paired sequence, please also specify `fa2`,
     # !!! Also pay attention to the file name of `fa1` (add suffix `_1`)
     # if you use paired reads.
     # fa2 = "kraken_microbiome_reads_2.fa",
-    kraken_report = "kraken_report.txt",
-    kraken_out = "kraken_microbiome_output.txt",
+    kreport = "kraken_report.txt",
+    koutput = "kraken_microbiome_output.txt",
     odir = NULL
 )
+
 # you may want to prepare all datasets for subsequent workflows.
 # `paths` should be the output directory for each sample from
-# `blit::kraken2()`, `extract_kraken_output()` and `extract_kraken_reads()`.
+# `blit::kraken2()` and `kractor()`.
 sahmi_datasets <- lapply(paths, function(dir) {
     prep_dataset(
         fa1 = file.path(dir, "kraken_microbiome_reads.fa"),
         # fa2 = file.path(dir, "kraken_microbiome_reads_2.fa"),
-        kraken_report = file.path(dir, "kraken_report.txt"),
-        kraken_out = file.path(dir, "kraken_microbiome_output.txt"),
+        kreport = file.path(dir, "kraken_report.txt"),
+        koutput = file.path(dir, "kraken_microbiome_output.txt"),
         odir = dir
     )
 })

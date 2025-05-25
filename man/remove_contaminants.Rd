@@ -5,7 +5,7 @@
 \title{Identifying contaminants and false positives taxa (cell line quantile test)}
 \usage{
 remove_contaminants(
-  kraken_reports,
+  kreports,
   study = "current study",
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   quantile = 0.95,
@@ -15,14 +15,14 @@ remove_contaminants(
 )
 }
 \arguments{
-\item{kraken_reports}{A character of path to all kraken report files.}
+\item{kreports}{A character of path to all kraken report files.}
 
 \item{study}{A string of the study name, used to differentiate with cell line
 data.}
 
 \item{taxon}{An atomic character specify the taxa name wanted. Should follow
 the kraken style, connected by rank codes, two underscores, and the
-scientific name of the taxon (e.g., "d__Viruses")}
+scientific name of the taxon (e.g., "d__Viruses").}
 
 \item{quantile}{Probabilities with values in \verb{[0, 1]} specifying the quantile
 to calculate.}
@@ -56,7 +56,7 @@ Identifying contaminants and false positives taxa (cell line quantile test)
 # `paths` should be the output directory for each sample from
 # `blit::kraken2()`
 truly_microbe <- remove_contaminants(
-    kraken_reports = file.path(paths, "kraken_report.txt"),
+    kreports = file.path(paths, "kraken_report.txt"),
     quantile = 0.99, exclusive = FALSE
 )
 microbe_for_plot <- attr(truly_microbe, "truly")[
