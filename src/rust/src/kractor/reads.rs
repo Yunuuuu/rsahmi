@@ -177,7 +177,7 @@ mod tests {
             .unwrap();
         // Only the first record should be collected
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0], b"seq1 description\nACGTACGT\n".to_vec());
+        assert_eq!(results[0], b">seq1 description\nACGTACGT\n".to_vec());
     }
 
     #[test]
