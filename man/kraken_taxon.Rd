@@ -75,8 +75,7 @@ Default is \code{2 * 1024 * 1024} (2MB).}
 controlling the amount of in-flight data awaiting processing or
 writing. Default is \code{2}.}
 
-\item{threads}{Integer. Number of threads to use. Defaults to all available
-threads.}
+\item{threads}{Integer. Number of threads to use. Default is \code{1}.}
 
 \item{kraken2}{A string of path to \code{kraken2} command.}
 

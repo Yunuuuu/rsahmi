@@ -37,8 +37,7 @@
 #'   controlling the amount of in-flight data awaiting processing or
 #'   writing. Default is `2`.
 #'
-#' @param threads Integer. Number of threads to use. Defaults to all available
-#' threads.
+#' @param threads Integer. Number of threads to use. Default is `1`.
 #'
 #' @param odir A string of directory to save the `ofile`.
 #'
@@ -120,7 +119,7 @@ kractor <- function(kreport, koutput, reads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    threads <- threads %||% min(2L, parallel::detectCores())
+    threads <- threads %||% 1L
     assert_string(odir, allow_empty = FALSE)
     dir_create(odir)
 
