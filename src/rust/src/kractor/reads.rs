@@ -49,8 +49,6 @@ impl<'a> ChunkParser for ReadsParser<'a> {
         let mut record_start = 0usize;
         let mut sequence_start = 0usize;
         let mut sequence_end = 0usize;
-        let mut quality_start = 0usize;
-        let mut quality_end = 0usize;
         let mut push_record = false;
         while let Some(line_pos) = memchr(b'\n', &chunk[start ..]) {
             match record_pos {
@@ -95,13 +93,10 @@ impl<'a> ChunkParser for ReadsParser<'a> {
                 }
                 3 => {
                     // fourth line, should be the quality scores
-                    quality_start = start;
-                    quality_end = start + line_pos;
-                    if push_record
                     // It should have the same length as the sequence
                     // sequence and quality lengths do not match, skip this record
-                        && (sequence_end - sequence_start)
-                            == (quality_end - quality_start)
+                    if push_record
+                        && (sequence_end - sequence_start) == line_pos
                     {
                         // push the id, description, and sequence
                         // we remove the '@' from the start of the sequence ID
