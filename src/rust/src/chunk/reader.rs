@@ -94,13 +94,13 @@ where
     fn take_chunk(&mut self) -> Option<Vec<u8>> {
         self.splitter
             .breakpoint(&self.buffer[.. self.offset])
-            .map(|pos| self.take_buffer(pos))
+            .map(|pos| self.take_buffer_copy(pos))
     }
 
     fn take_leftover(&mut self) -> Option<Vec<u8>> {
         // ensure all buffer has been read
         if self.offset > 0 {
-            let mut chunk = self.take_buffer(self.offset - 1);
+            let mut chunk = self.take_buffer_copy(self.offset - 1);
             // always ensure the last line has `\n`
             if !chunk.ends_with(b"\n") {
                 chunk.push(b'\n');
@@ -111,13 +111,23 @@ where
         }
     }
 
-    fn take_buffer(&mut self, pos: usize) -> Vec<u8> {
+    fn take_buffer_copy(&mut self, pos: usize) -> Vec<u8> {
         let chunk = self.buffer[..= pos].to_vec(); // copy out the chunk
         let remaining = self.offset - (pos + 1); // move remaining bytes to the front
         if remaining > 0 {
             self.buffer.copy_within((pos + 1) .. self.offset, 0);
         }
         self.offset = remaining;
+        chunk
+    }
+
+    #[warn(dead_code)]
+    fn take_buffer_drain(&mut self, pos: usize) -> Vec<u8> {
+        let chunk = self.buffer.drain(..= pos).collect::<Vec<u8>>();
+        // drain won't reduce the capacity of the buffer but will remove the data
+        self.buffer.resize(self.buffer.capacity(), 0);
+        // we need to move the offset to the end of the remaing buffer
+        self.offset -= pos + 1;
         chunk
     }
 
@@ -183,5 +193,67 @@ mod tests {
 
         let mut reader = ChunkReader::new(cursor);
         assert!(reader.next().is_none());
+    }
+}
+
+#[cfg(test)]
+mod bench_take_buffer {
+    use std::io::Cursor;
+    use std::time::Instant;
+
+    use super::*;
+
+    #[test]
+    fn bench_take_buffer() {
+        let data = b"line1\nline2\nline3\nline4\nlast".repeat(100_000); // ~700 KB
+
+        fn setup_reader(data: &[u8]) -> ChunkReader<Cursor<Vec<u8>>> {
+            let mut reader = ChunkReader::build(
+                Cursor::new(data.to_vec()),
+                ChunkSplitter::default(),
+                1024 * 1024,
+            );
+            reader.read_buffer().unwrap();
+            reader
+        }
+        // Benchmark take_buffer_copy
+        {
+            let mut reader = setup_reader(&data);
+            let start = Instant::now();
+            let mut count = 0;
+            while let Some(pos) =
+                reader.splitter.breakpoint(&reader.buffer[.. reader.offset])
+            {
+                let _chunk = reader.take_buffer_copy(pos);
+                count += 1;
+            }
+            let duration = start.elapsed();
+            println!(
+                "take_buffer_copy: {:>8} chunks in {:>6?} ({:.2} µs/chunk)",
+                count,
+                duration,
+                duration.as_micros() as f64 / count as f64
+            );
+        }
+
+        // Benchmark take_buffer_drain
+        {
+            let mut reader = setup_reader(&data);
+            let start = Instant::now();
+            let mut count = 0;
+            while let Some(pos) =
+                reader.splitter.breakpoint(&reader.buffer[.. reader.offset])
+            {
+                let _chunk = reader.take_buffer_drain(pos);
+                count += 1;
+            }
+            let duration = start.elapsed();
+            println!(
+                "take_buffer_drain: {:>6} chunks in {:>6?} ({:.2} µs/chunk)",
+                count,
+                duration,
+                duration.as_micros() as f64 / count as f64
+            );
+        }
     }
 }
