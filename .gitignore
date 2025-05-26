@@ -6,3 +6,4 @@ data-raw/test_data
 src/rust/vendor
 src/Makevars
 src/Makevars.win
+bench/data

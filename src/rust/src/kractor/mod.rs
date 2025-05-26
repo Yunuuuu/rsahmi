@@ -26,6 +26,46 @@ fn kractor(
     write_queue: usize,
     threads: usize,
 ) -> std::result::Result<(), String> {
+    kractor_koutput(
+        koutput,
+        patterns,
+        ofile,
+        read_buffer,
+        write_buffer,
+        parse_buffer,
+        read_queue,
+        write_queue,
+        threads,
+    )?;
+
+    kractor_reads(
+        ofile,
+        fq1,
+        ofile1,
+        fq2,
+        ofile2,
+        read_buffer,
+        write_buffer,
+        parse_buffer,
+        read_queue,
+        write_queue,
+        1,
+    )
+}
+
+#[extendr]
+#[allow(clippy::too_many_arguments)]
+fn kractor_koutput(
+    koutput: &str,
+    patterns: Robj,
+    ofile: &str,
+    read_buffer: usize,
+    write_buffer: usize,
+    parse_buffer: usize,
+    read_queue: usize,
+    write_queue: usize,
+    threads: usize,
+) -> std::result::Result<(), String> {
     let pattern_vec = patterns
         .as_str_vector()
         .ok_or("`patterns` must be a character vector")?;
@@ -42,9 +82,26 @@ fn kractor(
         read_queue,
         write_queue,
         threads,
-    )?;
+    )
+}
+
+#[extendr]
+#[allow(clippy::too_many_arguments)]
+fn kractor_reads(
+    koutput: &str,
+    fq1: &str,
+    ofile1: &str,
+    fq2: Option<&str>,
+    ofile2: Option<&str>,
+    read_buffer: usize,
+    write_buffer: usize,
+    parse_buffer: usize,
+    read_queue: usize,
+    write_queue: usize,
+    threads: usize,
+) -> std::result::Result<(), String> {
     rprintln!("Extracting sequence IDs");
-    let ids = read_sequence_id_from_koutput(ofile, 126 * 1024)
+    let ids = read_sequence_id_from_koutput(koutput, 126 * 1024)
         .map_err(|e| format!("Failed to read sequence IDs: {}", e))?;
     let id_sets = ids
         .iter()
@@ -61,7 +118,7 @@ fn kractor(
         parse_buffer,
         read_queue,
         write_queue,
-        1,
+        threads,
     )?;
     if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
         rprintln!("Extracting the matching sequence from: {}", in_file);
@@ -73,7 +130,7 @@ fn kractor(
             parse_buffer,
             read_queue,
             write_queue,
-            1,
+            threads,
         )?;
     }
     Ok(())
@@ -82,4 +139,6 @@ fn kractor(
 extendr_module! {
     mod kractor;
     fn kractor;
+    fn kractor_koutput;
+    fn kractor_reads;
 }

@@ -16,5 +16,8 @@ memchr = { version = "*" }
 aho-corasick = { version = "*" }
 ahash = { version = "*" }
 
+[dev-dependencies]
+pprof = { version = "0.14", features = ["flamegraph", "protobuf"] }
+
 [lints.clippy]
 needless_late_init = "allow"
