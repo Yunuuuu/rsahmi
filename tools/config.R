@@ -1,3 +1,8 @@
+args <- commandArgs(TRUE) # configure-args
+
+input_profile <- args[[1L]]
+input_features <- args[[2L]]
+
 # check the packages MSRV first
 source("tools/msrv.R")
 
@@ -31,7 +36,27 @@ if (!is_not_cran) {
 )
 
 # when DEBUG env var is present we use `--debug` build
-.profile <- ifelse(is_debug, "", "--release")
+.profile <- if (nzchar(input_profile)) {
+  message("Using input profile: --", input_profile)
+  sprintf("--%s", input_profile)
+} else if (is_debug) {
+  ""
+} else {
+  "--release"
+}
+
+if (nzchar(input_features)) {
+  .features <- unique(strsplit(input_features, ",")[[1L]])
+  .features <- .features[nzchar(.features)]
+  if (length(.features)) {
+    .features <- paste(.features, collapse = ",")
+    message("Using input features: ", .features)
+    .features <- sprintf("--features %s", .features)
+  }
+} else {
+  .features <- ""
+}
+
 .clean_targets <- ifelse(is_debug, "", "$(TARGET_DIR)")
 
 # when we are using a debug build we need to use target/debug instead of target/release
@@ -67,7 +92,8 @@ mv_txt <- readLines(mv_fp)
 new_txt <- gsub("@CRAN_FLAGS@", .cran_flags, mv_txt) |>
   gsub("@PROFILE@", .profile, x = _) |>
   gsub("@CLEAN_TARGET@", .clean_targets, x = _) |>
-  gsub("@LIBDIR@", .libdir, x = _)
+  gsub("@LIBDIR@", .libdir, x = _) |>
+  gsub("@FEATURES@", .features, x = _)
 
 message("Writing `", mv_ofp, "`.")
 con <- file(mv_ofp, open = "wb")
