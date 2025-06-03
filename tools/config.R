@@ -1,10 +1,19 @@
 args <- commandArgs(TRUE) # configure-args
 
+# check the packages MSRV first
+source("tools/msrv.R")
+
+# Configure arguments
 input_profile <- args[[1L]]
 input_features <- args[[2L]]
 
-# check the packages MSRV first
-source("tools/msrv.R")
+if (!nzchar(input_profile)) {
+  input_profile <- Sys.getenv("RUST_PROFILE")
+}
+
+if (!nzchar(input_features)) {
+  input_features <- Sys.getenv("RUST_FEATURES")
+}
 
 # check DEBUG and NOT_CRAN environment variables
 env_debug <- Sys.getenv("DEBUG")
