@@ -4,7 +4,6 @@ use memchr::memmem;
 pub enum ChunkSplitter {
     Byte(u8),             // Split at a specific byte, like `b'\n'`
     Bytes(&'static [u8]), // Special case for FASTQ format
-    FixedLength(usize),   // Split every N bytes
 }
 
 impl ChunkSplitter {
@@ -15,13 +14,6 @@ impl ChunkSplitter {
                 // FASTQ format has a specific structure, we look for the '@' character
                 // which indicates the start of a new record.
                 memmem::FinderRev::new(bytes).rfind(buffer)
-            }
-            ChunkSplitter::FixedLength(n) => {
-                if buffer.len() >= *n {
-                    Some(*n - 1)
-                } else {
-                    None
-                }
             }
         }
     }

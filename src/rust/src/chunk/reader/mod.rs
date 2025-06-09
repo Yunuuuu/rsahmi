@@ -1,8 +1,9 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+mod splitter;
 
-use super::splitter::ChunkSplitter;
+pub use splitter::ChunkSplitter;
 
 pub struct ChunkReader<R>
 where
@@ -65,7 +66,7 @@ where
     fn take_next(&mut self) -> Option<std::result::Result<Vec<u8>, String>> {
         match self.read_buffer() {
             Ok(0) => self.take_leftover().map(Ok),
-            Ok(_) => match self.take_chunk() {
+            Ok(_) => match self.break_chunk() {
                 Some(chunk) => Some(Ok(chunk)),
                 None => {
                     // if we have not found a chunk, we need to read more
@@ -91,7 +92,7 @@ where
         Ok(read_bytes)
     }
 
-    fn take_chunk(&mut self) -> Option<Vec<u8>> {
+    fn break_chunk(&mut self) -> Option<Vec<u8>> {
         self.splitter
             .breakpoint(&self.buffer[.. self.offset])
             .map(|pos| self.take_buffer_copy(pos))
@@ -142,17 +143,6 @@ where
 
     fn is_buffer_full(&self) -> bool {
         self.offset == self.buffer.capacity()
-    }
-}
-
-impl<R> Iterator for ChunkReader<R>
-where
-    R: Read,
-{
-    type Item = std::result::Result<Vec<u8>, String>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.take_next()
     }
 }
 

@@ -3,12 +3,12 @@ use std::fs::File;
 use std::io::BufWriter;
 
 mod io;
+mod parser;
 mod reader;
-mod splitter;
 
 use io::ChunkIO;
 use reader::ChunkReader;
-pub use splitter::ChunkSplitter;
+pub use reader::ChunkSplitter;
 
 struct ChunkFactory<F>
 where

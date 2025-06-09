@@ -11,6 +11,7 @@ name = 'rsahmi'
 
 [dependencies]
 extendr-api = '*'
+anyhow = '*'
 crossbeam-channel = { version = "*" }
 memchr = { version = "*" }
 aho-corasick = { version = "*" }
