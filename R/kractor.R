@@ -81,13 +81,131 @@ kractor <- function(kreport, koutput, reads,
                     parse_buffer = NULL,
                     read_queue = NULL, write_queue = NULL,
                     threads = NULL, odir = getwd()) {
+    rust_kractor_koutput(
+        kreport, koutput,
+        extract_koutput = extract_koutput,
+        taxon = taxon,
+        read_buffer = read_buffer,
+        write_buffer = write_buffer,
+        parse_buffer = parse_buffer,
+        read_queue = read_queue,
+        write_queue = write_queue,
+        threads = threads,
+        odir = odir,
+    )
+    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
+    extract_koutput <- file.path(odir, extract_koutput)
+    rust_kractor_reads(
+        extract_koutput, reads,
+        extract_reads = extract_reads,
+        read_buffer = read_buffer,
+        write_buffer = write_buffer,
+        parse_buffer = parse_buffer,
+        read_queue = read_queue,
+        write_queue = write_queue,
+        threads = threads,
+        odir = odir,
+    )
+    cli::cli_inform(c("v" = "Finished"))
+}
+
+rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
+                                 taxon = c(
+                                     "d__Bacteria", "d__Fungi",
+                                     "d__Viruses"
+                                 ),
+                                 read_buffer = NULL, write_buffer = NULL,
+                                 parse_buffer = NULL,
+                                 read_queue = NULL, write_queue = NULL,
+                                 threads = NULL, odir = getwd(), pprof = NULL) {
     assert_string(kreport, allow_empty = FALSE)
+    assert_string(koutput, allow_empty = FALSE)
+    assert_string(extract_koutput, allow_empty = FALSE, allow_null = TRUE)
+    taxon <- as.character(taxon)
+    if (length(taxon) == 0L) {
+        cli::cli_abort("empty {.arg taxon} provided")
+    }
+    taxids <- parse_kraken_report(kreport)$
+        explode(pl$col("ranks", "taxon"))$
+        filter(
+        pl$concat_str(
+            pl$col("ranks")$str$to_lowercase(),
+            pl$col("taxon"),
+            separator = "__"
+        )$is_in(pl$lit(taxon))
+    )$
+        select(pl$col("taxids")$list$last())$
+        to_series()$unique()
+    assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(parse_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(read_queue, min = 1, allow_null = TRUE)
+    assert_number_whole(write_queue, min = 1, allow_null = TRUE)
+    assert_number_whole(threads,
+        min = 1, max = as.double(parallel::detectCores()),
+        allow_null = TRUE
+    )
+    assert_string(odir, allow_empty = FALSE)
+    assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
+    dir_create(odir)
+
+    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
+    # take care of taxid: "A"
+    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
+        taxids <- taxids$append(c("81077", "A"))
+    }
+    # the third column of kraken2 output:
+    # Using (taxid ****)
+    patterns <- paste0("(taxid ", as.character(taxids), ")")
+    # small read buffer, so the worker threads can
+    # accept the data fast
+    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
+    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
+    parse_buffer <- parse_buffer %||% 20L
+    read_queue <- read_queue %||% 100L
+    write_queue <- write_queue %||% 100L
+    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
+    extract_koutput <- file.path(odir, extract_koutput)
+    if (is.null(pprof)) {
+        rust_call(
+            "kractor_koutput",
+            koutput,
+            patterns,
+            ofile = extract_koutput,
+            read_buffer = read_buffer,
+            write_buffer = write_buffer,
+            parse_buffer = parse_buffer,
+            read_queue = read_queue,
+            write_queue = write_queue,
+            threads = threads
+        )
+    } else {
+        rust_call(
+            "pprof_kractor_koutput",
+            koutput,
+            patterns,
+            ofile = extract_koutput,
+            read_buffer = read_buffer,
+            write_buffer = write_buffer,
+            parse_buffer = parse_buffer,
+            read_queue = read_queue,
+            write_queue = write_queue,
+            threads = threads,
+            pprof_file = file.path(odir, pprof)
+        )
+    }
+}
+
+rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
+                               read_buffer = NULL, write_buffer = NULL,
+                               parse_buffer = NULL,
+                               read_queue = NULL, write_queue = NULL,
+                               threads = NULL, odir = getwd(), pprof = NULL) {
     assert_string(koutput, allow_empty = FALSE)
     reads <- as.character(reads)
     if (length(reads) < 1L || length(reads) > 2L) {
         cli::cli_abort("{.arg reads} must be of length 1 or 2")
     }
-    assert_string(extract_koutput, allow_empty = FALSE, allow_null = TRUE)
     if (is.null(extract_reads)) {
         if (is_scalar(reads)) {
             extract_reads <- "kraken_microbiome_reads.fa"
@@ -105,11 +223,6 @@ kractor <- function(kreport, koutput, reads,
             )
         }
     }
-    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
-    taxon <- as.character(taxon)
-    if (length(taxon) == 0L) {
-        cli::cli_abort("empty {.arg taxon} provided")
-    }
     assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(parse_buffer, min = 1, allow_null = TRUE)
@@ -119,52 +232,10 @@ kractor <- function(kreport, koutput, reads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    threads <- threads %||% 1L
     assert_string(odir, allow_empty = FALSE)
+    assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)
 
-    taxids <- parse_kraken_report(kreport)$
-        explode(pl$col("ranks", "taxon"))$
-        filter(
-        pl$concat_str(
-            pl$col("ranks")$str$to_lowercase(),
-            pl$col("taxon"),
-            separator = "__"
-        )$is_in(pl$lit(taxon))
-    )$
-        select(pl$col("taxids")$list$last())$
-        to_series()$unique()
-
-    rust_kractor(
-        koutput, reads, taxids,
-        read_buffer, write_buffer, parse_buffer,
-        read_queue, write_queue,
-        extract_reads, extract_koutput, threads, odir
-    )
-    cli::cli_inform(c("v" = "Finished"))
-}
-
-rust_kractor <- function(koutput, reads, taxids,
-                         read_buffer, write_buffer, parse_buffer,
-                         read_queue, write_queue,
-                         extract_reads, extract_koutput,
-                         threads, odir) {
-    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
-    # take care of taxid: "A"
-    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
-        taxids <- taxids$append(c("81077", "A"))
-    }
-    # the third column of kraken2 output:
-    # Using (taxid ****)
-    patterns <- paste0("(taxid ", as.character(taxids), ")")
-    # small read buffer, so the worker threads can
-    # accept the data fast
-    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
-    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
-    parse_buffer <- parse_buffer %||% 20L
-    read_queue <- read_queue %||% 100L
-    write_queue <- write_queue %||% 100L
-    extract_koutput <- file.path(odir, extract_koutput)
     extract_reads <- file.path(odir, extract_reads)
     if (is_scalar(extract_reads)) {
         fq1 <- reads[[1L]]
@@ -177,16 +248,39 @@ rust_kractor <- function(koutput, reads, taxids,
         extract_read1 <- extract_reads[[1L]]
         extract_read2 <- extract_reads[[2L]]
     }
-    rust_call(
-        "kractor", koutput, patterns,
-        ofile = extract_koutput,
-        fq1 = fq1, ofile1 = extract_read1,
-        fq2 = fq2, ofile2 = extract_read2,
-        read_buffer = read_buffer,
-        write_buffer = write_buffer,
-        parse_buffer = parse_buffer,
-        read_queue = read_queue,
-        write_queue = write_queue,
-        threads = threads
-    )
+
+    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
+    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
+    parse_buffer <- parse_buffer %||% 20L
+    read_queue <- read_queue %||% 100L
+    write_queue <- write_queue %||% 100L
+    threads <- threads %||% 1L
+    if (is.null(pprof)) {
+        rust_call(
+            "kractor_reads",
+            koutput,
+            fq1 = fq1, ofile1 = extract_read1,
+            fq2 = fq2, ofile2 = extract_read2,
+            read_buffer = read_buffer,
+            write_buffer = write_buffer,
+            parse_buffer = parse_buffer,
+            read_queue = read_queue,
+            write_queue = write_queue,
+            threads = threads
+        )
+    } else {
+        rust_call(
+            "pprof_kractor_reads",
+            koutput,
+            fq1 = fq1, ofile1 = extract_read1,
+            fq2 = fq2, ofile2 = extract_read2,
+            read_buffer = read_buffer,
+            write_buffer = write_buffer,
+            parse_buffer = parse_buffer,
+            read_queue = read_queue,
+            write_queue = write_queue,
+            threads = threads,
+            pprof_file = file.path(odir, pprof)
+        )
+    }
 }

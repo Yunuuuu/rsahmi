@@ -15,9 +15,10 @@ crossbeam-channel = { version = "*" }
 memchr = { version = "*" }
 aho-corasick = { version = "*" }
 ahash = { version = "*" }
+pprof = { version = "0.14", optional = true, features = ["flamegraph"] }
 
-[dev-dependencies]
-pprof = { version = "0.14", features = ["flamegraph", "protobuf"] }
+[features]
+bench = ["dep:pprof"]
 
 [lints.clippy]
 needless_late_init = "allow"

@@ -11,50 +11,6 @@ use crate::chunk::ChunkProcessor;
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
-fn kractor(
-    koutput: &str,
-    patterns: Robj,
-    ofile: &str,
-    fq1: &str,
-    ofile1: &str,
-    fq2: Option<&str>,
-    ofile2: Option<&str>,
-    read_buffer: usize,
-    write_buffer: usize,
-    parse_buffer: usize,
-    read_queue: usize,
-    write_queue: usize,
-    threads: usize,
-) -> std::result::Result<(), String> {
-    kractor_koutput(
-        koutput,
-        patterns,
-        ofile,
-        read_buffer,
-        write_buffer,
-        parse_buffer,
-        read_queue,
-        write_queue,
-        threads,
-    )?;
-
-    kractor_reads(
-        ofile,
-        fq1,
-        ofile1,
-        fq2,
-        ofile2,
-        read_buffer,
-        write_buffer,
-        parse_buffer,
-        read_queue,
-        write_queue,
-        1,
-    )
-}
-
-#[extendr]
-#[allow(clippy::too_many_arguments)]
 fn kractor_koutput(
     koutput: &str,
     patterns: Robj,
@@ -136,9 +92,57 @@ fn kractor_reads(
     Ok(())
 }
 
+#[extendr]
+#[allow(clippy::too_many_arguments)]
+#[cfg(feature = "bench")]
+fn pprof_kractor_koutput(
+    koutput: &str,
+    patterns: Robj,
+    ofile: &str,
+    read_buffer: usize,
+    write_buffer: usize,
+    parse_buffer: usize,
+    read_queue: usize,
+    write_queue: usize,
+    threads: usize,
+    pprof_file: &str,
+) -> std::result::Result<(), String> {
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(1000)
+        .build()
+        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+    let out = kractor_koutput(
+        koutput,
+        patterns,
+        ofile,
+        read_buffer,
+        write_buffer,
+        parse_buffer,
+        read_queue,
+        write_queue,
+        threads,
+    );
+    if let Ok(report) = guard.report().build() {
+        let file = std::fs::File::create(pprof_file).unwrap();
+        let mut options = pprof::flamegraph::Options::default();
+        options.image_width = Some(2500);
+        report.flamegraph_with_options(file, &mut options).unwrap();
+    };
+    out
+}
+
+#[cfg(not(feature = "bench"))]
 extendr_module! {
     mod kractor;
-    fn kractor;
     fn kractor_koutput;
     fn kractor_reads;
+
+}
+
+#[cfg(feature = "bench")]
+extendr_module! {
+    mod kractor;
+    fn kractor_koutput;
+    fn kractor_reads;
+    fn pprof_kractor_koutput;
 }
