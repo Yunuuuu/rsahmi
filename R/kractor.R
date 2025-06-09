@@ -157,6 +157,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     # the third column of kraken2 output:
     # Using (taxid ****)
     patterns <- paste0("(taxid ", as.character(taxids), ")")
+    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
+    extract_koutput <- file.path(odir, extract_koutput)
     # small read buffer, so the worker threads can
     # accept the data fast
     read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
@@ -164,8 +166,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     parse_buffer <- parse_buffer %||% 20L
     read_queue <- read_queue %||% 100L
     write_queue <- write_queue %||% 100L
-    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
-    extract_koutput <- file.path(odir, extract_koutput)
+    threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
             "kractor_koutput",
