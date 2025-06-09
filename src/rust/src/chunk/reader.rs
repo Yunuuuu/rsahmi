@@ -121,7 +121,7 @@ where
         chunk
     }
 
-    #[warn(dead_code)]
+    #[allow(dead_code)]
     fn take_buffer_drain(&mut self, pos: usize) -> Vec<u8> {
         let chunk = self.buffer.drain(..= pos).collect::<Vec<u8>>();
         // drain won't reduce the capacity of the buffer but will remove the data
