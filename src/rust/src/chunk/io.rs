@@ -90,7 +90,7 @@ where
                 let factory = &self.factory;
                 let handle =
                     scope.spawn(move || -> std::result::Result<(), String> {
-                        let mut buffer = Vec::with_capacity(factory.buffersize);
+                        let mut buffer = Vec::with_capacity(factory.batch_size);
                         let parser = factory.processor.new_parser();
                         for chunk in parser_rx.iter() {
                             // A list of records is returned
@@ -102,7 +102,7 @@ where
                                         format!("Send to writer failed: {}", e)
                                     })?;
                                     buffer =
-                                        Vec::with_capacity(factory.buffersize);
+                                        Vec::with_capacity(factory.batch_size);
                                 }
                                 Ok(())
                             })?;

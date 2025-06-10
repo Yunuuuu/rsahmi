@@ -13,7 +13,7 @@ kractor(
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   read_buffer = NULL,
   write_buffer = NULL,
-  parse_buffer = NULL,
+  batch_size = NULL,
   read_queue = NULL,
   write_queue = NULL,
   threads = NULL,
@@ -48,14 +48,16 @@ processing. Default is \code{1 * 1024 * 1024} (1MB).}
 writing to disk. This controls the capacity of the buffered file writer.
 Default is \code{2 * 1024 * 1024} (2MB).}
 
-\item{parse_buffer}{Integer. Number of records to write per batch. Default is
-\code{20}.}
+\item{batch_size}{Integer. Number of records to accumulate before triggering
+a write operation. Default is \code{20}.}
 
 \item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or
-writing. Default is \code{2}.}
+writing. Default is \code{1000}.}
 
-\item{threads}{Integer. Number of threads to use. Default is \code{1}.}
+\item{threads}{Integer. Number of threads to use. Default is \code{1}. Performance
+is generally constrained by system call I/O, so increasing thread count may
+not substantially reduce runtime.}
 
 \item{odir}{A string of directory to save the \code{ofile}.}
 }

@@ -17,7 +17,7 @@ fn kractor_koutput(
     ofile: &str,
     read_buffer: usize,
     write_buffer: usize,
-    parse_buffer: usize,
+    batch_size: usize,
     read_queue: usize,
     write_queue: usize,
     threads: usize,
@@ -34,7 +34,7 @@ fn kractor_koutput(
         ofile,
         read_buffer,
         write_buffer,
-        parse_buffer,
+        batch_size,
         read_queue,
         write_queue,
         threads,
@@ -51,7 +51,7 @@ fn kractor_reads(
     ofile2: Option<&str>,
     read_buffer: usize,
     write_buffer: usize,
-    parse_buffer: usize,
+    batch_size: usize,
     read_queue: usize,
     write_queue: usize,
     threads: usize,
@@ -71,7 +71,7 @@ fn kractor_reads(
         ofile1,
         read_buffer,
         write_buffer,
-        parse_buffer,
+        batch_size,
         read_queue,
         write_queue,
         threads,
@@ -83,7 +83,7 @@ fn kractor_reads(
             out_file,
             read_buffer,
             write_buffer,
-            parse_buffer,
+            batch_size,
             read_queue,
             write_queue,
             threads,
@@ -101,14 +101,14 @@ fn pprof_kractor_koutput(
     ofile: &str,
     read_buffer: usize,
     write_buffer: usize,
-    parse_buffer: usize,
+    batch_size: usize,
     read_queue: usize,
     write_queue: usize,
     threads: usize,
     pprof_file: &str,
 ) -> std::result::Result<(), String> {
     let guard = pprof::ProfilerGuardBuilder::default()
-        .frequency(1000)
+        .frequency(2000)
         .build()
         .map_err(|e| format!("cannot create profile guard {:?}", e))?;
     let out = kractor_koutput(
@@ -117,7 +117,50 @@ fn pprof_kractor_koutput(
         ofile,
         read_buffer,
         write_buffer,
-        parse_buffer,
+        batch_size,
+        read_queue,
+        write_queue,
+        threads,
+    );
+    if let Ok(report) = guard.report().build() {
+        let file = std::fs::File::create(pprof_file).unwrap();
+        let mut options = pprof::flamegraph::Options::default();
+        options.image_width = Some(2500);
+        report.flamegraph_with_options(file, &mut options).unwrap();
+    };
+    out
+}
+
+#[extendr]
+#[allow(clippy::too_many_arguments)]
+#[cfg(feature = "bench")]
+fn pprof_kractor_reads(
+    koutput: &str,
+    fq1: &str,
+    ofile1: &str,
+    fq2: Option<&str>,
+    ofile2: Option<&str>,
+    read_buffer: usize,
+    write_buffer: usize,
+    batch_size: usize,
+    read_queue: usize,
+    write_queue: usize,
+    threads: usize,
+    pprof_file: &str,
+) -> std::result::Result<(), String> {
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(2000)
+        .build()
+        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+    let out = kractor_reads(
+        koutput,
+        fq1,
+        ofile1,
+        fq2,
+        ofile2,
+        read_buffer,
+        write_buffer,
+        batch_size,
         read_queue,
         write_queue,
         threads,
@@ -145,4 +188,5 @@ extendr_module! {
     fn kractor_koutput;
     fn kractor_reads;
     fn pprof_kractor_koutput;
+    fn pprof_kractor_reads;
 }

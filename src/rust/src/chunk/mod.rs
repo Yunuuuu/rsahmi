@@ -15,17 +15,17 @@ where
     F: ChunkProcessor,
 {
     processor: F,
-    buffersize: usize,
+    batch_size: usize,
 }
 
 impl<F> ChunkFactory<F>
 where
     F: ChunkProcessor,
 {
-    pub fn new(processor: F, buffersize: usize) -> Self {
+    pub fn new(processor: F, batch_size: usize) -> Self {
         Self {
             processor,
-            buffersize,
+            batch_size,
         }
     }
 }
@@ -52,7 +52,7 @@ pub trait ChunkProcessor: Sync + Sized {
         output: P,
         read_buffer: usize,
         write_buffer: usize,
-        parse_buffer: usize,
+        batch_size: usize,
         read_queue: usize,
         write_queue: usize,
         threads: usize,
@@ -78,7 +78,7 @@ pub trait ChunkProcessor: Sync + Sized {
                 )
             })?,
         );
-        let factory = ChunkFactory::new(self, parse_buffer);
+        let factory = ChunkFactory::new(self, batch_size);
         let mut io = ChunkIO::new(
             reader,
             writer,

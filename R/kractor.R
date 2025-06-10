@@ -30,14 +30,16 @@
 #' writing to disk. This controls the capacity of the buffered file writer.
 #' Default is `2 * 1024 * 1024` (2MB).
 #'
-#' @param parse_buffer Integer. Number of records to write per batch. Default is
-#'   `20`.
+#' @param batch_size Integer. Number of records to accumulate before triggering
+#' a write operation. Default is `20`.
 #'
 #' @param read_queue,write_queue Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or
-#'   writing. Default is `2`.
+#'   writing. Default is `1000`.
 #'
-#' @param threads Integer. Number of threads to use. Default is `1`.
+#' @param threads Integer. Number of threads to use. Default is `1`. Performance
+#' is generally constrained by system call I/O, so increasing thread count may
+#' not substantially reduce runtime.
 #'
 #' @param odir A string of directory to save the `ofile`.
 #'
@@ -78,7 +80,7 @@ kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                     read_buffer = NULL, write_buffer = NULL,
-                    parse_buffer = NULL,
+                    batch_size = NULL,
                     read_queue = NULL, write_queue = NULL,
                     threads = NULL, odir = getwd()) {
     rust_kractor_koutput(
@@ -87,20 +89,19 @@ kractor <- function(kreport, koutput, reads,
         taxon = taxon,
         read_buffer = read_buffer,
         write_buffer = write_buffer,
-        parse_buffer = parse_buffer,
+        batch_size = batch_size,
         read_queue = read_queue,
         write_queue = write_queue,
         threads = threads,
         odir = odir,
     )
-    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
-    extract_koutput <- file.path(odir, extract_koutput)
     rust_kractor_reads(
-        extract_koutput, reads,
+        file.path(odir, extract_koutput %||% "kraken_microbiome_output.txt"),
+        reads = reads,
         extract_reads = extract_reads,
         read_buffer = read_buffer,
         write_buffer = write_buffer,
-        parse_buffer = parse_buffer,
+        batch_size = batch_size,
         read_queue = read_queue,
         write_queue = write_queue,
         threads = threads,
@@ -115,7 +116,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
                                      "d__Viruses"
                                  ),
                                  read_buffer = NULL, write_buffer = NULL,
-                                 parse_buffer = NULL,
+                                 batch_size = NULL,
                                  read_queue = NULL, write_queue = NULL,
                                  threads = NULL, odir = getwd(), pprof = NULL) {
     assert_string(kreport, allow_empty = FALSE)
@@ -138,7 +139,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
         to_series()$unique()
     assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
-    assert_number_whole(parse_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
     assert_number_whole(read_queue, min = 1, allow_null = TRUE)
     assert_number_whole(write_queue, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
@@ -163,9 +164,9 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     # accept the data fast
     read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
     write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
-    parse_buffer <- parse_buffer %||% 20L
-    read_queue <- read_queue %||% 100L
-    write_queue <- write_queue %||% 100L
+    batch_size <- batch_size %||% 20L
+    read_queue <- read_queue %||% 1000L
+    write_queue <- write_queue %||% 1000L
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
@@ -175,7 +176,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
             ofile = extract_koutput,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
-            parse_buffer = parse_buffer,
+            batch_size = batch_size,
             read_queue = read_queue,
             write_queue = write_queue,
             threads = threads
@@ -188,7 +189,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
             ofile = extract_koutput,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
-            parse_buffer = parse_buffer,
+            batch_size = batch_size,
             read_queue = read_queue,
             write_queue = write_queue,
             threads = threads,
@@ -199,7 +200,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
 
 rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
                                read_buffer = NULL, write_buffer = NULL,
-                               parse_buffer = NULL,
+                               batch_size = NULL,
                                read_queue = NULL, write_queue = NULL,
                                threads = NULL, odir = getwd(), pprof = NULL) {
     assert_string(koutput, allow_empty = FALSE)
@@ -226,7 +227,7 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
     }
     assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
-    assert_number_whole(parse_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
     assert_number_whole(read_queue, min = 1, allow_null = TRUE)
     assert_number_whole(write_queue, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
@@ -252,9 +253,9 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
 
     read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
     write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
-    parse_buffer <- parse_buffer %||% 20L
-    read_queue <- read_queue %||% 100L
-    write_queue <- write_queue %||% 100L
+    batch_size <- batch_size %||% 20L
+    read_queue <- read_queue %||% 1000L
+    write_queue <- write_queue %||% 1000L
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
@@ -264,7 +265,7 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
             fq2 = fq2, ofile2 = extract_read2,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
-            parse_buffer = parse_buffer,
+            batch_size = batch_size,
             read_queue = read_queue,
             write_queue = write_queue,
             threads = threads
@@ -277,7 +278,7 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
             fq2 = fq2, ofile2 = extract_read2,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
-            parse_buffer = parse_buffer,
+            batch_size = batch_size,
             read_queue = read_queue,
             write_queue = write_queue,
             threads = threads,

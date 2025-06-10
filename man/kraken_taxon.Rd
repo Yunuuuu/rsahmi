@@ -18,10 +18,11 @@ kraken_taxon(
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   read_buffer = NULL,
   write_buffer = NULL,
-  parse_buffer = NULL,
+  batch_size = NULL,
   read_queue = NULL,
   write_queue = NULL,
-  threads = NULL,
+  kraken2_threads = NULL,
+  kractor_threads = NULL,
   kraken2 = NULL,
   envpath = NULL,
   overwrite = FALSE,
@@ -68,14 +69,19 @@ processing. Default is \code{1 * 1024 * 1024} (1MB).}
 writing to disk. This controls the capacity of the buffered file writer.
 Default is \code{2 * 1024 * 1024} (2MB).}
 
-\item{parse_buffer}{Integer. Number of records to write per batch. Default is
-\code{20}.}
+\item{batch_size}{Integer. Number of records to accumulate before triggering
+a write operation. Default is \code{20}.}
 
 \item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or
-writing. Default is \code{2}.}
+writing. Default is \code{1000}.}
 
-\item{threads}{Integer. Number of threads to use. Default is \code{1}.}
+\item{kraken2_threads}{Integer. Number of threads to use. Default to all
+available threads.}
+
+\item{kractor_threads}{Integer. Number of threads to use. Default is \code{1}.
+Performance is generally constrained by system call I/O, so increasing thread
+count may not substantially reduce runtime.}
 
 \item{kraken2}{A string of path to \code{kraken2} command.}
 
@@ -91,8 +97,10 @@ None. This function generates the following files:
 \itemize{
 \item \code{kreport}: the \code{kraken2} report file.
 \item \code{koutput}: the \code{kraken2} output file.
-\item \code{classified_out}: the classified sequence file(s) from \code{kraken2}.
-\item \code{unclassified_out}: the unclassified sequence file(s) from \code{kraken2}.
+\item \code{classified_out}: the classified sequence file(s) from \code{kraken2}. Not
+required for downstream processing.
+\item \code{unclassified_out}: the unclassified sequence file(s) from \code{kraken2}. Not
+required for downstream processing.
 \item \code{extract_koutput}: Kraken2 output entries corresponding to the specified
 \code{taxon}, extracted from koutput.
 \item \code{extract_reads}: Sequence file(s) containing reads assigned to the

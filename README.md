@@ -43,7 +43,7 @@ or from [GitHub](https://github.com/Yunuuuu/rsahmi) with:
 pak::pak("Yunuuuu/rsahmi")
 ```
 
-You must also install [seqkit](https://bioinf.shenwei.me/seqkit/) and
+You must also install
 [kraken2](https://github.com/DerrickWood/kraken2/wiki/Manual).
 
 Additionally, `rsahmi` relies on
@@ -53,70 +53,47 @@ package.
 
 ## Workflow
 
-``` r
-library(ggplot2)
-```
-
 Prepare the output directory and input data
 
 ``` r
-odir <- "rsahmi"
+odir <- "rsahmi" # Specify your output directory
 # For 10x Genomic data, `fq1` only contain barcode and umi, but the official
 # didn't give any information for this. In this way, I prefer using `umi-tools`
 # to transform the `umi` into fq2 and then run `rsahmi` with only fq2.
-fq1 <-
-fq2 <- # can be `NULL`
-kraken_db <- # specify the kraken database
+fq1 <-      # Sequence file
+fq2 <- NULL # can be `NULL`
 if (dir.exists(odir)) dir.create(odir, recursive = TRUE)
 ```
 
-### Taxonomic sequence classifier
+### Taxonomic classifier
 
-We must run `kraken2` with `--use-names`, and `--report-minimizer-data`,
-`classified_out` is not necessary in `rsahmi` package, but should be
-specified if you want to use official `SAHMI` script.
+Note: Replace `sample` with your actual sample name, and run the
+following code for each of your samples. The function will generate the
+following files in the `odir`, corresponding to the specified
+arguments::
+
+- `kreport`: the `kraken2` report file.
+- `koutput`: the `kraken2` output file.
+- `classified_out`: the classified sequence file(s) from `kraken2`. Not
+  required for downstream processing.
+- `unclassified_out`: the unclassified sequence file(s) from `kraken2`.
+  Not required for downstream processing.
+- `extract_koutput`: Kraken2 output entries corresponding to the
+  specified `taxon`, extracted from koutput.
+- `extract_reads`: Sequence file(s) containing reads assigned to the
+  specified `taxon`.
 
 ``` r
-blit::kraken2(
+kraken_taxon(
     fq1 = fq1,
     fq2 = fq2,
-    classified_out = "classified.fq",
-    blit::arg("--threads", 10L, format = "%d"),
-    blit::arg("--db", kraken_db),
-    "--use-names", "--report-minimizer-data",
-    # Note: you should change `sample` into your sample name
-    odir = file.path(odir, sample)
-) |> blit::cmd_run()
-```
-
-### Extract microbiome kraken output
-
-``` r
-# Note: you should change `sample` into your sample name
-#
-# this'll extract all taxids specified in `taxon`
-# which default to: c("d__Bacteria", "d__Fungi", "d__Viruses")
-taxids <- rsahmi::extract_taxids(file.path(odir, sample, "kraken_report.txt"))
-# then we extract the kraken2 output for these taxon.
-rsahmi::extract_kraken_output(
-    file.path(odir, sample, "kraken_output.txt"),
-    taxids = taxids,
-    dir = file.path(odir, sample)
-)
-```
-
-### Extract microbiome kraken reads
-
-``` r
-# Note: you should change `sample` into your sample name
-rsahmi::extract_kraken_reads(
-    kraken_out = file.path(odir, sample, "kraken_microbiome_output.txt"),
-    reads = c(fq1, fq2),
+    # kraken2 database
+    db = NULL,
+    # Replace `sample` with your actual sample name. This will place the results
+    # for each sample into its own directory.
     odir = file.path(odir, sample),
-    threads = 10L,
-    # try to change `seqkit` argument into your seqkit path
-    # If `NULL`, the internal will detect it in your `PATH` environment variable
-    seqkit = NULL
+    # kraken2 command path
+    kraken2 = NULL
 )
 ```
 
@@ -151,6 +128,7 @@ sahmi_datasets <- lapply(paths, function(dir) {
 
 ``` r
 library(polars) # rsahmi dependents on `polars`
+library(ggplot2)
 truly_microbe <- rsahmi::remove_contaminants(
     file.path(paths, "kraken_report.txt"),
     quantile = 0.99, exclusive = FALSE
@@ -209,7 +187,7 @@ umi_list <- lapply(sahmi_datasets, function(dataset) {
     real_taxids <- real_taxids$filter(real_taxids$is_in(real_taxids_slsd))
     # remove contaminants
     real_taxids <- real_taxids$filter(
-        real_taxids$is_in(attr(truly_microbe, "truly"))
+        real_taxids$is_in(attr(truly_microbe, "truly", exact = TRUE))
     )
     # filter UMI data
     dataset$umi$filter(pl$col("taxid")$is_in(real_taxids))
@@ -263,16 +241,8 @@ sessionInfo()
 #> attached base packages:
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
-#> other attached packages:
-#> [1] ggplot2_3.5.2.9000
-#> 
 #> loaded via a namespace (and not attached):
-#>  [1] vctrs_0.6.5        cli_3.6.3          knitr_1.49         rlang_1.1.4       
-#>  [5] xfun_0.49          generics_0.1.3     glue_1.8.0         htmltools_0.5.8.1 
-#>  [9] scales_1.4.0       fansi_1.0.6        rmarkdown_2.29     grid_4.4.2        
-#> [13] evaluate_1.0.1     tibble_3.2.1       fastmap_1.2.0      yaml_2.3.10       
-#> [17] lifecycle_1.0.4    compiler_4.4.2     dplyr_1.1.4        RColorBrewer_1.1-3
-#> [21] pkgconfig_2.0.3    farver_2.1.2       digest_0.6.37      R6_2.5.1          
-#> [25] tidyselect_1.2.1   utf8_1.2.4         pillar_1.9.0       magrittr_2.0.3    
-#> [29] withr_3.0.2        tools_4.4.2        gtable_0.3.6
+#>  [1] compiler_4.4.2    fastmap_1.2.0     cli_3.6.5         tools_4.4.2      
+#>  [5] htmltools_0.5.8.1 yaml_2.3.10       rmarkdown_2.29    knitr_1.49       
+#>  [9] xfun_0.52         digest_0.6.37     rlang_1.1.6       evaluate_1.0.3
 ```
