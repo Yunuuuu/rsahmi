@@ -60,8 +60,8 @@ odir <- "rsahmi" # Specify your output directory
 # For 10x Genomic data, `fq1` only contain barcode and umi, but the official
 # didn't give any information for this. In this way, I prefer using `umi-tools`
 # to transform the `umi` into fq2 and then run `rsahmi` with only fq2.
-fq1 <-      # Sequence file
-fq2 <- NULL # can be `NULL`
+fq1 <- # Sequence file
+    fq2 <- NULL # can be `NULL`
 if (dir.exists(odir)) dir.create(odir, recursive = TRUE)
 ```
 
@@ -131,13 +131,13 @@ library(polars) # rsahmi dependents on `polars`
 library(ggplot2)
 truly_microbe <- rsahmi::remove_contaminants(
     file.path(paths, "kraken_report.txt"),
-    quantile = 0.99, exclusive = FALSE
+    quantile = 0.99, drop_unmatched_taxa = TRUE
 )
 microbe_for_plot <- attr(truly_microbe, "truly")[
     order(attr(truly_microbe, "pvalue")[attr(truly_microbe, "truly")])
 ]
 microbe_for_plot <- microbe_for_plot[
-    !microbe_for_plot %in% attr(truly_microbe, "exclusive")
+    !microbe_for_plot %in% attr(truly_microbe, "unmatched_taxa")
 ]
 
 truly_microbe_density <- ggplot(
