@@ -67,10 +67,8 @@ if (dir.exists(odir)) dir.create(odir, recursive = TRUE)
 
 ### Taxonomic classifier
 
-Note: Replace `sample` with your actual sample name, and run the
-following code for each of your samples. The function will generate the
-following files in the `odir`, corresponding to the specified
-arguments::
+The function will generate the following files in the `odir`,
+corresponding to the specified arguments::
 
 - `kreport`: the `kraken2` report file.
 - `koutput`: the `kraken2` output file.
@@ -82,6 +80,9 @@ arguments::
   specified `taxon`, extracted from `koutput`.
 - `extract_reads`: Sequence file(s) containing reads assigned to the
   specified `taxon`.
+
+> Replace `sample` with your actual sample name, and run the following
+> code for each of your samples.
 
 ``` r
 kraken_taxon(
