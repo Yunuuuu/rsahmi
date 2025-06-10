@@ -58,13 +58,13 @@ Identifying contaminants and false positives taxa (cell line quantile test)
 # `blit::kraken2()`
 truly_microbe <- remove_contaminants(
     kreports = file.path(paths, "kraken_report.txt"),
-    quantile = 0.99, exclusive = FALSE
+    quantile = 0.99, drop_unmatched_taxa = TRUE
 )
 microbe_for_plot <- attr(truly_microbe, "truly")[
     order(attr(truly_microbe, "pvalue")[attr(truly_microbe, "truly")])
 ]
 microbe_for_plot <- microbe_for_plot[
-    !microbe_for_plot \%in\% attr(truly_microbe, "exclusive")
+    !microbe_for_plot \%in\% attr(truly_microbe, "unmatched_taxa")
 ]
 ggplot(
     truly_microbe$filter(pl$col("taxid")$is_in(microbe_for_plot))$
