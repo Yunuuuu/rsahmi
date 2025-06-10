@@ -97,9 +97,8 @@ kraken_taxon(
 )
 ```
 
-**Following workflow will need all samples (multiple), you should run
-above command for your all samples, then proceed to the subsequent
-steps.**
+**The following workflow requires all samples. Please run the above
+command for each of your samples before proceeding to the next steps.**
 
 ### Prepare datasets for signal denoising and taxa counting
 
