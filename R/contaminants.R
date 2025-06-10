@@ -10,16 +10,17 @@
 #' @param alternative A string specifying the alternative hypothesis, must be
 #' one of "two.sided", "greater" (default) or "less". You can specify just the
 #' initial letter.
-#' @param exclusive A boolean value, indicates whether taxa not found in
-#' celllines data should be regarded as truly. Default: `FALSE`.
+#' @param drop_unmatched_taxa A boolean value, indicates whether taxa not found
+#' in celllines data should be dropped. Default: `TRUE`.
 #' @return A polars [DataFrame][polars::DataFrame_class] with following
 #' attributes:
 #' 1. `pvalues`: Quantile test pvalue.
-#' 2. `exclusive`: taxids in current study but not found in cellline data.
+#' 2. `unmatched_taxa`: taxids in current study but not found in cellline data.
 #' 3. `significant`: significant taxids with `pvalues < alpha`.
-#' 4. `truly`: truly taxids based on `alpha` and `exclusive`. If `exclusive` is
-#'    `TRUE`, this should be the union of `exclusive` and `significant`,
-#'    otherwise, this should be the same with `significant`.
+#' 4. `truly`: truly taxids based on `alpha` and `unmatched_taxa`. If
+#'    `drop_unmatched_taxa` isn't `TRUE`, this should be the union of
+#'    `unmatched_taxa` and `significant`, otherwise, this should be the same
+#'    with `significant`.
 #' @examples
 #' \dontrun{
 #' # `paths` should be the output directory for each sample from
@@ -58,7 +59,7 @@ remove_contaminants <- function(kreports, study = "current study",
                                 ),
                                 quantile = 0.95, alpha = 0.05,
                                 alternative = "greater",
-                                exclusive = FALSE) {
+                                drop_unmatched_taxa = TRUE) {
     use_polars()
     alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
     cli::cli_alert_info("Parsing reads per million microbiome reads (rpmm)")
@@ -90,10 +91,10 @@ remove_contaminants <- function(kreports, study = "current study",
             alternative = alternative
         )
     }, rpmm = rpmm_list, taxid = taxids, USE.NAMES = FALSE)
-    exclusive_taxids <- setdiff(taxids, names(ref_quantile))
+    unmatched_taxa <- setdiff(taxids, names(ref_quantile))
     truly <- significant <- taxids[!is.na(pvalues) & pvalues < alpha]
-    if (isTRUE(exclusive)) {
-        truly <- union(exclusive_taxids, truly)
+    if (!isTRUE(drop_unmatched_taxa)) {
+        truly <- union(unmatched_taxa, truly)
     }
 
     # collect results and return ----------------
@@ -104,7 +105,7 @@ remove_contaminants <- function(kreports, study = "current study",
             how = "vertical"
         ),
         pvalues = structure(pvalues, names = taxids),
-        exclusive = exclusive_taxids,
+        unmatched_taxa = unmatched_taxa,
         significant = significant,
         truly = truly
     )
