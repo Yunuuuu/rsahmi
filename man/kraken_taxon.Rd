@@ -102,7 +102,7 @@ required for downstream processing.
 \item \code{unclassified_out}: the unclassified sequence file(s) from \code{kraken2}. Not
 required for downstream processing.
 \item \code{extract_koutput}: Kraken2 output entries corresponding to the specified
-\code{taxon}, extracted from koutput.
+\code{taxon}, extracted from \code{koutput}.
 \item \code{extract_reads}: Sequence file(s) containing reads assigned to the
 specified \code{taxon}.
 }

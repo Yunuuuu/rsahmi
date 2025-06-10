@@ -79,7 +79,7 @@ arguments::
 - `unclassified_out`: the unclassified sequence file(s) from `kraken2`.
   Not required for downstream processing.
 - `extract_koutput`: Kraken2 output entries corresponding to the
-  specified `taxon`, extracted from koutput.
+  specified `taxon`, extracted from `koutput`.
 - `extract_reads`: Sequence file(s) containing reads assigned to the
   specified `taxon`.
 
