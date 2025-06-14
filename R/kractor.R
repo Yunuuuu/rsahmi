@@ -110,6 +110,10 @@ kractor <- function(kreport, koutput, reads,
     cli::cli_inform(c("v" = "Finished"))
 }
 
+BATCH_SIZE <- 200L
+READ_BUFFER <- 2L * 1024L * 1024L
+WRITE_BUFFER <- 1L * 1024L * 1024L
+
 rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
                                  taxon = c(
                                      "d__Bacteria", "d__Fungi",
@@ -140,8 +144,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
-    assert_number_whole(read_queue, min = 1, allow_null = TRUE)
-    assert_number_whole(write_queue, min = 1, allow_null = TRUE)
+    assert_number_whole(read_queue, min = 0, allow_null = TRUE)
+    assert_number_whole(write_queue, min = 0, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
@@ -162,18 +166,20 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     extract_koutput <- file.path(odir, extract_koutput)
     # small read buffer, so the worker threads can
     # accept the data fast
-    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
-    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
-    batch_size <- batch_size %||% 20L
-    read_queue <- read_queue %||% 1000L
-    write_queue <- write_queue %||% 1000L
+    read_buffer <- read_buffer %||% READ_BUFFER
+    write_buffer <- write_buffer %||% WRITE_BUFFER
+    batch_size <- batch_size %||% BATCH_SIZE
+    read_queue <- read_queue %||%
+        max(ceiling(READ_BUFFER / read_buffer), 1L)
+    write_queue <- write_queue %||%
+        max(ceiling(WRITE_BUFFER / write_buffer), 1L)
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
             "kractor_koutput",
             koutput,
-            patterns,
             ofile = extract_koutput,
+            patterns = patterns,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
             batch_size = batch_size,
@@ -185,8 +191,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
         rust_call(
             "pprof_kractor_koutput",
             koutput,
-            patterns,
             ofile = extract_koutput,
+            patterns = patterns,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
             batch_size = batch_size,
@@ -198,7 +204,9 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     }
 }
 
-rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
+rust_kractor_reads <- function(koutput, reads,
+                               extract_reads = NULL,
+                               ubread = NULL, ub_pattern = NULL,
                                read_buffer = NULL, write_buffer = NULL,
                                batch_size = NULL,
                                read_queue = NULL, write_queue = NULL,
@@ -225,11 +233,18 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
             )
         }
     }
+    if (!identical(is.null(ubread), is.null(ub_pattern))) {
+        cli::cli_abort(paste(
+            "Both {.arg ubread} and {.arg ub_pattern} must be provided",
+            "to extract {.field UMI} and {.field Cell Barcode}"
+        ))
+    }
+    assert_string(ubread, allow_empty = FALSE, allow_null = TRUE)
     assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
-    assert_number_whole(read_queue, min = 1, allow_null = TRUE)
-    assert_number_whole(write_queue, min = 1, allow_null = TRUE)
+    assert_number_whole(read_queue, min = 0, allow_null = TRUE)
+    assert_number_whole(write_queue, min = 0, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
@@ -251,11 +266,13 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
         extract_read2 <- extract_reads[[2L]]
     }
 
-    read_buffer <- read_buffer %||% (1 * 1024L * 1024L) # DEFAULT_BUF_SIZE 1MB
-    write_buffer <- write_buffer %||% (2 * 1024L * 1024L) # 2MB
-    batch_size <- batch_size %||% 20L
-    read_queue <- read_queue %||% 1000L
-    write_queue <- write_queue %||% 1000L
+    read_buffer <- read_buffer %||% READ_BUFFER
+    write_buffer <- write_buffer %||% WRITE_BUFFER
+    batch_size <- batch_size %||% BATCH_SIZE
+    read_queue <- read_queue %||%
+        max(ceiling(READ_BUFFER / read_buffer), 1L)
+    write_queue <- write_queue %||%
+        max(ceiling(WRITE_BUFFER / write_buffer), 1L)
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
@@ -263,6 +280,7 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
             koutput,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
+            ubread = ubread, ub_pattern = ub_pattern,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
             batch_size = batch_size,
@@ -276,6 +294,7 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
             koutput,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
+            ubread = ubread, ub_pattern = ub_pattern,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
             batch_size = batch_size,

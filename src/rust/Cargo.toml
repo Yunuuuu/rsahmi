@@ -3,7 +3,7 @@ name = 'rsahmi'
 publish = false
 version = '0.1.0'
 edition = '2021'
-rust-version = '1.65'
+rust-version = '1.87'
 
 [lib]
 crate-type = ['staticlib']
@@ -11,11 +11,16 @@ name = 'rsahmi'
 
 [dependencies]
 extendr-api = '*'
+anyhow = '*'
 crossbeam-channel = { version = "*" }
 memchr = { version = "*" }
 aho-corasick = { version = "*" }
 ahash = { version = "*" }
 pprof = { version = "0.14", optional = true, features = ["flamegraph"] }
+
+[dev-dependencies]
+tempfile = '*'
+rand = "0.8"
 
 [features]
 bench = ["dep:pprof"]
