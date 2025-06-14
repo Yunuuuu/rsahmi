@@ -24,18 +24,18 @@
 #'
 #' @param read_buffer Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during
-#' processing. Default is `1 * 1024 * 1024` (1MB).
+#' processing. Default is `2 * 1024 * 1024` (1MB).
 #'
 #' @param write_buffer Integer specifying the buffer size in bytes used for
 #' writing to disk. This controls the capacity of the buffered file writer.
-#' Default is `2 * 1024 * 1024` (2MB).
+#' Default is `1 * 1024 * 1024` (2MB).
 #'
 #' @param batch_size Integer. Number of records to accumulate before triggering
-#' a write operation. Default is `20`.
+#' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
 #'
 #' @param read_queue,write_queue Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or
-#'   writing. Default is `1000`.
+#'   writing.
 #'
 #' @param threads Integer. Number of threads to use. Default is `1`. Performance
 #' is generally constrained by system call I/O, so increasing thread count may
@@ -169,10 +169,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     read_buffer <- read_buffer %||% READ_BUFFER
     write_buffer <- write_buffer %||% WRITE_BUFFER
     batch_size <- batch_size %||% BATCH_SIZE
-    read_queue <- read_queue %||%
-        max(ceiling(READ_BUFFER / read_buffer), 1L)
-    write_queue <- write_queue %||%
-        max(ceiling(WRITE_BUFFER / write_buffer), 1L)
+    read_queue <- read_queue %||% ceiling(READ_BUFFER / read_buffer)
+    write_queue <- write_queue %||% ceiling(WRITE_BUFFER / write_buffer)
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
@@ -269,10 +267,8 @@ rust_kractor_reads <- function(koutput, reads,
     read_buffer <- read_buffer %||% READ_BUFFER
     write_buffer <- write_buffer %||% WRITE_BUFFER
     batch_size <- batch_size %||% BATCH_SIZE
-    read_queue <- read_queue %||%
-        max(ceiling(READ_BUFFER / read_buffer), 1L)
-    write_queue <- write_queue %||%
-        max(ceiling(WRITE_BUFFER / write_buffer), 1L)
+    read_queue <- read_queue %||% ceiling(READ_BUFFER / read_buffer)
+    write_queue <- write_queue %||% ceiling(WRITE_BUFFER / write_buffer)
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
