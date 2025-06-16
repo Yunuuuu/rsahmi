@@ -57,30 +57,33 @@ pub fn reader_kractor_koutput(
         // second thread, used to filter lines
         let parser_handle = scope.spawn(|| {
             let matcher_ref = &matcher;
+            let parser_batch_tx =
+                BatchSender::with_capacity(batch_size, parser_tx);
             rayon::scope(|s| -> Result<()> {
-                let mut parser_batch_tx =
-                    BatchSender::with_capacity(batch_size, parser_tx);
+                let mut main_tx = parser_batch_tx.clone();
                 let mut leftover: Option<Bytes> = None;
                 let mut start;
                 for chunk in parser_rx {
                     // merge the leftover with current chunk
-                    if let Some(prev) = leftover {
+                    if let Some(head) = leftover {
                         // Combine previous partial line with new chunk — 1 allocation, unavoidable
                         if let Some(pos) = memchr(b'\n', &chunk) {
-                            let end = chunk.slice(..= pos);
-                            let line: Bytes =
-                                prev.iter().chain(&end).copied().collect();
+                            let line: Bytes = head
+                                .iter()
+                                .chain(&chunk[..= pos])
+                                .copied()
+                                .collect();
                             if kractor_match_aho(matcher_ref, &line) {
-                                parser_batch_tx.send(line)?;
+                                main_tx.send(line)?;
                             };
                             start = pos + 1;
                         } else {
-                            let line: Vec<u8> = prev
+                            let line: Bytes = head
                                 .iter()
                                 .chain(chunk.iter())
                                 .copied()
                                 .collect();
-                            leftover = Some(Bytes::from(line));
+                            leftover = Some(line);
                             continue;
                         }
                     } else {
@@ -93,21 +96,28 @@ pub fn reader_kractor_koutput(
                         let records = chunk.slice(start ..= start + pos);
                         let mut tx = parser_batch_tx.clone();
                         s.spawn(move |_| {
-                            let mut start = 0;
+                            let mut line_start = 0;
                             while let Some(pos) =
-                                memchr(b'\n', &records[start ..])
+                                memchr(b'\n', &records[line_start ..])
                             {
-                                let end = start + pos + 1;
-                                let line = records.slice(start .. end);
+                                let line = records
+                                    .slice(line_start ..= line_start + pos);
                                 if kractor_match_aho(matcher_ref, &line) {
-                                    let _ = tx.send(line);
+                                    match tx.send(line) {
+                                        // Only error when `writer_handle` return error
+                                        Err(_) => {
+                                            return ();
+                                        }
+                                        Ok(_) => {}
+                                    };
                                 }
-                                start = end
+                                line_start += pos + 1
                             }
                             let _ = tx.flush();
                         });
                         start += pos + 1;
                     }
+                    // handle trailing bytes (no newline)
                     if start < chunk.len() {
                         leftover = Some(chunk.slice(start ..)); // save remainder (no copy)
                     } else {
@@ -116,10 +126,10 @@ pub fn reader_kractor_koutput(
                 }
                 if let Some(line) = leftover {
                     if kractor_match_aho(matcher_ref, &line) {
-                        parser_batch_tx.send(Bytes::from(line))?;
+                        main_tx.send(Bytes::from(line))?;
                     }
                 }
-                parser_batch_tx.flush()?;
+                main_tx.flush()?;
                 Ok(())
             })
         });
@@ -195,17 +205,11 @@ pub fn mmap_kractor_koutput(
 
         // second thread, used to filter lines
         let parser_handle = scope.spawn(|| {
-            let parser_err = AtomicBool::new(false); // Shared error flag
+            let matcher_ref = &matcher;
+            let parser_batch_tx =
+                BatchSender::with_capacity(batch_size, parser_tx);
             rayon::scope(|s| {
-                let parser_batch_tx =
-                    BatchSender::with_capacity(batch_size, parser_tx);
                 for chunk in parser_rx {
-                    // early exit when `writer_handle` return error
-                    if parser_err.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let parser_err_ref = &parser_err;
-                    let matcher_ref = &matcher;
                     // let taxid_sets_ref = &taxid_sets;
                     let mut tx = parser_batch_tx.clone();
                     s.spawn(move |_| {
@@ -213,33 +217,18 @@ pub fn mmap_kractor_koutput(
                             if kractor_match_aho(matcher_ref, line) {
                                 match tx.send(line) {
                                     // Only error when `writer_handle` return error
+                                    // So we just omit the error information
                                     Err(_) => {
-                                        if parser_err_ref
-                                            .fetch_not(Ordering::Relaxed)
-                                        {
-                                            parser_err_ref
-                                                .store(true, Ordering::Relaxed)
-                                        }
-                                        break;
+                                        return ();
                                     }
                                     Ok(_) => continue,
                                 };
                             }
                         }
-                        if let Err(_) = tx.flush() {
-                            // Only error when `writer_handle` return error
-                            if !parser_err_ref.load(Ordering::Relaxed) {
-                                parser_err_ref.store(true, Ordering::Relaxed)
-                            }
-                        }
+                        let _ = tx.flush();
                     });
                 }
             });
-            if parser_err.load(Ordering::Relaxed) {
-                Err(anyhow!("Failed to send to Writer thread"))
-            } else {
-                Ok(())
-            }
         });
 
         // third thread, used to read lines
@@ -267,13 +256,12 @@ pub fn mmap_kractor_koutput(
         reader_handle
             .join()
             .map_err(|e| anyhow!("Reader thread panicked: {:?}", e))??;
-        let parser_result = parser_handle
+        parser_handle
             .join()
             .map_err(|e| anyhow!("Parser thread panicked: {:?}", e))?;
         writer_handle
             .join()
             .map_err(|e| anyhow!("Writer thread panicked: {:?}", e))??;
-        parser_result?; // Only error when `writer_handle` return error
         Ok(())
     })
 }
@@ -285,6 +273,7 @@ static KOUTPUT_TAXID_PREFIX_FINDERREV: std::sync::LazyLock<memmem::FinderRev> =
 
 #[allow(dead_code)]
 fn kractor_match_aho(matcher: &AhoCorasick, line: &[u8]) -> bool {
+    // println!("Matching line: {:?}", String::from_utf8_lossy(line));
     // Efficient 3rd column parsing
     let mut field_start = 0usize;
     let mut field_index = 0usize;

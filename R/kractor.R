@@ -170,7 +170,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     }
     write_buffer <- write_buffer %||% WRITE_BUFFER
     batch_size <- batch_size %||% BATCH_SIZE
-    threads <- threads %||% 0L
+    threads <- threads %||% 0L # Let rayon to determine the threads
     if (is.null(pprof)) {
         rust_call(
             "kractor_koutput",
