@@ -24,13 +24,17 @@ impl<T> BatchSender<T> {
     }
 
     pub fn send(&mut self, msg: T) -> Result<(), SendError<Vec<T>>> {
-        if self.msg_vec.len() >= self.msg_vec.capacity() {
-            let mut pack = Vec::with_capacity(self.capacity);
-            std::mem::swap(&mut self.msg_vec, &mut pack);
-            self.tx.send(pack)?
+        if self.msg_vec.capacity() == 0 {
+            self.tx.send(vec![msg])
+        } else {
+            if self.msg_vec.len() >= self.msg_vec.capacity() {
+                let mut pack = Vec::with_capacity(self.capacity);
+                std::mem::swap(&mut self.msg_vec, &mut pack);
+                self.tx.send(pack)?
+            }
+            self.msg_vec.push(msg);
+            Ok(())
         }
-        self.msg_vec.push(msg);
-        Ok(())
     }
 
     pub fn flush(&mut self) -> Result<(), SendError<Vec<T>>> {
