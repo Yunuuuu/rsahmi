@@ -46,7 +46,7 @@ processing. Default is \code{NULL}, which enables memory-mapped file access.
 Memory mapping is highly efficient for multi-threaded reading and avoids
 redundant copying. However, its performance and behavior may depend on the
 operating system and file system. If set to \code{0}, it will fall back to a
-default size of \code{1 * 1024 * 1024} (1MB).}
+size of \code{1 * 1024 * 1024} (1MB).}
 
 \item{write_buffer}{Integer specifying the buffer size in bytes used for
 writing to disk. This controls the capacity of the buffered file writer.

@@ -25,7 +25,7 @@
 #' Memory mapping is highly efficient for multi-threaded reading and avoids
 #' redundant copying. However, its performance and behavior may depend on the
 #' operating system and file system. If set to `0`, it will fall back to a
-#' default size of `1 * 1024 * 1024` (1MB).
+#' size of `1 * 1024 * 1024` (1MB).
 #' @param write_buffer Integer specifying the buffer size in bytes used for
 #' writing to disk. This controls the capacity of the buffered file writer.
 #' Default is `1 * 1024 * 1024` (1MB). If set to `0`, it will fall back to a
