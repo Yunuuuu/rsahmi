@@ -1,6 +1,5 @@
 use extendr_api::prelude::*;
 mod batchsender;
-mod io;
 mod koutput;
 // mod reads;
 

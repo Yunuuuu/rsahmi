@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
