@@ -34,7 +34,7 @@ matching the specified \code{taxon} will be saved. Defaults to
 
 \item{extract_reads}{A character vector of the same length as \code{reads},
 specifying the output FASTQ file(s) where the matching reads will be saved.
-Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}}
+Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
 
 \item{taxon}{An atomic character specify the taxa name wanted. Should follow
 the kraken style, connected by rank codes, two underscores, and the
@@ -42,22 +42,26 @@ scientific name of the taxon (e.g., "d__Viruses").}
 
 \item{read_buffer}{Integer specifying the size in bytes of the intermediate
 buffer used for splitting and distributing chunks to worker threads during
-processing. Default is \code{2 * 1024 * 1024} (1MB).}
+processing. Default is \code{NULL}, which enables memory-mapped file access.
+Memory mapping is highly efficient for multi-threaded reading and avoids
+redundant copying. However, its performance and behavior may depend on the
+operating system and file system. If set to \code{0}, it will fall back to a
+default size of \code{1 * 1024 * 1024} (1MB).}
 
 \item{write_buffer}{Integer specifying the buffer size in bytes used for
 writing to disk. This controls the capacity of the buffered file writer.
-Default is \code{1 * 1024 * 1024} (2MB).}
+Default is \code{1 * 1024 * 1024} (1MB). If set to \code{0}, it will fall back to a
+the default size.}
 
 \item{batch_size}{Integer. Number of records to accumulate before triggering
-a write operation. Default is \code{200}.}
+a write operation. Default is \code{500}.}
 
 \item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or
-writing.}
+writing. Default: \code{10}.}
 
-\item{threads}{Integer. Number of threads to use. Default is \code{1}. Performance
-is generally constrained by system call I/O, so increasing thread count may
-not substantially reduce runtime.}
+\item{threads}{Integer. Number of threads to use. Default will determined
+atomatically by rayon.}
 
 \item{odir}{A string of directory to save the \code{ofile}.}
 }

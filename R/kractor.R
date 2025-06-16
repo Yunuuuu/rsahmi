@@ -4,42 +4,36 @@
 #' based on a set of specified taxonomic IDs.
 #'
 #' @param kreport Path to the Kraken2 report file.
-#'
 #' @param koutput Path to the Kraken2 output file.
-#'
 #' @param reads A character vector of FASTQ files used as input to Kraken2.
 #' Can be one file (single-end) or two files (paired-end).
-#'
 #' @param extract_koutput Path to the file where the extracted Kraken2 output
 #' matching the specified `taxon` will be saved. Defaults to
 #' `"kraken_microbiome_output.txt"`.
-#'
 #' @param extract_reads A character vector of the same length as `reads`,
 #' specifying the output FASTQ file(s) where the matching reads will be saved.
-#' Defaults to `"kraken_microbiome_reads(_1|2).txt"`
-#'
+#' Defaults to `"kraken_microbiome_reads(_1|2).txt"`.
 #' @param taxon An atomic character specify the taxa name wanted. Should follow
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses").
-#'
 #' @param batch_size Integer. Number of records to accumulate before triggering
 #' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
-#' 
 #' @param read_buffer Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during
-#' processing. Default is `2 * 1024 * 1024` (1MB).
-#'
+#' processing. Default is `NULL`, which enables memory-mapped file access.
+#' Memory mapping is highly efficient for multi-threaded reading and avoids
+#' redundant copying. However, its performance and behavior may depend on the
+#' operating system and file system. If set to `0`, it will fall back to a
+#' default size of `1 * 1024 * 1024` (1MB).
 #' @param write_buffer Integer specifying the buffer size in bytes used for
 #' writing to disk. This controls the capacity of the buffered file writer.
-#' Default is `1 * 1024 * 1024` (2MB).
-#'
+#' Default is `1 * 1024 * 1024` (1MB). If set to `0`, it will fall back to a
+#' the default size.
 #' @param read_queue,write_queue Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or
-#'   writing.
-#'
+#'   writing. Default: `10`.
 #' @param threads Integer. Number of threads to use. Default will determined
 #' atomatically by rayon.
-#'
 #' @param odir A string of directory to save the `ofile`.
 #'
 #' @seealso [`kraken_taxon()`]
@@ -79,7 +73,7 @@ kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                     read_buffer = NULL, write_buffer = NULL,
-                    batch_size = NULL,                    read_queue = NULL, write_queue = NULL,
+                    batch_size = NULL, read_queue = NULL, write_queue = NULL,
                     threads = NULL, odir = getwd()) {
     rust_kractor_koutput(
         kreport, koutput,
@@ -140,17 +134,25 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     )$
         select(pl$col("taxids")$list$last())$
         to_series()$unique()
-    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
+    assert_number_whole(batch_size, min = 0, allow_null = TRUE)
     assert_number_whole(read_buffer, min = 0, allow_null = TRUE)
-    assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(write_buffer, min = 0, allow_null = TRUE)
     assert_number_whole(threads,
-        min = 1, max = as.double(parallel::detectCores()),
+        min = 0, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
     read_queue <- check_queue(read_queue, 10) *
-        if (is.null(threads)) parallel::detectCores() else threads
+        if (is.null(threads) || threads == 0L) {
+            parallel::detectCores()
+        } else {
+            threads
+        }
     write_queue <- check_queue(write_queue, 10L) *
-        if (is.null(threads)) parallel::detectCores() else threads
+        if (is.null(threads) || threads == 0L) {
+            parallel::detectCores()
+        } else {
+            threads
+        }
     assert_string(odir, allow_empty = FALSE)
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)
@@ -168,7 +170,9 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     if (!is.null(read_buffer) && read_buffer == 0L) {
         read_buffer <- READ_BUFFER # 1MB
     }
-    write_buffer <- write_buffer %||% WRITE_BUFFER
+    if (is.null(write_buffer) || write_buffer == 0L) {
+        write_buffer <- WRITE_BUFFER # 1MB
+    }
     batch_size <- batch_size %||% BATCH_SIZE
     threads <- threads %||% 0L # Let rayon to determine the threads
     if (is.null(pprof)) {
