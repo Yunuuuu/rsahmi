@@ -54,7 +54,8 @@ Default is \code{1 * 1024 * 1024} (1MB). If set to \code{0}, it will fall back t
 the default size.}
 
 \item{batch_size}{Integer. Number of records to accumulate before triggering
-a write operation. Default is \code{500}.}
+a write operation or sending to another thread for parsing (when
+\code{read_buffer} is zero). Default is \code{500}.}
 
 \item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
 controlling the amount of in-flight data awaiting processing or

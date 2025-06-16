@@ -17,7 +17,8 @@
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses").
 #' @param batch_size Integer. Number of records to accumulate before triggering
-#' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
+#' a write operation or sending to another thread for parsing (when
+#' `read_buffer` is zero). Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
 #' @param read_buffer Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during
 #' processing. Default is `NULL`, which enables memory-mapped file access.
