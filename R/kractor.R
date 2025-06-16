@@ -22,6 +22,9 @@
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses").
 #'
+#' @param batch_size Integer. Number of records to accumulate before triggering
+#' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
+#' 
 #' @param read_buffer Integer specifying the size in bytes of the intermediate
 #' buffer used for splitting and distributing chunks to worker threads during
 #' processing. Default is `2 * 1024 * 1024` (1MB).
@@ -30,16 +33,12 @@
 #' writing to disk. This controls the capacity of the buffered file writer.
 #' Default is `1 * 1024 * 1024` (2MB).
 #'
-#' @param batch_size Integer. Number of records to accumulate before triggering
-#' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
-#'
 #' @param read_queue,write_queue Integer. Maximum number of buffers per thread,
 #'   controlling the amount of in-flight data awaiting processing or
 #'   writing.
 #'
-#' @param threads Integer. Number of threads to use. Default is `1`. Performance
-#' is generally constrained by system call I/O, so increasing thread count may
-#' not substantially reduce runtime.
+#' @param threads Integer. Number of threads to use. Default will determined
+#' atomatically by rayon.
 #'
 #' @param odir A string of directory to save the `ofile`.
 #'
@@ -80,8 +79,7 @@ kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                     read_buffer = NULL, write_buffer = NULL,
-                    batch_size = NULL,
-                    read_queue = NULL, write_queue = NULL,
+                    batch_size = NULL,                    read_queue = NULL, write_queue = NULL,
                     threads = NULL, odir = getwd()) {
     rust_kractor_koutput(
         kreport, koutput,
@@ -112,7 +110,7 @@ kractor <- function(kreport, koutput, reads,
 
 BATCH_SIZE <- 500L
 ONE_GB_SIZE <- 1 * 1024L * 1024L * 1024L
-READ_BUFFER <- 2L * 1024L * 1024L
+READ_BUFFER <- 1L * 1024L * 1024L
 WRITE_BUFFER <- 1L * 1024L * 1024L
 
 rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
@@ -120,8 +118,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
                                      "d__Bacteria", "d__Fungi",
                                      "d__Viruses"
                                  ),
-                                 read_buffer = NULL, write_buffer = NULL,
                                  batch_size = NULL,
+                                 read_buffer = NULL, write_buffer = NULL,
                                  read_queue = NULL, write_queue = NULL,
                                  threads = NULL, odir = getwd(), pprof = NULL) {
     assert_string(kreport, allow_empty = FALSE)
@@ -142,93 +140,9 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     )$
         select(pl$col("taxids")$list$last())$
         to_series()$unique()
-    assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
-    assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
-    assert_number_whole(threads,
-        min = 1, max = as.double(parallel::detectCores()),
-        allow_null = TRUE
-    )
-    assert_string(odir, allow_empty = FALSE)
-    assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
-    dir_create(odir)
-
-    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
-    # take care of taxid: "A"
-    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
-        taxids <- taxids$append(c("81077", "A"))
-    }
-    # the third column of kraken2 output:
-    # Using (taxid ****)
-    patterns <- paste0("(taxid ", as.character(taxids), ")")
-    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
-    extract_koutput <- file.path(odir, extract_koutput)
-    # small read buffer, so the worker threads can
-    # accept the data fast
-    read_buffer <- read_buffer %||% READ_BUFFER
-    write_buffer <- write_buffer %||% WRITE_BUFFER
-    batch_size <- batch_size %||% BATCH_SIZE
-    read_queue <- check_queue(read_queue, ceiling(ONE_GB_SIZE / read_buffer))
-    write_queue <- check_queue(write_queue, ceiling(ONE_GB_SIZE / write_buffer))
-    threads <- threads %||% 1L
-    if (is.null(pprof)) {
-        rust_call(
-            "kractor_koutput",
-            koutput,
-            ofile = extract_koutput,
-            patterns = patterns,
-            read_buffer = read_buffer,
-            write_buffer = write_buffer,
-            batch_size = batch_size,
-            read_queue = read_queue,
-            write_queue = write_queue,
-        )
-    } else {
-        rust_call(
-            "pprof_kractor_koutput",
-            koutput,
-            ofile = extract_koutput,
-            patterns = patterns,
-            read_buffer = read_buffer,
-            write_buffer = write_buffer,
-            batch_size = batch_size,
-            read_queue = read_queue,
-            write_queue = write_queue,
-            pprof_file = file.path(odir, pprof)
-        )
-    }
-}
-
-rust_mmap_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
-                                      taxon = c(
-                                          "d__Bacteria", "d__Fungi",
-                                          "d__Viruses"
-                                      ),
-                                      write_buffer = NULL,
-                                      batch_size = NULL,
-                                      read_queue = NULL, write_queue = NULL,
-                                      threads = NULL,
-                                      odir = getwd(), pprof = NULL) {
-    assert_string(kreport, allow_empty = FALSE)
-    assert_string(koutput, allow_empty = FALSE)
-    assert_string(extract_koutput, allow_empty = FALSE, allow_null = TRUE)
-    taxon <- as.character(taxon)
-    if (length(taxon) == 0L) {
-        cli::cli_abort("empty {.arg taxon} provided")
-    }
-    taxids <- parse_kraken_report(kreport)$
-        explode(pl$col("ranks", "taxon"))$
-        filter(
-        pl$concat_str(
-            pl$col("ranks")$str$to_lowercase(),
-            pl$col("taxon"),
-            separator = "__"
-        )$is_in(pl$lit(taxon))
-    )$
-        select(pl$col("taxids")$list$last())$
-        to_series()$unique()
+    assert_number_whole(read_buffer, min = 0, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
-    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
@@ -251,16 +165,20 @@ rust_mmap_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     patterns <- paste0("(taxid ", as.character(taxids), ")")
     extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
     extract_koutput <- file.path(odir, extract_koutput)
-    batch_size <- batch_size %||% BATCH_SIZE
+    if (!is.null(read_buffer) && read_buffer == 0L) {
+        read_buffer <- READ_BUFFER # 1MB
+    }
     write_buffer <- write_buffer %||% WRITE_BUFFER
-    threads <- threads %||% 0L # Let rayon automatically decide
+    batch_size <- batch_size %||% BATCH_SIZE
+    threads <- threads %||% 0L
     if (is.null(pprof)) {
         rust_call(
-            "mmap_kractor_koutput",
+            "kractor_koutput",
             koutput,
             ofile = extract_koutput,
             patterns = patterns,
             batch_size = batch_size,
+            read_buffer = read_buffer,
             write_buffer = write_buffer,
             read_queue = read_queue,
             write_queue = write_queue,
@@ -268,11 +186,12 @@ rust_mmap_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
         )
     } else {
         rust_call(
-            "pprof_mmap_kractor_koutput",
+            "pprof_kractor_koutput",
             koutput,
             ofile = extract_koutput,
             patterns = patterns,
             batch_size = batch_size,
+            read_buffer = read_buffer,
             write_buffer = write_buffer,
             read_queue = read_queue,
             write_queue = write_queue,

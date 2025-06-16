@@ -18,7 +18,7 @@ rayon = '*'
 crossbeam-channel = { version = "*" }
 memchr = { version = "*" }
 aho-corasick = { version = "*" }
-ahash = { version = "*" }
+rustc-hash = { version = "*" }
 pprof = { version = "0.14", optional = true, features = ["flamegraph"] }
 
 [dev-dependencies]

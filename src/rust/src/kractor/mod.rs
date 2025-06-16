@@ -5,7 +5,6 @@ mod koutput;
 // mod reads;
 
 // use ahash::AHashSet as HashSet;
-use aho_corasick::{AhoCorasick, AhoCorasickKind, MatchKind};
 
 // use reads::{read_sequence_id_from_koutput, ReadsProcessor};
 
@@ -15,43 +14,8 @@ fn kractor_koutput(
     koutput: &str,
     ofile: &str,
     patterns: Robj,
-    read_buffer: usize,
-    write_buffer: usize,
     batch_size: usize,
-    read_queue: Option<usize>,
-    write_queue: Option<usize>,
-) -> std::result::Result<(), String> {
-    let pattern_vec = patterns
-        .as_str_vector()
-        .ok_or("`patterns` must be a character vector")?;
-    let matcher = AhoCorasick::builder()
-        // .match_kind(MatchKind::LeftmostFirst)
-        .kind(Some(AhoCorasickKind::DFA))
-        .build(pattern_vec)
-        .map_err(|e| {
-            format!("Failed to create Aho-Corasick automaton: {}", e)
-        })?;
-
-    rprintln!("Extracting matching kraken2 output from: {}", koutput);
-    koutput::kractor_koutput(
-        koutput,
-        ofile,
-        &matcher,
-        read_buffer,
-        write_buffer,
-        batch_size,
-        read_queue,
-        write_queue,
-    )
-    .map_err(|e| format!("{}", e))
-}
-
-#[extendr]
-fn mmap_kractor_koutput(
-    koutput: &str,
-    ofile: &str,
-    patterns: Robj,
-    batch_size: usize,
+    read_buffer: Option<usize>,
     write_buffer: usize,
     read_queue: Option<usize>,
     write_queue: Option<usize>,
@@ -60,15 +24,8 @@ fn mmap_kractor_koutput(
     let pattern_vec = patterns
         .as_str_vector()
         .ok_or("`patterns` must be a character vector")?;
-    let matcher = AhoCorasick::builder()
-        .match_kind(MatchKind::LeftmostFirst)
-        .kind(Some(AhoCorasickKind::DFA))
-        .build(pattern_vec)
-        .map_err(|e| {
-            format!("Failed to create Aho-Corasick automaton: {}", e)
-        })?;
-    rprintln!("Extracting matching kraken2 output from: {}", koutput);
 
+    rprintln!("Extracting matching kraken2 output from: {}", koutput);
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
@@ -77,15 +34,28 @@ fn mmap_kractor_koutput(
         })?;
     rayon_pool
         .install(|| {
-            koutput::mmap_kractor_koutput(
-                koutput,
-                ofile,
-                &matcher,
-                batch_size,
-                write_buffer,
-                read_queue,
-                write_queue,
-            )
+            if let Some(read_buffer) = read_buffer {
+                koutput::reader_kractor_koutput(
+                    koutput,
+                    ofile,
+                    &pattern_vec,
+                    batch_size,
+                    read_buffer,
+                    write_buffer,
+                    read_queue,
+                    write_queue,
+                )
+            } else {
+                koutput::mmap_kractor_koutput(
+                    koutput,
+                    ofile,
+                    &pattern_vec,
+                    batch_size,
+                    write_buffer,
+                    read_queue,
+                    write_queue,
+                )
+            }
         })
         .map_err(|e| format!("{}", e))
 }
@@ -146,11 +116,12 @@ fn mmap_kractor_koutput(
 
 #[extendr]
 #[cfg(feature = "bench")]
-fn pprof_mmap_kractor_koutput(
+fn pprof_kractor_koutput(
     koutput: &str,
     ofile: &str,
     patterns: Robj,
     batch_size: usize,
+    read_buffer: Option<usize>,
     write_buffer: usize,
     read_queue: Option<usize>,
     write_queue: Option<usize>,
@@ -161,51 +132,16 @@ fn pprof_mmap_kractor_koutput(
         .frequency(2000)
         .build()
         .map_err(|e| format!("cannot create profile guard {:?}", e))?;
-    let out = mmap_kractor_koutput(
-        koutput,
-        ofile,
-        patterns,
-        batch_size,
-        write_buffer,
-        read_queue,
-        write_queue,
-        threads,
-    );
-    if let Ok(report) = guard.report().build() {
-        let file = std::fs::File::create(pprof_file).unwrap();
-        let mut options = pprof::flamegraph::Options::default();
-        options.image_width = Some(2500);
-        report.flamegraph_with_options(file, &mut options).unwrap();
-    };
-    out
-}
-
-#[extendr]
-#[cfg(feature = "bench")]
-fn pprof_kractor_koutput(
-    koutput: &str,
-    ofile: &str,
-    patterns: Robj,
-    read_buffer: usize,
-    write_buffer: usize,
-    batch_size: usize,
-    read_queue: Option<usize>,
-    write_queue: Option<usize>,
-    pprof_file: &str,
-) -> std::result::Result<(), String> {
-    let guard = pprof::ProfilerGuardBuilder::default()
-        .frequency(2000)
-        .build()
-        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
     let out = kractor_koutput(
         koutput,
         ofile,
         patterns,
+        batch_size,
         read_buffer,
         write_buffer,
-        batch_size,
         read_queue,
         write_queue,
+        threads,
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file).unwrap();
@@ -267,7 +203,6 @@ fn pprof_kractor_koutput(
 extendr_module! {
     mod kractor;
     fn kractor_koutput;
-    fn mmap_kractor_koutput;
     // fn kractor_reads;
 }
 
@@ -275,10 +210,8 @@ extendr_module! {
 extendr_module! {
     mod kractor;
     fn kractor_koutput;
-    fn mmap_kractor_koutput;
     // fn kractor_reads;
     fn pprof_kractor_koutput;
-    fn pprof_mmap_kractor_koutput;
     // fn pprof_kractor_reads;
 }
 
