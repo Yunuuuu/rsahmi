@@ -1,12 +1,12 @@
 use extendr_api::prelude::*;
 mod batchsender;
-mod buffer;
 mod io;
 mod koutput;
 // mod reads;
 
 // use ahash::AHashSet as HashSet;
-use aho_corasick::AhoCorasick;
+use aho_corasick::{AhoCorasick, AhoCorasickKind, MatchKind};
+
 // use reads::{read_sequence_id_from_koutput, ReadsProcessor};
 
 #[extendr]
@@ -18,16 +18,20 @@ fn kractor_koutput(
     read_buffer: usize,
     write_buffer: usize,
     batch_size: usize,
-    read_queue: usize,
-    write_queue: usize,
-    threads: usize,
+    read_queue: Option<usize>,
+    write_queue: Option<usize>,
 ) -> std::result::Result<(), String> {
     let pattern_vec = patterns
         .as_str_vector()
         .ok_or("`patterns` must be a character vector")?;
-    let matcher = AhoCorasick::new(pattern_vec).map_err(|e| {
-        format!("Failed to create Aho-Corasick automaton: {}", e)
-    })?;
+    let matcher = AhoCorasick::builder()
+        // .match_kind(MatchKind::LeftmostFirst)
+        .kind(Some(AhoCorasickKind::DFA))
+        .build(pattern_vec)
+        .map_err(|e| {
+            format!("Failed to create Aho-Corasick automaton: {}", e)
+        })?;
+
     rprintln!("Extracting matching kraken2 output from: {}", koutput);
     koutput::kractor_koutput(
         koutput,
@@ -38,9 +42,52 @@ fn kractor_koutput(
         batch_size,
         read_queue,
         write_queue,
-        threads,
     )
     .map_err(|e| format!("{}", e))
+}
+
+#[extendr]
+fn mmap_kractor_koutput(
+    koutput: &str,
+    ofile: &str,
+    patterns: Robj,
+    batch_size: usize,
+    write_buffer: usize,
+    read_queue: Option<usize>,
+    write_queue: Option<usize>,
+    threads: usize,
+) -> std::result::Result<(), String> {
+    let pattern_vec = patterns
+        .as_str_vector()
+        .ok_or("`patterns` must be a character vector")?;
+    let matcher = AhoCorasick::builder()
+        .match_kind(MatchKind::LeftmostFirst)
+        .kind(Some(AhoCorasickKind::DFA))
+        .build(pattern_vec)
+        .map_err(|e| {
+            format!("Failed to create Aho-Corasick automaton: {}", e)
+        })?;
+    rprintln!("Extracting matching kraken2 output from: {}", koutput);
+
+    let rayon_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .map_err(|e| {
+            format!("Failed to initialize rayon thread pool: {:?}", e)
+        })?;
+    rayon_pool
+        .install(|| {
+            koutput::mmap_kractor_koutput(
+                koutput,
+                ofile,
+                &matcher,
+                batch_size,
+                write_buffer,
+                read_queue,
+                write_queue,
+            )
+        })
+        .map_err(|e| format!("{}", e))
 }
 
 // #[extendr]
@@ -98,7 +145,42 @@ fn kractor_koutput(
 // }
 
 #[extendr]
-#[allow(clippy::too_many_arguments)]
+#[cfg(feature = "bench")]
+fn pprof_mmap_kractor_koutput(
+    koutput: &str,
+    ofile: &str,
+    patterns: Robj,
+    batch_size: usize,
+    write_buffer: usize,
+    read_queue: Option<usize>,
+    write_queue: Option<usize>,
+    threads: usize,
+    pprof_file: &str,
+) -> std::result::Result<(), String> {
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(2000)
+        .build()
+        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+    let out = mmap_kractor_koutput(
+        koutput,
+        ofile,
+        patterns,
+        batch_size,
+        write_buffer,
+        read_queue,
+        write_queue,
+        threads,
+    );
+    if let Ok(report) = guard.report().build() {
+        let file = std::fs::File::create(pprof_file).unwrap();
+        let mut options = pprof::flamegraph::Options::default();
+        options.image_width = Some(2500);
+        report.flamegraph_with_options(file, &mut options).unwrap();
+    };
+    out
+}
+
+#[extendr]
 #[cfg(feature = "bench")]
 fn pprof_kractor_koutput(
     koutput: &str,
@@ -107,9 +189,8 @@ fn pprof_kractor_koutput(
     read_buffer: usize,
     write_buffer: usize,
     batch_size: usize,
-    read_queue: usize,
-    write_queue: usize,
-    threads: usize,
+    read_queue: Option<usize>,
+    write_queue: Option<usize>,
     pprof_file: &str,
 ) -> std::result::Result<(), String> {
     let guard = pprof::ProfilerGuardBuilder::default()
@@ -125,7 +206,6 @@ fn pprof_kractor_koutput(
         batch_size,
         read_queue,
         write_queue,
-        threads,
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file).unwrap();
@@ -187,6 +267,7 @@ fn pprof_kractor_koutput(
 extendr_module! {
     mod kractor;
     fn kractor_koutput;
+    fn mmap_kractor_koutput;
     // fn kractor_reads;
 }
 
@@ -194,15 +275,17 @@ extendr_module! {
 extendr_module! {
     mod kractor;
     fn kractor_koutput;
+    fn mmap_kractor_koutput;
     // fn kractor_reads;
     fn pprof_kractor_koutput;
+    fn pprof_mmap_kractor_koutput;
     // fn pprof_kractor_reads;
 }
 
 #[cfg(test)]
-mod tests {
+mod bench {
     use std::fs::{remove_file, File};
-    use std::io::{BufReader, BufWriter, Read, Write};
+    use std::io::{BufWriter, Read, Write};
     use std::time::Instant;
 
     use rand::rngs::StdRng;
@@ -213,7 +296,7 @@ mod tests {
     const CHUNK_SIZE: usize = 1024 * 1024; // 1 MB
 
     #[test]
-    fn test_io() -> std::io::Result<()> {
+    fn bench_io() -> std::io::Result<()> {
         let mut rng = StdRng::seed_from_u64(42);
         let mut file =
             BufWriter::with_capacity(CHUNK_SIZE, File::create(FILE_PATH)?);
@@ -247,15 +330,16 @@ mod tests {
                 / elapsed.as_secs_f64()
         );
 
-        let file = File::open(FILE_PATH)?;
-        let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
+        // === Benchmark only read time ===
+        let mut file = File::open(FILE_PATH)?;
+        // let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
         let mut buffer = vec![0u8; CHUNK_SIZE];
 
         let mut total_read = 0;
         let start = Instant::now();
 
         loop {
-            let bytes_read = reader.read(&mut buffer)?;
+            let bytes_read = file.read(&mut buffer)?;
             if bytes_read == 0 {
                 break;
             }
@@ -277,6 +361,7 @@ mod tests {
 
         assert_eq!(total_read, TOTAL_SIZE);
         remove_file(FILE_PATH)?;
+
         Ok(())
     }
 }

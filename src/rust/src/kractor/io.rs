@@ -7,18 +7,18 @@ use crossbeam_channel::{Receiver, Sender};
 
 pub trait ChunkReader {
     type Output: Send;
-    fn read(self) -> Result<()>;
+    fn read(&mut self) -> Result<()>;
 }
 
 pub trait ChunkParser {
     type Input: Send;
     type Output: Send;
-    fn parse(self) -> Result<()>;
+    fn parse(&mut self) -> Result<()>;
 }
 
 pub trait ChunkWriter {
     type Input;
-    fn write(self) -> Result<()>;
+    fn write(&mut self) -> Result<()>;
 }
 
 /// Factory trait: responsible for constructing a reader, parser, and writer.
@@ -135,7 +135,7 @@ mod tests {
     impl ChunkReader for MockReader {
         type Output = String;
 
-        fn read(self) -> Result<()> {
+        fn read(&mut self) -> Result<()> {
             self.tx.send("line1".to_string())?;
             self.tx.send("line2".to_string())?;
             Ok(())
@@ -151,7 +151,7 @@ mod tests {
         type Input = String;
         type Output = String;
 
-        fn parse(self) -> Result<()> {
+        fn parse(&mut self) -> Result<()> {
             for line in self.rx.iter() {
                 let parsed = format!("parsed:{}", line);
                 self.tx.send(parsed)?;
@@ -168,7 +168,7 @@ mod tests {
     impl ChunkWriter for MockWriter {
         type Input = String;
 
-        fn write(self) -> Result<()> {
+        fn write(&mut self) -> Result<()> {
             for item in self.rx.iter() {
                 self.output.lock().unwrap().push(item);
             }

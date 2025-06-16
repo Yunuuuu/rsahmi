@@ -110,7 +110,8 @@ kractor <- function(kreport, koutput, reads,
     cli::cli_inform(c("v" = "Finished"))
 }
 
-BATCH_SIZE <- 200L
+BATCH_SIZE <- 500L
+ONE_GB_SIZE <- 1 * 1024L * 1024L * 1024L
 READ_BUFFER <- 2L * 1024L * 1024L
 WRITE_BUFFER <- 1L * 1024L * 1024L
 
@@ -144,8 +145,6 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
-    assert_number_whole(read_queue, min = 0, allow_null = TRUE)
-    assert_number_whole(write_queue, min = 0, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
@@ -169,8 +168,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     read_buffer <- read_buffer %||% READ_BUFFER
     write_buffer <- write_buffer %||% WRITE_BUFFER
     batch_size <- batch_size %||% BATCH_SIZE
-    read_queue <- read_queue %||% ceiling(READ_BUFFER / read_buffer)
-    write_queue <- write_queue %||% ceiling(WRITE_BUFFER / write_buffer)
+    read_queue <- check_queue(read_queue, ceiling(ONE_GB_SIZE / read_buffer))
+    write_queue <- check_queue(write_queue, ceiling(ONE_GB_SIZE / write_buffer))
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
@@ -183,7 +182,6 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
             batch_size = batch_size,
             read_queue = read_queue,
             write_queue = write_queue,
-            threads = threads
         )
     } else {
         rust_call(
@@ -194,6 +192,88 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
             read_buffer = read_buffer,
             write_buffer = write_buffer,
             batch_size = batch_size,
+            read_queue = read_queue,
+            write_queue = write_queue,
+            pprof_file = file.path(odir, pprof)
+        )
+    }
+}
+
+rust_mmap_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
+                                      taxon = c(
+                                          "d__Bacteria", "d__Fungi",
+                                          "d__Viruses"
+                                      ),
+                                      write_buffer = NULL,
+                                      batch_size = NULL,
+                                      read_queue = NULL, write_queue = NULL,
+                                      threads = NULL,
+                                      odir = getwd(), pprof = NULL) {
+    assert_string(kreport, allow_empty = FALSE)
+    assert_string(koutput, allow_empty = FALSE)
+    assert_string(extract_koutput, allow_empty = FALSE, allow_null = TRUE)
+    taxon <- as.character(taxon)
+    if (length(taxon) == 0L) {
+        cli::cli_abort("empty {.arg taxon} provided")
+    }
+    taxids <- parse_kraken_report(kreport)$
+        explode(pl$col("ranks", "taxon"))$
+        filter(
+        pl$concat_str(
+            pl$col("ranks")$str$to_lowercase(),
+            pl$col("taxon"),
+            separator = "__"
+        )$is_in(pl$lit(taxon))
+    )$
+        select(pl$col("taxids")$list$last())$
+        to_series()$unique()
+    assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
+    assert_number_whole(threads,
+        min = 1, max = as.double(parallel::detectCores()),
+        allow_null = TRUE
+    )
+    read_queue <- check_queue(read_queue, 10) *
+        if (is.null(threads)) parallel::detectCores() else threads
+    write_queue <- check_queue(write_queue, 10L) *
+        if (is.null(threads)) parallel::detectCores() else threads
+    assert_string(odir, allow_empty = FALSE)
+    assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
+    dir_create(odir)
+
+    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
+    # take care of taxid: "A"
+    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
+        taxids <- taxids$append(c("81077", "A"))
+    }
+    # the third column of kraken2 output:
+    # Using (taxid ****)
+    patterns <- paste0("(taxid ", as.character(taxids), ")")
+    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
+    extract_koutput <- file.path(odir, extract_koutput)
+    batch_size <- batch_size %||% BATCH_SIZE
+    write_buffer <- write_buffer %||% WRITE_BUFFER
+    threads <- threads %||% 0L # Let rayon automatically decide
+    if (is.null(pprof)) {
+        rust_call(
+            "mmap_kractor_koutput",
+            koutput,
+            ofile = extract_koutput,
+            patterns = patterns,
+            batch_size = batch_size,
+            write_buffer = write_buffer,
+            read_queue = read_queue,
+            write_queue = write_queue,
+            threads = threads
+        )
+    } else {
+        rust_call(
+            "pprof_mmap_kractor_koutput",
+            koutput,
+            ofile = extract_koutput,
+            patterns = patterns,
+            batch_size = batch_size,
+            write_buffer = write_buffer,
             read_queue = read_queue,
             write_queue = write_queue,
             threads = threads,
@@ -241,8 +321,6 @@ rust_kractor_reads <- function(koutput, reads,
     assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
-    assert_number_whole(read_queue, min = 0, allow_null = TRUE)
-    assert_number_whole(write_queue, min = 0, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
@@ -267,8 +345,8 @@ rust_kractor_reads <- function(koutput, reads,
     read_buffer <- read_buffer %||% READ_BUFFER
     write_buffer <- write_buffer %||% WRITE_BUFFER
     batch_size <- batch_size %||% BATCH_SIZE
-    read_queue <- read_queue %||% ceiling(READ_BUFFER / read_buffer)
-    write_queue <- write_queue %||% ceiling(WRITE_BUFFER / write_buffer)
+    read_queue <- check_queue(read_queue, ceiling(ONE_GB_SIZE / read_buffer))
+    write_queue <- check_queue(write_queue, ceiling(ONE_GB_SIZE / write_buffer))
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
@@ -281,8 +359,7 @@ rust_kractor_reads <- function(koutput, reads,
             write_buffer = write_buffer,
             batch_size = batch_size,
             read_queue = read_queue,
-            write_queue = write_queue,
-            threads = threads
+            write_queue = write_queue
         )
     } else {
         rust_call(
@@ -296,8 +373,27 @@ rust_kractor_reads <- function(koutput, reads,
             batch_size = batch_size,
             read_queue = read_queue,
             write_queue = write_queue,
-            threads = threads,
             pprof_file = file.path(odir, pprof)
         )
+    }
+}
+
+check_queue <- function(queue, default, arg = caller_arg(queue),
+                        call = rlang::caller_call()) {
+    # styler: off
+    if (.rlang_check_number(queue, min = 0,
+                            allow_null = TRUE,
+                            allow_decimal = FALSE,
+                            allow_infinite = TRUE) != 0L ||
+                            (!is.null(queue) && queue < 0)) {
+        cli::cli_abort("{.arg {arg}} must be a non-negtive integer number")
+    }
+    # styler: on
+    if (is.null(queue)) {
+        default
+    } else if (is.finite(queue)) {
+        queue
+    } else {
+        NULL
     }
 }
