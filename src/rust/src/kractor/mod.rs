@@ -1,11 +1,8 @@
 use extendr_api::prelude::*;
-mod batchsender;
+use rustc_hash::FxHashSet as HashSet;
+
 mod koutput;
-// mod reads;
-
-// use ahash::AHashSet as HashSet;
-
-// use reads::{read_sequence_id_from_koutput, ReadsProcessor};
+mod reads;
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
@@ -59,59 +56,54 @@ fn kractor_koutput(
         .map_err(|e| format!("{}", e))
 }
 
-// #[extendr]
-// #[allow(clippy::too_many_arguments)]
-// #[cfg(feature = "bench")]
-// fn kractor_reads(
-//     koutput: &str,
-//     fq1: &str,
-//     ofile1: &str,
-//     fq2: Option<&str>,
-//     ofile2: Option<&str>,
-//     ubread: Option<&str>,
-//     ub_pattern: Robj,
-//     read_buffer: usize,
-//     write_buffer: usize,
-//     batch_size: usize,
-//     read_queue: usize,
-//     write_queue: usize,
-//     threads: usize,
-// ) -> std::result::Result<(), String> {
-//     rprintln!("Extracting sequence IDs");
-//     let ids = read_sequence_id_from_koutput(koutput, 126 * 1024)
-//         .map_err(|e| format!("Failed to read sequence IDs: {}", e))?;
-//     let id_sets = ids
-//         .iter()
-//         .map(|id| id.as_slice())
-//         .collect::<HashSet<&[u8]>>();
-//     rprintln!("Extracting the matching sequence from: {}", fq1);
-//     // Don't use multiple threads for the reads processing
-//     // as it will disturb the order of reads
-//     ReadsProcessor::new(&id_sets).chunk_io(
-//         fq1,
-//         ofile1,
-//         read_buffer,
-//         write_buffer,
-//         batch_size,
-//         read_queue,
-//         write_queue,
-//         threads,
-//     )?;
-//     if let (Some(in_file), Some(out_file)) = (fq2, ofile2) {
-//         rprintln!("Extracting the matching sequence from: {}", in_file);
-//         ReadsProcessor::new(&id_sets).chunk_io(
-//             in_file,
-//             out_file,
-//             read_buffer,
-//             write_buffer,
-//             batch_size,
-//             read_queue,
-//             write_queue,
-//             threads,
-//         )?;
-//     }
-//     Ok(())
-// }
+#[extendr]
+#[allow(clippy::too_many_arguments)]
+fn kractor_reads(
+    koutput: &str,
+    fq1: &str,
+    ofile1: &str,
+    fq2: Option<&str>,
+    ofile2: Option<&str>,
+    ubread: Option<&str>,
+    _ub_pattern: Robj,
+    chunk_size: usize,
+    buffer_size: usize,
+    batch_size: usize,
+    nqueue: Option<usize>,
+    threads: usize,
+) -> std::result::Result<(), String> {
+    rprintln!("Extracting sequence IDs");
+    let ids = reads::read_sequence_id_from_koutput(koutput, 126 * 1024)
+        .map_err(|e| format!("Failed to read sequence IDs: {}", e))?;
+    let id_sets = ids
+        .iter()
+        .map(|id| id.as_slice())
+        .collect::<HashSet<&[u8]>>();
+
+    rprintln!("Extracting the matching sequence from: {}", fq1);
+    let rayon_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .map_err(|e| {
+            format!("Failed to initialize rayon thread pool: {:?}", e)
+        })?;
+    rayon_pool.install(|| {
+        reads::mmap_kractor_reads(
+            id_sets,
+            fq1,
+            ofile1,
+            fq2,
+            ofile2,
+            ubread,
+            None,
+            chunk_size,
+            buffer_size,
+            batch_size,
+            nqueue,
+        )
+        .map_err(|e| format!("{}", e))
+    })
+}
 
 #[extendr]
 #[cfg(feature = "bench")]
@@ -143,6 +135,53 @@ fn pprof_kractor_koutput(
         threads,
     );
     if let Ok(report) = guard.report().build() {
+        let file = std::fs::File::create(pprof_file).map_err(|e| {
+            format!("Failed to create file: {} ({})", pprof_file, e)
+        })?;
+        let mut options = pprof::flamegraph::Options::default();
+        options.image_width = Some(2500);
+        report.flamegraph_with_options(file, &mut options).unwrap();
+    };
+    out
+}
+
+#[extendr]
+#[allow(clippy::too_many_arguments)]
+#[cfg(feature = "bench")]
+fn pprof_kractor_reads(
+    koutput: &str,
+    fq1: &str,
+    ofile1: &str,
+    fq2: Option<&str>,
+    ofile2: Option<&str>,
+    ubread: Option<&str>,
+    ub_pattern: Robj,
+    chunk_size: usize,
+    buffer_size: usize,
+    batch_size: usize,
+    nqueue: Option<usize>,
+    threads: usize,
+    pprof_file: &str,
+) -> std::result::Result<(), String> {
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(2000)
+        .build()
+        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+    let out = kractor_reads(
+        koutput,
+        fq1,
+        ofile1,
+        fq2,
+        ofile2,
+        ubread,
+        ub_pattern,
+        chunk_size,
+        buffer_size,
+        batch_size,
+        nqueue,
+        threads,
+    );
+    if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file).unwrap();
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
@@ -151,70 +190,23 @@ fn pprof_kractor_koutput(
     out
 }
 
-// #[extendr]
-// #[allow(clippy::too_many_arguments)]
-// #[cfg(feature = "bench")]
-// fn pprof_kractor_reads(
-//     koutput: &str,
-//     fq1: &str,
-//     ofile1: &str,
-//     fq2: Option<&str>,
-//     ofile2: Option<&str>,
-//     ubread: Option<&str>,
-//     ub_pattern: Robj,
-//     read_buffer: usize,
-//     write_buffer: usize,
-//     batch_size: usize,
-//     read_queue: usize,
-//     write_queue: usize,
-//     threads: usize,
-//     pprof_file: &str,
-// ) -> std::result::Result<(), String> {
-//     let guard = pprof::ProfilerGuardBuilder::default()
-//         .frequency(2000)
-//         .build()
-//         .map_err(|e| format!("cannot create profile guard {:?}", e))?;
-//     let out = kractor_reads(
-//         koutput,
-//         fq1,
-//         ofile1,
-//         fq2,
-//         ofile2,
-//         ubread,
-//         ub_pattern,
-//         read_buffer,
-//         write_buffer,
-//         batch_size,
-//         read_queue,
-//         write_queue,
-//         threads,
-//     );
-//     if let Ok(report) = guard.report().build() {
-//         let file = std::fs::File::create(pprof_file).unwrap();
-//         let mut options = pprof::flamegraph::Options::default();
-//         options.image_width = Some(2500);
-//         report.flamegraph_with_options(file, &mut options).unwrap();
-//     };
-//     out
-// }
-
 #[cfg(not(feature = "bench"))]
 extendr_module! {
     mod kractor;
     fn kractor_koutput;
-    // fn kractor_reads;
+    fn kractor_reads;
 }
 
 #[cfg(feature = "bench")]
 extendr_module! {
     mod kractor;
     fn kractor_koutput;
-    // fn kractor_reads;
+    fn kractor_reads;
     fn pprof_kractor_koutput;
-    // fn pprof_kractor_reads;
+    fn pprof_kractor_reads;
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "bench"))]
 mod bench {
     use std::fs::{remove_file, File};
     use std::io::{BufWriter, Read, Write};

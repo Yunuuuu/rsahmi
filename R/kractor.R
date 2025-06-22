@@ -209,10 +209,10 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
 rust_kractor_reads <- function(koutput, reads,
                                extract_reads = NULL,
                                ubread = NULL, ub_pattern = NULL,
-                               read_buffer = NULL, write_buffer = NULL,
+                               chunk_size = NULL, buffer_size = NULL,
                                batch_size = NULL,
-                               read_queue = NULL, write_queue = NULL,
-                               threads = NULL, odir = getwd(), pprof = NULL) {
+                               nqueue = NULL, threads = NULL,
+                               odir = getwd(), pprof = NULL) {
     assert_string(koutput, allow_empty = FALSE)
     reads <- as.character(reads)
     if (length(reads) < 1L || length(reads) > 2L) {
@@ -242,8 +242,8 @@ rust_kractor_reads <- function(koutput, reads,
         ))
     }
     assert_string(ubread, allow_empty = FALSE, allow_null = TRUE)
-    assert_number_whole(read_buffer, min = 1, allow_null = TRUE)
-    assert_number_whole(write_buffer, min = 1, allow_null = TRUE)
+    assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
+    assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
@@ -266,11 +266,15 @@ rust_kractor_reads <- function(koutput, reads,
         extract_read2 <- extract_reads[[2L]]
     }
 
-    read_buffer <- read_buffer %||% READ_BUFFER
-    write_buffer <- write_buffer %||% WRITE_BUFFER
+    chunk_size <- chunk_size %||% 10 * 1024 * 1024
+    buffer_size <- buffer_size %||% WRITE_BUFFER
     batch_size <- batch_size %||% BATCH_SIZE
-    read_queue <- check_queue(read_queue, ceiling(ONE_GB_SIZE / read_buffer))
-    write_queue <- check_queue(write_queue, ceiling(ONE_GB_SIZE / write_buffer))
+    nqueue <- check_queue(nqueue, 3L) *
+        if (is.null(threads) || threads == 0L) {
+            parallel::detectCores()
+        } else {
+            threads
+        }
     threads <- threads %||% 1L
     if (is.null(pprof)) {
         rust_call(
@@ -279,11 +283,11 @@ rust_kractor_reads <- function(koutput, reads,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
             ubread = ubread, ub_pattern = ub_pattern,
-            read_buffer = read_buffer,
-            write_buffer = write_buffer,
+            chunk_size = chunk_size,
+            buffer_size = buffer_size,
             batch_size = batch_size,
-            read_queue = read_queue,
-            write_queue = write_queue
+            nqueue = nqueue,
+            threads = threads
         )
     } else {
         rust_call(
@@ -292,11 +296,11 @@ rust_kractor_reads <- function(koutput, reads,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
             ubread = ubread, ub_pattern = ub_pattern,
-            read_buffer = read_buffer,
-            write_buffer = write_buffer,
+            chunk_size = chunk_size,
+            buffer_size = buffer_size,
             batch_size = batch_size,
-            read_queue = read_queue,
-            write_queue = write_queue,
+            nqueue = nqueue,
+            threads = threads,
             pprof_file = file.path(odir, pprof)
         )
     }

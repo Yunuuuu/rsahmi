@@ -4,20 +4,12 @@ use std::io::{BufWriter, Read, Write};
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
 use bytes::{Bytes, BytesMut};
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use memchr::{memchr, memmem, memrchr};
 use memmap2::{Advice, Mmap};
 use rustc_hash::FxHashSet as HashSet;
 
-use crate::kractor::batchsender::BatchSender;
-
-fn new_channel<T>(queue: Option<usize>) -> (Sender<T>, Receiver<T>) {
-    if let Some(queue) = queue {
-        bounded(queue)
-    } else {
-        unbounded()
-    }
-}
+use crate::batchsender::BatchSender;
 
 #[allow(clippy::too_many_arguments)]
 pub fn reader_kractor_koutput(
@@ -39,9 +31,9 @@ pub fn reader_kractor_koutput(
 
     std::thread::scope(|scope| {
         let (reader_tx, parser_rx): (Sender<Bytes>, Receiver<Bytes>) =
-            new_channel(read_queue);
+            crate::new_channel(read_queue);
         let (parser_tx, writer_rx): (Sender<Vec<Bytes>>, Receiver<Vec<Bytes>>) =
-            new_channel(write_queue);
+            crate::new_channel(write_queue);
 
         // first thread, used to write lines
         let writer_handle = scope.spawn(move || -> Result<()> {
@@ -189,8 +181,8 @@ pub fn mmap_kractor_koutput(
     let mut writer =
         BufWriter::with_capacity(write_buffer, std::fs::File::create(ofile)?);
     std::thread::scope(|scope| {
-        let (reader_tx, parser_rx) = new_channel(read_queue);
-        let (parser_tx, writer_rx) = new_channel(write_queue);
+        let (reader_tx, parser_rx) = crate::new_channel(read_queue);
+        let (parser_tx, writer_rx) = crate::new_channel(write_queue);
 
         // first thread, used to write lines
         let writer_handle = scope.spawn(|| -> Result<()> {
@@ -267,6 +259,7 @@ pub fn mmap_kractor_koutput(
 
 static KOUTPUT_TAXID_PREFIX_FINDER: std::sync::LazyLock<memmem::Finder> =
     std::sync::LazyLock::new(|| memmem::Finder::new("(taxid"));
+
 static KOUTPUT_TAXID_PREFIX_FINDERREV: std::sync::LazyLock<memmem::FinderRev> =
     std::sync::LazyLock::new(|| memmem::FinderRev::new("(taxid"));
 

@@ -1,6 +1,19 @@
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
 
-mod kractor; // kraken extractor
+mod batchsender;
+mod kractor;
+mod parser; // kraken extractor
+
+pub(crate) fn new_channel<T>(
+    nqueue: Option<usize>,
+) -> (Sender<T>, Receiver<T>) {
+    if let Some(queue) = nqueue {
+        bounded(queue)
+    } else {
+        unbounded()
+    }
+}
 
 // https://extendr.github.io/extendr/extendr_api/#returning-resultt-e-to-r
 // https://github.com/extendr/extendr/blob/master/extendr-api/src/robj/into_robj.rs#L100
