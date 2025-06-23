@@ -104,6 +104,7 @@ kractor <- function(kreport, koutput, reads,
 }
 
 BATCH_SIZE <- 500L
+CHUNK_SIZE <- 10L * 1024L * 1024L
 ONE_GB_SIZE <- 1 * 1024L * 1024L * 1024L
 READ_BUFFER <- 1L * 1024L * 1024L
 WRITE_BUFFER <- 1L * 1024L * 1024L
@@ -266,7 +267,7 @@ rust_kractor_reads <- function(koutput, reads,
         extract_read2 <- extract_reads[[2L]]
     }
 
-    chunk_size <- chunk_size %||% 10 * 1024 * 1024
+    chunk_size <- chunk_size %||% CHUNK_SIZE
     buffer_size <- buffer_size %||% WRITE_BUFFER
     batch_size <- batch_size %||% BATCH_SIZE
     nqueue <- check_queue(nqueue, 3L) *

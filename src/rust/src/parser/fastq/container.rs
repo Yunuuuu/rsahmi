@@ -14,27 +14,27 @@ impl<'a> std::fmt::Display for FastqContainer<'a> {
             match self.id {
                 Some(id) => match self.desc {
                     Some(Some(desc)) => format!(
-                        "head: {} {}\n",
+                        "head: {} {}",
                         String::from_utf8_lossy(id),
                         String::from_utf8_lossy(desc)
                     ),
-                    _ => format!("head: {}\n", String::from_utf8_lossy(id)),
+                    _ => format!("head: {}", String::from_utf8_lossy(id)),
                 },
                 None => String::new(),
             },
             match self.seq {
                 Some(seq) =>
-                    format!("sequence: {}\n", String::from_utf8_lossy(seq)),
+                    format!("\nsequence: {}", String::from_utf8_lossy(seq)),
                 None => String::new(),
             },
             match self.sep {
                 Some(sep) =>
-                    format!("separator: {}\n", String::from_utf8_lossy(sep)),
+                    format!("\nseparator: {}", String::from_utf8_lossy(sep)),
                 None => String::new(),
             },
             match self.qual {
                 Some(qual) =>
-                    format!("quality: {}", String::from_utf8_lossy(qual)),
+                    format!("\nquality: {}", String::from_utf8_lossy(qual)),
                 None => String::new(),
             }
         );

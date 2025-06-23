@@ -136,11 +136,15 @@ fn pprof_kractor_koutput(
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file).map_err(|e| {
-            format!("Failed to create file: {} ({})", pprof_file, e)
+            format!("Failed to create file {}: {}", pprof_file, e)
         })?;
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
-        report.flamegraph_with_options(file, &mut options).unwrap();
+        report
+            .flamegraph_with_options(file, &mut options)
+            .map_err(|e| {
+                format!("Failed to write flamegraph to {}: {}", pprof_file, e)
+            })?;
     };
     out
 }
@@ -182,10 +186,16 @@ fn pprof_kractor_reads(
         threads,
     );
     if let Ok(report) = guard.report().build() {
-        let file = std::fs::File::create(pprof_file).unwrap();
+        let file = std::fs::File::create(pprof_file).map_err(|e| {
+            format!("Failed to create file {}: {}", pprof_file, e)
+        })?;
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
-        report.flamegraph_with_options(file, &mut options).unwrap();
+        report
+            .flamegraph_with_options(file, &mut options)
+            .map_err(|e| {
+                format!("Failed to write flamegraph to {}: {}", pprof_file, e)
+            })?;
     };
     out
 }

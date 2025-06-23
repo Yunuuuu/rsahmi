@@ -73,6 +73,9 @@ pub fn mmap_kractor_single_read(
                             })?;
                         }
                     }
+                    thread_tx.flush().map_err(|e| {
+                        anyhow!("Failed to send to Writer thread: {}", e)
+                    })?;
                     Ok(())
                 },
             )
