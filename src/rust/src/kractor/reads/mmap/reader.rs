@@ -206,9 +206,6 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
         >,
         FastqParseError,
     > {
-        let end1 = self.pos1 + self.chunk_size;
-        let end2 = self.pos2 + self.chunk_size;
-
         // Handle EOF logic for paired files
         let eof1 = self.pos1 >= self.slice1.len();
         let eof2 = self.pos2 >= self.slice2.len();
@@ -216,7 +213,9 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
         match (eof1, eof2) {
             (true, true) => return Ok(None),
             (true, false) => {
-                if self.slice2[end2 ..].iter().all(|b| b.is_ascii_whitespace())
+                if self.slice2[self.pos2 ..]
+                    .iter()
+                    .all(|b| b.is_ascii_whitespace())
                 {
                     self.pos2 = self.slice2.len();
                     return Ok(None);
@@ -229,7 +228,9 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
                 });
             }
             (false, true) => {
-                if self.slice1[end1 ..].iter().all(|b| b.is_ascii_whitespace())
+                if self.slice1[self.pos1 ..]
+                    .iter()
+                    .all(|b| b.is_ascii_whitespace())
                 {
                     self.pos1 = self.slice1.len();
                     return Ok(None);
@@ -243,6 +244,8 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
             }
             (false, false) => {}
         }
+        let end1 = self.pos1 + self.chunk_size;
+        let end2 = self.pos2 + self.chunk_size;
 
         let (mut chunk1, mut newlines1) =
             slice_chunk(self.slice1, self.pos1, self.chunk_size);
@@ -283,6 +286,7 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
         let nkeep = count - (count % 4);
         newlines1.truncate(nkeep);
         newlines2.truncate(nkeep);
+        // SAFETY: newlines1 won't be empty
         let endpoint1 = unsafe { *newlines1.last().unwrap_unchecked() };
         if endpoint1 == chunk1.len() {
             chunk1 = &chunk1[.. endpoint1]; // we have no endpoint '\n'
