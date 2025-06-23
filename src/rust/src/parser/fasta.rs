@@ -97,3 +97,61 @@ impl<T: AsRef<[u8]>> FastaRecordWithUMIBarcode<T> {
         writer.write_all(&buffer)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // Test the `write` method of `FastaRecord`
+    #[test]
+    fn test_fasta_record_write() {
+        let record = FastaRecord::new(
+            b"seq1".to_vec(),
+            Some(b"description".to_vec()),
+            b"AGCTTAGCTA".to_vec(),
+        );
+
+        // Create a mutable vector to capture the written output
+        let mut output = Vec::new();
+
+        // Call the write method
+        record
+            .write(&mut output)
+            .expect("Failed to write FASTA record");
+
+        // Expected output
+        let expected_output = b">seq1 description\nAGCTTAGCTA\n";
+
+        // Assert that the output matches the expected output
+        assert_eq!(output, expected_output);
+    }
+
+    // Test the `write` method of `FastaRecordWithUMIBarcode`
+    #[test]
+    fn test_fasta_record_with_umi_barcode_write() {
+        // Example data for the test
+        let record = FastaRecord::new(
+            b"seq1".to_vec(),
+            Some(b"description".to_vec()),
+            b"AGCTTAGCTA".to_vec(),
+        );
+        let umi = b"UMI1234".to_vec();
+        let barcode = b"BC5678".to_vec();
+
+        let wrapped_record =
+            FastaRecordWithUMIBarcode::new(record, umi, barcode);
+
+        // Create a mutable vector to capture the written output
+        let mut output = Vec::new();
+
+        // Call the write method
+        wrapped_record
+            .write(&mut output)
+            .expect("Failed to write FASTA record");
+
+        // Expected output (including UMI and Barcode in the header)
+        let expected_output = b">seq1@RSAHMI:UMI:UMI1234:BARCODE:BC5678:RSAHMI@ description\nAGCTTAGCTA\n";
+
+        // Assert that the output matches the expected output
+        assert_eq!(output, expected_output);
+    }
+}

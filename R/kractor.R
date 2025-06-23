@@ -209,7 +209,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
 
 rust_kractor_reads <- function(koutput, reads,
                                extract_reads = NULL,
-                               ubread = NULL, ub_pattern = NULL,
+                               ubread = NULL,
+                               umi_ranges = NULL, barcode_ranges = NULL,
                                chunk_size = NULL, buffer_size = NULL,
                                batch_size = NULL,
                                nqueue = NULL, threads = NULL,
@@ -236,13 +237,23 @@ rust_kractor_reads <- function(koutput, reads,
             )
         }
     }
-    if (!identical(is.null(ubread), is.null(ub_pattern))) {
-        cli::cli_abort(paste(
-            "Both {.arg ubread} and {.arg ub_pattern} must be provided",
-            "to extract {.field UMI} and {.field Cell Barcode}"
+    assert_string(ubread, allow_empty = FALSE, allow_null = TRUE)
+    if (!is_range(umi_ranges)) {
+        cli::cli_abort("{.arg umi_ranges} must be created with {.fn ubrange} or a combination of them using {.fn c}.")
+    }
+    if (!is_range(barcode_ranges)) {
+        cli::cli_abort("{.arg barcode_ranges} must be created with {.fn ubrange} or a combination of them using {.fn c}.")
+    }
+    if (!identical(is.null(ubread), is.null(umi_ranges)) ||
+        !identical(is.null(ubread), is.null(barcode_ranges))) {
+        cli::cli_abort(c(
+            "All or none of the following arguments must be provided:",
+            "*" = "{.arg ubread}",
+            "*" = "{.arg umi_ranges}",
+            "*" = "{.arg barcode_ranges}",
+            "i" = "These are required to extract {.field UMI} and {.field Cell Barcode}."
         ))
     }
-    assert_string(ubread, allow_empty = FALSE, allow_null = TRUE)
     assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
@@ -276,14 +287,15 @@ rust_kractor_reads <- function(koutput, reads,
         } else {
             threads
         }
-    threads <- threads %||% 1L
+    threads <- threads %||% 0L
     if (is.null(pprof)) {
         rust_call(
             "kractor_reads",
             koutput,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
-            ubread = ubread, ub_pattern = ub_pattern,
+            ubread = ubread, umi_ranges = umi_ranges,
+            barcode_ranges = barcode_ranges,
             chunk_size = chunk_size,
             buffer_size = buffer_size,
             batch_size = batch_size,
@@ -296,7 +308,8 @@ rust_kractor_reads <- function(koutput, reads,
             koutput,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
-            ubread = ubread, ub_pattern = ub_pattern,
+            ubread = ubread, umi_ranges = umi_ranges,
+            barcode_ranges = barcode_ranges,
             chunk_size = chunk_size,
             buffer_size = buffer_size,
             batch_size = batch_size,

@@ -67,8 +67,8 @@ fn kractor_reads(
     fq2: Option<&str>,
     ofile2: Option<&str>,
     ubread: Option<&str>,
-    umi_pattern: Robj,
-    barcode_pattern: Robj,
+    umi_ranges: Robj,
+    barcode_ranges: Robj,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
@@ -82,8 +82,8 @@ fn kractor_reads(
         .iter()
         .map(|id| id.as_slice())
         .collect::<HashSet<&[u8]>>();
-    let umi_pattern = ubpatterns(umi_pattern);
-    let barcode_pattern = ubpatterns(barcode_pattern);
+    let umi_ranges = ubpatterns(umi_ranges);
+    let barcode_ranges = ubpatterns(barcode_ranges);
     rprintln!("Extracting the matching sequence from: {}", fq1);
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
@@ -99,8 +99,8 @@ fn kractor_reads(
             fq2,
             ofile2,
             ubread,
-            umi_pattern,
-            barcode_pattern,
+            umi_ranges,
+            barcode_ranges,
             chunk_size,
             buffer_size,
             batch_size,

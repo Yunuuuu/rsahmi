@@ -23,8 +23,8 @@ pub fn mmap_kractor_reads(
     fq2: Option<&str>,
     ofile2: Option<&str>,
     ubread: Option<&str>,
-    umi_pattern: Option<Vec<RangeKind>>,
-    barcode_pattern: Option<Vec<RangeKind>>,
+    umi_ranges: Option<Vec<RangeKind>>,
+    barcode_ranges: Option<Vec<RangeKind>>,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
@@ -57,19 +57,19 @@ pub fn mmap_kractor_reads(
             )
         }
         (None, Some(ubread)) => {
-            let umi_pattern = umi_pattern.ok_or(anyhow!(
-                "`umi_pattern` must be provided when processing `ubread` reads"
+            let umi_ranges = umi_ranges.ok_or(anyhow!(
+                "`umi_ranges` must be provided when processing `ubread` reads"
             ))?;
-            let barcode_pattern = barcode_pattern.ok_or(anyhow!(
-                "`barcode_pattern` must be provided when processing `ubread` reads"
+            let barcode_ranges = barcode_ranges.ok_or(anyhow!(
+                "`barcode_ranges` must be provided when processing `ubread` reads"
             ))?;
             mmap_kractor_ubread_read(
                 id_sets,
                 fq1,
                 ofile1,
                 ubread,
-                umi_pattern,
-                barcode_pattern,
+                umi_ranges,
+                barcode_ranges,
                 chunk_size,
                 buffer_size,
                 batch_size,
