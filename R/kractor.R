@@ -238,10 +238,10 @@ rust_kractor_reads <- function(koutput, reads,
         }
     }
     assert_string(ubread, allow_empty = FALSE, allow_null = TRUE)
-    if (!is_range(umi_ranges)) {
+    if (!is.null(umi_ranges) && !is_range(umi_ranges)) {
         cli::cli_abort("{.arg umi_ranges} must be created with {.fn ubrange} or a combination of them using {.fn c}.")
     }
-    if (!is_range(barcode_ranges)) {
+    if (!is.null(barcode_ranges) && !is_range(barcode_ranges)) {
         cli::cli_abort("{.arg barcode_ranges} must be created with {.fn ubrange} or a combination of them using {.fn c}.")
     }
     if (!identical(is.null(ubread), is.null(umi_ranges)) ||

@@ -10,15 +10,15 @@ use rustc_hash::FxHashSet as HashSet;
 use super::reader::SliceChunkPairedReader;
 use crate::batchsender::BatchSender;
 use crate::kractor::reads::range::*;
-use crate::parser::fasta::{FastaRecord, FastaRecordWithUMIBarcode};
+use crate::parser::fasta::FastaRecordWithUMIBarcode;
 
 pub fn mmap_kractor_ubread_read(
     id_sets: HashSet<&[u8]>,
     fq: &str,
     ofile: &str,
     ubread: &str,
-    umi_pattern: Vec<RangeKind>,
-    barcode_pattern: Vec<RangeKind>,
+    umi_ranges: Vec<RangeKind>,
+    barcode_ranges: Vec<RangeKind>,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
@@ -76,11 +76,11 @@ pub fn mmap_kractor_ubread_read(
                         if id_sets.contains(record1.id) {
                             let umi = extract_pattern_from_sequence(
                                 record2.seq,
-                                &umi_pattern,
+                                &umi_ranges,
                             )?;
                             let barcode = extract_pattern_from_sequence(
                                 record2.seq,
-                                &barcode_pattern,
+                                &barcode_ranges,
                             )?;
                             let record = FastaRecordWithUMIBarcode::new(
                                 record1, umi, barcode,
