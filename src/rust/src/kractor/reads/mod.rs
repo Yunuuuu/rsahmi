@@ -3,13 +3,18 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rustc_hash::FxHashSet as HashSet;
 
 mod io;
 mod mmap;
+pub mod range;
 
-use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read};
+use mmap::{
+    mmap_kractor_paired_read, mmap_kractor_single_read,
+    mmap_kractor_ubread_read,
+};
+use range::RangeKind;
 
 pub fn mmap_kractor_reads(
     id_sets: HashSet<&[u8]>,
@@ -18,27 +23,15 @@ pub fn mmap_kractor_reads(
     fq2: Option<&str>,
     ofile2: Option<&str>,
     ubread: Option<&str>,
-    ub_pattern: Option<Vec<u8>>,
+    umi_pattern: Option<Vec<RangeKind>>,
+    barcode_pattern: Option<Vec<RangeKind>>,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
 ) -> Result<()> {
-    match (fq2, ofile2, ubread, ub_pattern) {
-        (Some(fq2), Some(ofile2), None, None)
-        | (Some(fq2), Some(ofile2), None, Some(_))
-        | (Some(fq2), Some(ofile2), Some(_), None) => mmap_kractor_paired_read(
-            id_sets,
-            fq1,
-            ofile1,
-            fq2,
-            ofile2,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-        ),
-        (None, None, None, None) => mmap_kractor_single_read(
+    match (fq2, ubread) {
+        (None, None) => mmap_kractor_single_read(
             id_sets,
             fq1,
             ofile1,
@@ -47,13 +40,46 @@ pub fn mmap_kractor_reads(
             batch_size,
             nqueue,
         ),
-        (Some(_), Some(_), Some(_), Some(_)) => {
-            unreachable!("Paired + UMI mode is not supported yet")
-        }
-        _ => {
-            unreachable!(
-                "Invalid argument combination for paired/single/UMI mode"
+        (Some(fq2), None) => {
+            let ofile2 = ofile2.ok_or(anyhow!(
+                "`ofile2` must be provided when processing paired-end reads"
+            ))?;
+            mmap_kractor_paired_read(
+                id_sets,
+                fq1,
+                ofile1,
+                fq2,
+                ofile2,
+                chunk_size,
+                buffer_size,
+                batch_size,
+                nqueue,
             )
+        }
+        (None, Some(ubread)) => {
+            let umi_pattern = umi_pattern.ok_or(anyhow!(
+                "`umi_pattern` must be provided when processing `ubread` reads"
+            ))?;
+            let barcode_pattern = barcode_pattern.ok_or(anyhow!(
+                "`barcode_pattern` must be provided when processing `ubread` reads"
+            ))?;
+            mmap_kractor_ubread_read(
+                id_sets,
+                fq1,
+                ofile1,
+                ubread,
+                umi_pattern,
+                barcode_pattern,
+                chunk_size,
+                buffer_size,
+                batch_size,
+                nqueue,
+            )
+        }
+        (Some(_), Some(_)) => {
+            return Err(anyhow!(
+                "Both `fq2` and `ubread` cannot be provided simultaneously. Choose one."
+            ));
         }
     }
 }

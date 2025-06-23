@@ -39,3 +39,61 @@ impl<T: AsRef<[u8]>> FastaRecord<T> {
         writer.write_all(&buffer)
     }
 }
+
+/// Wrapper struct to include UMI and Barcode in the FASTA Record ID
+#[derive(Debug)]
+pub struct FastaRecordWithUMIBarcode<T> {
+    record: FastaRecord<T>,
+    umi: Vec<u8>,
+    barcode: Vec<u8>,
+}
+
+impl<T> FastaRecordWithUMIBarcode<T> {
+    pub fn new(record: FastaRecord<T>, umi: Vec<u8>, barcode: Vec<u8>) -> Self {
+        Self {
+            record,
+            umi,
+            barcode,
+        }
+    }
+}
+
+impl<T: AsRef<[u8]>> FastaRecordWithUMIBarcode<T> {
+    pub fn write<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let id = self.record.id.as_ref();
+        let desc = self.record.desc.as_ref().map(|d| d.as_ref());
+        let seq = self.record.seq.as_ref();
+        let mut buffer = Vec::with_capacity(
+            id.len()
+                + b"@RSAHMI:UMI:".len() // Constant length for the UMI part
+                + self.umi.len() // UMI length
+                + b":BARCODE:".len() // Constant length for the Barcode part
+                + self.barcode.len() // Barcode length
+                + b":RSAHMI@".len() // Constant RSAHMI end part
+                + desc.map(|d| d.len() + 1).unwrap_or(0) // ' '
+                + seq.len()
+                + 3, // '>' and 2 * '\n'
+        );
+        buffer.extend_from_slice(b">");
+        buffer.extend_from_slice(id);
+
+        // Add UMI and Barcode information
+        buffer.extend_from_slice(b"@RSAHMI:UMI:");
+        buffer.extend_from_slice(&self.umi);
+        buffer.extend_from_slice(b":BARCODE:");
+        buffer.extend_from_slice(&self.barcode);
+        buffer.extend_from_slice(b":RSAHMI@");
+
+        // Optionally append description
+        if let Some(desc) = &desc {
+            buffer.push(b' ');
+            buffer.extend_from_slice(desc);
+        }
+
+        buffer.push(b'\n');
+        buffer.extend_from_slice(seq);
+        buffer.push(b'\n');
+
+        writer.write_all(&buffer)
+    }
+}

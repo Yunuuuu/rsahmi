@@ -4,6 +4,8 @@ use rustc_hash::FxHashSet as HashSet;
 mod koutput;
 mod reads;
 
+use reads::range::*;
+
 #[extendr]
 #[allow(clippy::too_many_arguments)]
 fn kractor_koutput(
@@ -65,7 +67,8 @@ fn kractor_reads(
     fq2: Option<&str>,
     ofile2: Option<&str>,
     ubread: Option<&str>,
-    _ub_pattern: Robj,
+    umi_pattern: Robj,
+    barcode_pattern: Robj,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
@@ -79,7 +82,8 @@ fn kractor_reads(
         .iter()
         .map(|id| id.as_slice())
         .collect::<HashSet<&[u8]>>();
-
+    let umi_pattern = ubpatterns(umi_pattern);
+    let barcode_pattern = ubpatterns(barcode_pattern);
     rprintln!("Extracting the matching sequence from: {}", fq1);
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
@@ -95,7 +99,8 @@ fn kractor_reads(
             fq2,
             ofile2,
             ubread,
-            None,
+            umi_pattern,
+            barcode_pattern,
             chunk_size,
             buffer_size,
             batch_size,
