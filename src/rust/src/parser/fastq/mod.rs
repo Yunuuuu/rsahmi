@@ -1,10 +1,10 @@
+mod container;
 mod error;
 mod reader;
 mod record;
-mod container;
 
+pub use container::FastqContainer;
 pub use error::FastqParseError;
-pub use reader::{FastqReader, FastqSource, FastqPairedReader};
+pub use reader::{FastqPairedReader, FastqReader, FastqSource};
 #[allow(unused_imports)]
 pub use record::FastqRecord;
-pub use container::FastqContainer;

@@ -100,9 +100,12 @@ impl<'a> SliceChunkReader<'a> {
         }
 
         // Truncate to a multiple of 4 lines to ensure only complete records are included
+        if newlines.len() >= 4 {
+            let nkeep = newlines.len() - (newlines.len() % 4);
+            newlines.truncate(nkeep);
+        }
+
         // SAFETY: above code will ensure newlines won't be empty
-        let nkeep = newlines.len() - (newlines.len() % 4);
-        newlines.truncate(nkeep);
         let endpoint = unsafe { *newlines.last().unwrap_unchecked() };
         if endpoint == chunk.len() {
             chunk = &chunk[.. endpoint]; // we have no endpoint '\n'
@@ -246,16 +249,39 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
             slice_chunk(self.slice1, self.pos1, self.chunk_size);
 
         let (mut chunk2, mut newlines2) =
-            slice_chunk(self.slice2, self.pos1, self.chunk_size);
+            slice_chunk(self.slice2, self.pos2, self.chunk_size);
 
         // Truncate to a multiple of 4 lines to ensure only complete records are included
         let count = usize::min(newlines1.len(), newlines2.len());
-        let nkeep = count - (count % 4);
-        if nkeep < 4 && end1 < self.slice1.len() && end2 < self.slice2.len() {
-            self.chunk_size += self.chunk_size;
+        if count < 4 && end1 < self.slice1.len() && end2 < self.slice2.len() {
+            self.chunk_size *= 2;
             return self.chunk_reader();
         }
 
+        // If one file only contain few lines, it means it has incompleted record
+        if count < 4 && (end1 >= self.slice1.len() || end2 >= self.slice2.len())
+        {
+            let (label, pos, record) = if end1 >= self.slice1.len() {
+                (
+                    self.label1,
+                    self.line_offset1,
+                    String::from_utf8_lossy(chunk1).to_string(),
+                )
+            } else {
+                (
+                    self.label2,
+                    self.line_offset2,
+                    String::from_utf8_lossy(chunk2).to_string(),
+                )
+            };
+            return Err(FastqParseError::IncompleteRecord {
+                label,
+                record,
+                pos,
+            });
+        }
+
+        let nkeep = count - (count % 4);
         newlines1.truncate(nkeep);
         newlines2.truncate(nkeep);
         let endpoint1 = unsafe { *newlines1.last().unwrap_unchecked() };
@@ -346,12 +372,12 @@ impl<'a> FastqSource<'a> for SliceFastqChunkSource<'a> {
 mod tests {
     use super::*;
 
-    const FASTQ_SINGLE: &str = 
+    const FASTQ_SINGLE: &str =
         "@SEQ_ID1\nGATTACA\n+\n!!!!!!!\n@SEQ_ID2\nCTGAAGT\n+\n???????\n@SEQ_ID3\nTTTGGCA\n+\n%%%%%%%\n@SEQ_ID4\nAACCGGT\n+\n(((((((\n";
-    const FASTQ_PAIR_1: &str = 
+    const FASTQ_PAIR_1: &str =
         "@SEQ_ID1\nGATTACA\n+\n!!!!!!!\n@SEQ_ID2\nCTGAAGT\n+\n???????\n@SEQ_ID3\nTTTGGCA\n+\n%%%%%%%\n@SEQ_ID4\nAACCGGT\n+\n(((((((\n";
 
-    const FASTQ_PAIR_2: &str = 
+    const FASTQ_PAIR_2: &str =
         "@SEQ_ID1\nTTGGAAC\n+\n!!!!!!!\n@SEQ_ID2\nACTTCAG\n+\n???????\n@SEQ_ID3\nTGCCAAA\n+\n%%%%%%%\n@SEQ_ID4\nACCGGTT\n+\n(((((((\n";
 
     #[test]
@@ -379,7 +405,7 @@ mod tests {
         for pair in reader {
             let mut pair = pair.unwrap();
             while let Some((r1, r2)) = pair.read_record().unwrap() {
-                assert_eq!(r1.id[5..], r2.id[5..]); // match SEQ_IDn
+                assert_eq!(r1.id[5 ..], r2.id[5 ..]); // match SEQ_IDn
                 total_records += 1;
             }
         }

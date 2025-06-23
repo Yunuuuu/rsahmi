@@ -14,27 +14,24 @@ impl<'a> std::fmt::Display for FastqContainer<'a> {
             match self.id {
                 Some(id) => match self.desc {
                     Some(Some(desc)) => format!(
-                        "head: {} {}",
+                        "{} {}",
                         String::from_utf8_lossy(id),
                         String::from_utf8_lossy(desc)
                     ),
-                    _ => format!("head: {}", String::from_utf8_lossy(id)),
+                    _ => format!("{}", String::from_utf8_lossy(id)),
                 },
                 None => String::new(),
             },
             match self.seq {
-                Some(seq) =>
-                    format!("\nsequence: {}", String::from_utf8_lossy(seq)),
+                Some(seq) => format!("\n{}", String::from_utf8_lossy(seq)),
                 None => String::new(),
             },
             match self.sep {
-                Some(sep) =>
-                    format!("\nseparator: {}", String::from_utf8_lossy(sep)),
+                Some(sep) => format!("\n{}", String::from_utf8_lossy(sep)),
                 None => String::new(),
             },
             match self.qual {
-                Some(qual) =>
-                    format!("\nquality: {}", String::from_utf8_lossy(qual)),
+                Some(qual) => format!("\n{}", String::from_utf8_lossy(qual)),
                 None => String::new(),
             }
         );
@@ -44,6 +41,7 @@ impl<'a> std::fmt::Display for FastqContainer<'a> {
 }
 
 impl<'a> FastqContainer<'a> {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -135,10 +133,10 @@ mod tests {
         container.set_qual(b"####");
 
         let formatted = format!("{}", container);
-        assert!(formatted.contains("head: SEQ_ID desc"));
-        assert!(formatted.contains("sequence: ACGT"));
-        assert!(formatted.contains("separator: +"));
-        assert!(formatted.contains("quality: ####"));
+        assert!(formatted.contains("SEQ_ID desc"));
+        assert!(formatted.contains("ACGT"));
+        assert!(formatted.contains("+"));
+        assert!(formatted.contains("####"));
     }
 
     #[test]
@@ -151,8 +149,8 @@ mod tests {
         container.set_qual(b"####");
 
         let formatted = format!("{}", container);
-        assert!(formatted.contains("head: SEQ_ID\n"));
-        assert!(formatted.contains("sequence: ACGT"));
+        assert!(formatted.contains("SEQ_ID\n"));
+        assert!(formatted.contains("ACGT"));
     }
 
     #[test]

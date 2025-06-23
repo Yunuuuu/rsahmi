@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::Result;
 use rustc_hash::FxHashSet as HashSet;
 
+mod io;
 mod mmap;
 
 use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read};
