@@ -101,8 +101,7 @@ impl<'a> SliceChunkReader<'a> {
 
         // Truncate to a multiple of 4 lines to ensure only complete records are included
         if newlines.len() >= 4 {
-            let nkeep = newlines.len() - (newlines.len() % 4);
-            newlines.truncate(nkeep);
+            newlines.truncate(newlines.len() - (newlines.len() % 4));
         }
 
         // SAFETY: above code will ensure newlines won't be empty
