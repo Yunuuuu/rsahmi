@@ -83,8 +83,10 @@ pub fn mmap_kractor_koutput(
                         }
                         match thread_tx.flush() {
                             Ok(_) => return (),
-                            Err(_) => {
+                            Err(e) => {
                                 has_error.store(true, Relaxed);
+                                // we only capture the first error
+                                let _ = err_tx.try_send(e);
                                 return ();
                             }
                         }
