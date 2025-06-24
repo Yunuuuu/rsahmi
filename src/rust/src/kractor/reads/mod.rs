@@ -6,6 +6,8 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashSet as HashSet;
 
+mod parser;
+mod io;
 mod mmap;
 pub mod range;
 

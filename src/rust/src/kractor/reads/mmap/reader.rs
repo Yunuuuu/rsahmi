@@ -1,7 +1,7 @@
 use memchr::memchr_iter;
 
-use crate::parser::fasta::FastaRecord;
-use crate::parser::fastq::{
+use crate::kractor::reads::parser::fasta::FastaRecord;
+use crate::kractor::reads::parser::fastq::{
     FastqPairedReader, FastqParseError, FastqReader, FastqSource,
 };
 

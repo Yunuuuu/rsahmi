@@ -3,10 +3,10 @@ use memchr::{memchr, memmem};
 use rustc_hash::FxHashSet as HashSet;
 
 mod mmap;
-mod reader;
+mod io;
 
 pub use mmap::mmap_kractor_koutput;
-pub use reader::reader_kractor_koutput;
+pub use io::reader_kractor_koutput;
 
 static KOUTPUT_TAXID_PREFIX_FINDER: std::sync::LazyLock<memmem::Finder> =
     std::sync::LazyLock::new(|| memmem::Finder::new("(taxid"));

@@ -3,7 +3,6 @@ use extendr_api::prelude::*;
 
 mod batchsender;
 mod kractor;
-mod parser; // kraken extractor
 
 pub(crate) fn new_channel<T>(
     nqueue: Option<usize>,

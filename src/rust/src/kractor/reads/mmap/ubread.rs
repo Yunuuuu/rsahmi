@@ -12,8 +12,8 @@ use rustc_hash::FxHashSet as HashSet;
 
 use super::reader::SliceChunkPairedReader;
 use crate::batchsender::BatchSender;
+use crate::kractor::reads::parser::fasta::FastaRecordWithUMIBarcode;
 use crate::kractor::reads::range::*;
-use crate::parser::fasta::FastaRecordWithUMIBarcode;
 
 pub fn mmap_kractor_ubread_read(
     id_sets: HashSet<&[u8]>,

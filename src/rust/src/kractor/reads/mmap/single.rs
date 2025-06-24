@@ -12,7 +12,7 @@ use rustc_hash::FxHashSet as HashSet;
 
 use super::reader::SliceChunkReader;
 use crate::batchsender::BatchSender;
-use crate::parser::fasta::FastaRecord;
+use crate::kractor::reads::parser::fasta::FastaRecord;
 
 pub fn mmap_kractor_single_read(
     id_sets: HashSet<&[u8]>,
