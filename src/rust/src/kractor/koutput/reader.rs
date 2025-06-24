@@ -197,7 +197,7 @@ impl Iterator for BytesKoutputChunk {
         }
         let out;
         if let Some(pos) = memchr(b'\n', &self.chunk[self.pos ..]) {
-            out = &self.chunk[self.pos .. self.pos + pos];
+            out = &self.chunk[self.pos ..= self.pos + pos];
             self.pos += pos + 1;
         } else {
             out = &self.chunk[self.pos ..];
