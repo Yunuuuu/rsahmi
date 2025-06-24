@@ -31,7 +31,8 @@ pub fn mmap_kractor_koutput(
     //     patterns.into_iter().map(|s| s.as_bytes()).collect();
     // https://github.com/rayon-rs/rayon/discussions/1164
     let map = unsafe { Mmap::map(&file) }?;
-    map.advise(Advice::Sequential)?;
+    // #[cfg(unix)]
+    // map.advise(Advice::Sequential)?;
 
     std::thread::scope(|scope| {
         // Create a channel between the parser and writer threads

@@ -32,11 +32,13 @@ pub fn mmap_kractor_paired_read(
     // Open and memory-map the input FASTQ file
     let file1 = File::open(fq1)?;
     let map1 = unsafe { Mmap::map(&file1) }?;
-    map1.advise(Advice::Sequential)?;
+    // #[cfg(unix)]
+    // map1.advise(Advice::Sequential)?;
 
     let file2 = File::open(fq2)?;
     let map2 = unsafe { Mmap::map(&file2) }?;
-    map2.advise(Advice::Sequential)?;
+    // #[cfg(unix)]
+    // map2.advise(Advice::Sequential)?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
