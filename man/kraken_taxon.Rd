@@ -61,26 +61,8 @@ Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
 the kraken style, connected by rank codes, two underscores, and the
 scientific name of the taxon (e.g., "d__Viruses").}
 
-\item{read_buffer}{Integer specifying the size in bytes of the intermediate
-buffer used for splitting and distributing chunks to worker threads during
-processing. Default is \code{NULL}, which enables memory-mapped file access.
-Memory mapping is highly efficient for multi-threaded reading and avoids
-redundant copying. However, its performance and behavior may depend on the
-operating system and file system. If set to \code{0}, it will fall back to a
-size of \code{1 * 1024 * 1024} (1MB).}
-
-\item{write_buffer}{Integer specifying the buffer size in bytes used for
-writing to disk. This controls the capacity of the buffered file writer.
-Default is \code{1 * 1024 * 1024} (1MB). If set to \code{0}, it will fall back to a
-the default size.}
-
 \item{batch_size}{Integer. Number of records to accumulate before triggering
-a write operation or sending to another thread for parsing (when
-\code{read_buffer} is zero). Default is \code{500}.}
-
-\item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
-controlling the amount of in-flight data awaiting processing or
-writing. Default: \code{10}.}
+a write operation. Default is \code{500}.}
 
 \item{kraken2_threads}{Integer. Number of threads to use. Default to all
 available threads.}

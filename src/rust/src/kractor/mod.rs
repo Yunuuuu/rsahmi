@@ -9,15 +9,15 @@ use reads::range::*;
 #[extendr]
 #[allow(clippy::too_many_arguments)]
 fn kractor_koutput(
+    patterns: Robj,
     koutput: &str,
     ofile: &str,
-    patterns: Robj,
+    chunk_size: usize,
+    buffer_size: usize,
     batch_size: usize,
-    read_buffer: Option<usize>,
-    write_buffer: usize,
-    read_queue: Option<usize>,
-    write_queue: Option<usize>,
+    nqueue: Option<usize>,
     threads: usize,
+    mmap: bool,
 ) -> std::result::Result<(), String> {
     let pattern_vec = patterns
         .as_str_vector()
@@ -32,26 +32,25 @@ fn kractor_koutput(
         })?;
     rayon_pool
         .install(|| {
-            if let Some(read_buffer) = read_buffer {
-                koutput::reader_kractor_koutput(
+            if mmap {
+                koutput::mmap_kractor_koutput(
+                    &pattern_vec,
                     koutput,
                     ofile,
-                    &pattern_vec,
+                    chunk_size,
+                    buffer_size,
                     batch_size,
-                    read_buffer,
-                    write_buffer,
-                    read_queue,
-                    write_queue,
+                    nqueue,
                 )
             } else {
-                koutput::mmap_kractor_koutput(
+                koutput::reader_kractor_koutput(
+                    &pattern_vec,
                     koutput,
                     ofile,
-                    &pattern_vec,
+                    chunk_size,
+                    buffer_size,
                     batch_size,
-                    write_buffer,
-                    read_queue,
-                    write_queue,
+                    nqueue,
                 )
             }
         })
@@ -113,15 +112,15 @@ fn kractor_reads(
 #[extendr]
 #[cfg(feature = "bench")]
 fn pprof_kractor_koutput(
+    patterns: Robj,
     koutput: &str,
     ofile: &str,
-    patterns: Robj,
+    chunk_size: usize,
+    buffer_size: usize,
     batch_size: usize,
-    read_buffer: Option<usize>,
-    write_buffer: usize,
-    read_queue: Option<usize>,
-    write_queue: Option<usize>,
+    nqueue: Option<usize>,
     threads: usize,
+    mmap: bool,
     pprof_file: &str,
 ) -> std::result::Result<(), String> {
     let guard = pprof::ProfilerGuardBuilder::default()
@@ -129,15 +128,15 @@ fn pprof_kractor_koutput(
         .build()
         .map_err(|e| format!("cannot create profile guard {:?}", e))?;
     let out = kractor_koutput(
+        patterns,
         koutput,
         ofile,
-        patterns,
+        chunk_size,
+        buffer_size,
         batch_size,
-        read_buffer,
-        write_buffer,
-        read_queue,
-        write_queue,
+        nqueue,
         threads,
+        mmap,
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file).map_err(|e| {
@@ -164,7 +163,8 @@ fn pprof_kractor_reads(
     fq2: Option<&str>,
     ofile2: Option<&str>,
     ubread: Option<&str>,
-    ub_pattern: Robj,
+    umi_ranges: Robj,
+    barcode_ranges: Robj,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
@@ -183,7 +183,8 @@ fn pprof_kractor_reads(
         fq2,
         ofile2,
         ubread,
-        ub_pattern,
+        umi_ranges,
+        barcode_ranges,
         chunk_size,
         buffer_size,
         batch_size,

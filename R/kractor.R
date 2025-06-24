@@ -16,27 +16,35 @@
 #' @param taxon An atomic character specify the taxa name wanted. Should follow
 #' the kraken style, connected by rank codes, two underscores, and the
 #' scientific name of the taxon (e.g., "d__Viruses").
+#' @param ubread Path to the input sequence file that contains UMI and/or
+#'   barcode sequences. If `NULL`, UMI/barcode parsing is disabled. When
+#'   specified, `reads` must contain only a single FASTQ file. This is commonly
+#'   used for 10x Genomics single-cell data, where the first read file contains
+#'   only UMI and barcode sequences. In such cases, you should provide that file
+#'   via `ubread`.
+#' @param umi_ranges A range or a list of ranges specifying where UMI sequences
+#'   are located in the reads. Must be created using the `ubrange()` function.
+#'   Only used when `ubread` is not `NULL`.
+#' @param barcode_ranges A range or a list of ranges specifying where cell
+#'   barcode sequences are located in the reads. Must be created using the
+#'   `ubrange()` function.  Only used when `ubread` is not `NULL`.
 #' @param batch_size Integer. Number of records to accumulate before triggering
-#' a write operation or sending to another thread for parsing (when
-#' `read_buffer` is zero). Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
-#' @param read_buffer Integer specifying the size in bytes of the intermediate
-#' buffer used for splitting and distributing chunks to worker threads during
-#' processing. Default is `NULL`, which enables memory-mapped file access.
-#' Memory mapping is highly efficient for multi-threaded reading and avoids
-#' redundant copying. However, its performance and behavior may depend on the
-#' operating system and file system. If set to `0`, it will fall back to a
-#' size of `1 * 1024 * 1024` (1MB).
-#' @param write_buffer Integer specifying the buffer size in bytes used for
+#' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
+#' @param chunk_size Integer. Size in bytes of the intermediate chunk used to
+#'   split and distribute data to worker threads during processing. Default is
+#'   `10 * 1024 * 1024` (10MB).
+#' @param buffer_size Integer specifying the buffer size in bytes used for
 #' writing to disk. This controls the capacity of the buffered file writer.
-#' Default is `1 * 1024 * 1024` (1MB). If set to `0`, it will fall back to a
-#' the default size.
-#' @param read_queue,write_queue Integer. Maximum number of buffers per thread,
-#'   controlling the amount of in-flight data awaiting processing or
-#'   writing. Default: `10`.
+#' Default is `1 * 1024 * 1024` (1MB).
+#' @param nqueue Integer. Maximum number of buffers per thread, controlling the
+#'   amount of in-flight data awaiting writing. Default: `3`.
 #' @param threads Integer. Number of threads to use. Default will determined
 #' atomatically by rayon.
 #' @param odir A string of directory to save the `ofile`.
-#'
+#' @param mmap Logical. Whether to use memory-mapped file access. Memory mapping
+#'   is highly efficient for multi-threaded reading and avoids redundant
+#'   copying.  However, its performance and behavior may depend on the operating
+#'   system and file system.
 #' @seealso [`kraken_taxon()`]
 #' @return None. This function generates the following files:
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
@@ -73,51 +81,53 @@
 kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                    read_buffer = NULL, write_buffer = NULL,
-                    batch_size = NULL, read_queue = NULL, write_queue = NULL,
-                    threads = NULL, odir = getwd()) {
+                    ubread = NULL, umi_ranges = NULL, barcode_ranges = NULL,
+                    chunk_size = NULL, buffer_size = NULL,
+                    batch_size = NULL, nqueue = NULL,
+                    threads = NULL, odir = getwd(),
+                    mmap = TRUE) {
     rust_kractor_koutput(
         kreport, koutput,
         extract_koutput = extract_koutput,
         taxon = taxon,
-        read_buffer = read_buffer,
-        write_buffer = write_buffer,
+        chunk_size = chunk_size,
+        buffer_size = buffer_size,
         batch_size = batch_size,
-        read_queue = read_queue,
-        write_queue = write_queue,
+        nqueue = nqueue,
         threads = threads,
         odir = odir,
+        mmap = mmap,
     )
     rust_kractor_reads(
         file.path(odir, extract_koutput %||% "kraken_microbiome_output.txt"),
         reads = reads,
         extract_reads = extract_reads,
-        read_buffer = read_buffer,
-        write_buffer = write_buffer,
+        ubread = ubread,
+        umi_ranges = umi_ranges,
+        barcode_ranges = barcode_ranges,
+        chunk_size = chunk_size,
+        buffer_size = buffer_size,
         batch_size = batch_size,
-        read_queue = read_queue,
-        write_queue = write_queue,
+        nqueue = nqueue,
         threads = threads,
-        odir = odir,
+        odir = odir
     )
     cli::cli_inform(c("v" = "Finished"))
 }
 
 BATCH_SIZE <- 500L
 CHUNK_SIZE <- 10L * 1024L * 1024L
-ONE_GB_SIZE <- 1 * 1024L * 1024L * 1024L
-READ_BUFFER <- 1L * 1024L * 1024L
-WRITE_BUFFER <- 1L * 1024L * 1024L
+BUFFER_SIZE <- 1L * 1024L * 1024L
 
 rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
                                  taxon = c(
                                      "d__Bacteria", "d__Fungi",
                                      "d__Viruses"
                                  ),
-                                 batch_size = NULL,
-                                 read_buffer = NULL, write_buffer = NULL,
-                                 read_queue = NULL, write_queue = NULL,
-                                 threads = NULL, odir = getwd(), pprof = NULL) {
+                                 chunk_size = NULL, buffer_size = NULL,
+                                 batch_size = NULL, nqueue = NULL,
+                                 threads = NULL, odir = getwd(),
+                                 mmap = TRUE, pprof = NULL) {
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
     assert_string(extract_koutput, allow_empty = FALSE, allow_null = TRUE)
@@ -136,25 +146,13 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     )$
         select(pl$col("taxids")$list$last())$
         to_series()$unique()
-    assert_number_whole(batch_size, min = 0, allow_null = TRUE)
-    assert_number_whole(read_buffer, min = 0, allow_null = TRUE)
-    assert_number_whole(write_buffer, min = 0, allow_null = TRUE)
+    assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
+    assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
     assert_number_whole(threads,
         min = 0, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    read_queue <- check_queue(read_queue, 10) *
-        if (is.null(threads) || threads == 0L) {
-            parallel::detectCores()
-        } else {
-            threads
-        }
-    write_queue <- check_queue(write_queue, 10L) *
-        if (is.null(threads) || threads == 0L) {
-            parallel::detectCores()
-        } else {
-            threads
-        }
     assert_string(odir, allow_empty = FALSE)
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)
@@ -169,39 +167,42 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     patterns <- paste0("(taxid ", as.character(taxids), ")")
     extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
     extract_koutput <- file.path(odir, extract_koutput)
-    if (!is.null(read_buffer) && read_buffer == 0L) {
-        read_buffer <- READ_BUFFER # 1MB
-    }
-    if (is.null(write_buffer) || write_buffer == 0L) {
-        write_buffer <- WRITE_BUFFER # 1MB
-    }
+
+    chunk_size <- chunk_size %||% CHUNK_SIZE
+    buffer_size <- buffer_size %||% BUFFER_SIZE
     batch_size <- batch_size %||% BATCH_SIZE
+    nqueue <- check_queue(nqueue, 3L) *
+        if (is.null(threads) || threads == 0L) {
+            parallel::detectCores()
+        } else {
+            threads
+        }
     threads <- threads %||% 0L # Let rayon to determine the threads
     if (is.null(pprof)) {
         rust_call(
             "kractor_koutput",
-            koutput,
-            ofile = extract_koutput,
             patterns = patterns,
+            koutput = koutput,
+            ofile = extract_koutput,
+            chunk_size = chunk_size,
+            buffer_size = buffer_size,
             batch_size = batch_size,
-            read_buffer = read_buffer,
-            write_buffer = write_buffer,
-            read_queue = read_queue,
-            write_queue = write_queue,
-            threads = threads
+            nqueue = nqueue,
+            threads = threads,
+            mmap = mmap
         )
     } else {
         rust_call(
             "pprof_kractor_koutput",
-            koutput,
-            ofile = extract_koutput,
             patterns = patterns,
+            koutput = koutput,
+            ofile = extract_koutput,
+            chunk_size = chunk_size,
+            buffer_size = buffer_size,
             batch_size = batch_size,
-            read_buffer = read_buffer,
-            write_buffer = write_buffer,
-            read_queue = read_queue,
-            write_queue = write_queue,
+            nqueue = nqueue,
             threads = threads,
+            mmap = mmap,
             pprof_file = file.path(odir, pprof)
         )
     }
@@ -254,6 +255,15 @@ rust_kractor_reads <- function(koutput, reads,
             "i" = "These are required to extract {.field UMI} and {.field Cell Barcode}."
         ))
     }
+    if (!is.null(ubread) && length(reads) == 2L) {
+        cli::cli_abort(c(
+            "{.arg reads} must be a single FASTQ file when {.arg ubread} is specified.",
+            i = paste(
+                "UMI/barcode parsing requires {.arg reads} to contain only one input file",
+                "while the read containing UMI/barcode sequences must be passed via {.arg ubread}."
+            )
+        ))
+    }
     assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
@@ -279,7 +289,7 @@ rust_kractor_reads <- function(koutput, reads,
     }
 
     chunk_size <- chunk_size %||% CHUNK_SIZE
-    buffer_size <- buffer_size %||% WRITE_BUFFER
+    buffer_size <- buffer_size %||% BUFFER_SIZE
     batch_size <- batch_size %||% BATCH_SIZE
     nqueue <- check_queue(nqueue, 3L) *
         if (is.null(threads) || threads == 0L) {

@@ -1,5 +1,6 @@
 use std::io::Write;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct FastqRecord<T> {
     pub id: T,
@@ -10,6 +11,7 @@ pub struct FastqRecord<T> {
 }
 
 impl<T> FastqRecord<T> {
+    #[allow(dead_code)]
     pub fn new(id: T, desc: Option<T>, seq: T, sep: T, qual: T) -> Self {
         Self {
             id,
@@ -22,6 +24,7 @@ impl<T> FastqRecord<T> {
 }
 
 impl<T: AsRef<[u8]>> FastqRecord<T> {
+    #[allow(dead_code)]
     pub fn write<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let id = self.id.as_ref();
         let desc = self.desc.as_ref().map(|d| d.as_ref());

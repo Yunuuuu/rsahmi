@@ -11,13 +11,16 @@ kractor(
   extract_koutput = NULL,
   extract_reads = NULL,
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-  read_buffer = NULL,
-  write_buffer = NULL,
+  ubread = NULL,
+  umi_ranges = NULL,
+  barcode_ranges = NULL,
+  chunk_size = NULL,
+  buffer_size = NULL,
   batch_size = NULL,
-  read_queue = NULL,
-  write_queue = NULL,
+  nqueue = NULL,
   threads = NULL,
-  odir = getwd()
+  odir = getwd(),
+  mmap = TRUE
 )
 }
 \arguments{
@@ -40,31 +43,44 @@ Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
 the kraken style, connected by rank codes, two underscores, and the
 scientific name of the taxon (e.g., "d__Viruses").}
 
-\item{read_buffer}{Integer specifying the size in bytes of the intermediate
-buffer used for splitting and distributing chunks to worker threads during
-processing. Default is \code{NULL}, which enables memory-mapped file access.
-Memory mapping is highly efficient for multi-threaded reading and avoids
-redundant copying. However, its performance and behavior may depend on the
-operating system and file system. If set to \code{0}, it will fall back to a
-size of \code{1 * 1024 * 1024} (1MB).}
+\item{ubread}{Path to the input sequence file that contains UMI and/or
+barcode sequences. If \code{NULL}, UMI/barcode parsing is disabled. When
+specified, \code{reads} must contain only a single FASTQ file. This is commonly
+used for 10x Genomics single-cell data, where the first read file contains
+only UMI and barcode sequences. In such cases, you should provide that file
+via \code{ubread}.}
 
-\item{write_buffer}{Integer specifying the buffer size in bytes used for
+\item{umi_ranges}{A range or a list of ranges specifying where UMI sequences
+are located in the reads. Must be created using the \code{ubrange()} function.
+Only used when \code{ubread} is not \code{NULL}.}
+
+\item{barcode_ranges}{A range or a list of ranges specifying where cell
+barcode sequences are located in the reads. Must be created using the
+\code{ubrange()} function.  Only used when \code{ubread} is not \code{NULL}.}
+
+\item{chunk_size}{Integer. Size in bytes of the intermediate chunk used to
+split and distribute data to worker threads during processing. Default is
+\code{10 * 1024 * 1024} (10MB).}
+
+\item{buffer_size}{Integer specifying the buffer size in bytes used for
 writing to disk. This controls the capacity of the buffered file writer.
-Default is \code{1 * 1024 * 1024} (1MB). If set to \code{0}, it will fall back to a
-the default size.}
+Default is \code{1 * 1024 * 1024} (1MB).}
 
 \item{batch_size}{Integer. Number of records to accumulate before triggering
-a write operation or sending to another thread for parsing (when
-\code{read_buffer} is zero). Default is \code{500}.}
+a write operation. Default is \code{500}.}
 
-\item{read_queue, write_queue}{Integer. Maximum number of buffers per thread,
-controlling the amount of in-flight data awaiting processing or
-writing. Default: \code{10}.}
+\item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
+amount of in-flight data awaiting writing. Default: \code{3}.}
 
 \item{threads}{Integer. Number of threads to use. Default will determined
 atomatically by rayon.}
 
 \item{odir}{A string of directory to save the \code{ofile}.}
+
+\item{mmap}{Logical. Whether to use memory-mapped file access. Memory mapping
+is highly efficient for multi-threaded reading and avoids redundant
+copying.  However, its performance and behavior may depend on the operating
+system and file system.}
 }
 \value{
 None. This function generates the following files:

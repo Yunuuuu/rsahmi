@@ -1,10 +1,11 @@
 use std::fs::File;
 use std::io::BufWriter;
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
 use memmap2::{Advice, Mmap};
-use rayon::prelude::*;
 use rustc_hash::FxHashSet as HashSet;
 
 use super::reader::SliceChunkReader;
@@ -53,32 +54,70 @@ pub fn mmap_kractor_single_read(
         let mut reader = SliceChunkReader::with_capacity(chunk_size, &map);
         reader.set_label("fq1");
 
-        let parser_handle = scope.spawn(move || {
-            // will move `reader`, `parser_tx`, and `id_sets`
-            reader.par_bridge().try_for_each_init(
-                // Initialize per-thread batching sender
-                || BatchSender::with_capacity(batch_size, parser_tx.clone()),
-                |thread_tx, mut parser| -> Result<()> {
-                    // Each thread parses a chunk, filters it, and sends matching records
-                    while let Some(record) = parser.read_record()? {
-                        if id_sets.contains(record.id) {
-                            // Wrap `SendError` in `anyhow::Error` explicitly.
-                            // this avoids capturing internal references (from `mmap`).
-                            // whose lifetime is not long enough to hold it
-                            thread_tx.send(record).map_err(|e| {
-                                anyhow!(
-                                    "Failed to send to Writer thread: {}",
-                                    e
-                                )
-                            })?;
-                        }
+        let parser_handle = scope.spawn(move || -> Result<()> {
+            // will move `reader`, `parser_tx`, and `matcher`
+            // Shared atomic flag to signal if any thread encountered an error
+            let has_error = Arc::new(AtomicBool::new(false));
+            // A bounded channel to capture the first error that occurs (capacity = 1)
+            let (err_tx, err_rx) = crossbeam_channel::bounded(1);
+            // Reuse the shared ID set for matching records
+            let id_sets = &id_sets;
+            // Rayon scope for spawning parsing threads
+            rayon::scope(|s| {
+                for mut parser in reader {
+                    // If an error already occurred, stop spawning new threads
+                    if has_error.load(Relaxed) {
+                        return ();
                     }
-                    thread_tx.flush().map_err(|e| {
-                        anyhow!("Failed to send to Writer thread: {}", e)
-                    })?;
-                    Ok(())
-                },
-            )
+                    // Initialize a thread-local batch sender for matching records
+                    let mut thread_tx = BatchSender::with_capacity(
+                        batch_size,
+                        parser_tx.clone(),
+                    );
+                    // Clone the shared error state for this thread
+                    let thread_has_error = has_error.clone();
+                    let thread_err_tx = err_tx.clone();
+                    s.spawn(move |_| {
+                        loop {
+                            match parser.read_record() {
+                                Ok(value) => match value {
+                                    Some(record) => {
+                                        if id_sets.contains(record.id) {
+                                            // Attempt to send the matching record to the writer thread.
+                                            // If this fails, it means the writer thread has already exited due to an error.
+                                            // Since that error will be reported separately, we can safely ignore this send failure.
+                                            match thread_tx.send(record) {
+                                                Ok(_) => continue,
+                                                Err(_) => return (),
+                                            };
+                                        }
+                                    }
+                                    None => break,
+                                },
+                                Err(e) => {
+                                    // Mark that an error has occurred
+                                    thread_has_error.store(true, Relaxed);
+                                    // Only the first error is reported
+                                    let _ = thread_err_tx.try_send(e);
+                                    return ();
+                                }
+                            }
+                        }
+                        let _ = thread_tx.flush();
+                    });
+                }
+            });
+            // Clean up: close the error channel and drop parser sender
+            drop(err_tx);
+            drop(parser_tx);
+
+            // Report the first error if any thread encountered one
+            if has_error.load(Relaxed) {
+                let err = err_rx.recv()?; // Safe unwrap because has_error is true
+                Err(anyhow!(err))
+            } else {
+                Ok(())
+            }
         });
 
         // ─── Join Threads and Propagate Errors ────────────────
