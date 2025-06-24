@@ -149,13 +149,13 @@ where
         let leftover_len = self.leftover.len();
         let mut buf = BytesMut::with_capacity(self.chunk_size + leftover_len);
         buf.extend_from_slice(&self.leftover);
-        self.leftover = BytesMut::new();
 
         // read files and pass chunks to parser
         unsafe { buf.set_len(leftover_len + self.chunk_size) };
         let nbytes = self.reader.read(&mut buf[leftover_len ..])?;
         unsafe { buf.set_len(leftover_len + nbytes) };
         if nbytes == 0 {
+            self.leftover = BytesMut::new();
             if buf.is_empty() {
                 return Ok(None);
             } else {
