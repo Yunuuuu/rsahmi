@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
-use memmap2::{Advice, Mmap};
+#[cfg(unix)]
+use memmap2::Advice;
+use memmap2::Mmap;
 use rustc_hash::FxHashSet as HashSet;
 
 use super::reader::SliceChunkPairedReader;

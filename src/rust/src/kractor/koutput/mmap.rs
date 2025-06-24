@@ -5,7 +5,9 @@ use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
 use memchr::{memchr, memrchr};
-use memmap2::{Advice, Mmap};
+#[cfg(unix)]
+use memmap2::Advice;
+use memmap2::Mmap;
 
 use super::kractor_match_aho;
 use crate::batchsender::BatchSender;
