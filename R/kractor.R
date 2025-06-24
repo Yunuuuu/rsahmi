@@ -43,7 +43,7 @@
 #' @param odir A string of directory to save the `ofile`.
 #' @param mmap Logical. Whether to use memory-mapped file access. Memory mapping
 #'   is highly efficient for multi-threaded reading and avoids redundant
-#'   copying.  However, its performance and behavior may depend on the operating
+#'   copying. However, its performance and behavior may depend on the operating
 #'   system and file system.
 #' @seealso [`kraken_taxon()`]
 #' @return None. This function generates the following files:
@@ -85,7 +85,7 @@ kractor <- function(kreport, koutput, reads,
                     chunk_size = NULL, buffer_size = NULL,
                     batch_size = NULL, nqueue = NULL,
                     threads = NULL, odir = getwd(),
-                    mmap = TRUE) {
+                    mmap = FALSE) {
     rust_kractor_koutput(
         kreport, koutput,
         extract_koutput = extract_koutput,

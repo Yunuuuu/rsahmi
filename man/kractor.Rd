@@ -20,7 +20,7 @@ kractor(
   nqueue = NULL,
   threads = NULL,
   odir = getwd(),
-  mmap = TRUE
+  mmap = FALSE
 )
 }
 \arguments{
@@ -79,7 +79,7 @@ atomatically by rayon.}
 
 \item{mmap}{Logical. Whether to use memory-mapped file access. Memory mapping
 is highly efficient for multi-threaded reading and avoids redundant
-copying.  However, its performance and behavior may depend on the operating
+copying. However, its performance and behavior may depend on the operating
 system and file system.}
 }
 \value{
