@@ -30,8 +30,9 @@ pub fn mmap_kractor_single_read(
     // Open and memory-map the input FASTQ file
     let file = File::open(read)?;
     let map = unsafe { Mmap::map(&file) }?;
-    // #[cfg(unix)]
-    // map.advise(Advice::Sequential)?;
+    #[cfg(unix)]
+    map.advise(Advice::Sequential)?;
+
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
