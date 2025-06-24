@@ -69,7 +69,7 @@ pub fn mmap_kractor_ubread_read(
         reader.set_label1("reads");
         reader.set_label2("ubread");
         let parser_handle = scope.spawn(move || {
-            // will move `reader`, `parser_tx`, and `matcher`
+            // will move `reader`, `parser_tx`, and `id_sets`
             // Shared atomic flag to signal if any thread encountered an error
             let has_error = Arc::new(AtomicBool::new(false));
             // A bounded channel to capture the first error that occurs (capacity = 1)
