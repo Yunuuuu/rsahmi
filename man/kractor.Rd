@@ -77,10 +77,13 @@ atomatically by rayon.}
 
 \item{odir}{A string of directory to save the \code{ofile}.}
 
-\item{mmap}{Logical. Whether to use memory-mapped file access. Memory mapping
-is highly efficient for multi-threaded reading and avoids redundant
-copying. However, its performance and behavior may depend on the operating
-system and file system.}
+\item{mmap}{Logical. Whether to enable memory-mapped file access. When set to
+\code{TRUE}, the function uses memory mapping, which can be highly efficient for
+multi-threaded reading and avoids redundant data copying. However, the
+performance of memory mapping may vary depending on the operating system
+and file system, and it is not always the fastest option. In most cases,
+standard file reading is already sufficiently fast. Therefore, the default
+is set to \code{FALSE}.}
 }
 \value{
 None. This function generates the following files:

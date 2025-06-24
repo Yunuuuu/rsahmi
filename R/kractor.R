@@ -41,10 +41,13 @@
 #' @param threads Integer. Number of threads to use. Default will determined
 #' atomatically by rayon.
 #' @param odir A string of directory to save the `ofile`.
-#' @param mmap Logical. Whether to use memory-mapped file access. Memory mapping
-#'   is highly efficient for multi-threaded reading and avoids redundant
-#'   copying. However, its performance and behavior may depend on the operating
-#'   system and file system.
+#' @param mmap Logical. Whether to enable memory-mapped file access. When set to
+#'   `TRUE`, the function uses memory mapping, which can be highly efficient for
+#'   multi-threaded reading and avoids redundant data copying. However, the
+#'   performance of memory mapping may vary depending on the operating system
+#'   and file system, and it is not always the fastest option. In most cases,
+#'   standard file reading is already sufficiently fast. Therefore, the default
+#'   is set to `FALSE`.
 #' @seealso [`kraken_taxon()`]
 #' @return None. This function generates the following files:
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
