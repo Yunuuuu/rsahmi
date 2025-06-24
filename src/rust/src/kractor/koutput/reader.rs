@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::io::{BufWriter, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 
@@ -20,12 +21,12 @@ pub fn reader_kractor_koutput(
     batch_size: usize,
     nqueue: Option<usize>,
 ) -> Result<()> {
-    let reader = std::fs::File::open(file)?;
+    let reader = File::open(file)?;
     let matcher = AhoCorasick::builder()
         .kind(Some(AhoCorasickKind::DFA))
         .build(patterns)?;
     let mut writer =
-        BufWriter::with_capacity(buffer_size, std::fs::File::create(ofile)?);
+        BufWriter::with_capacity(buffer_size, File::create(ofile)?);
 
     std::thread::scope(|scope| {
         // Create a channel between the parser and writer threads

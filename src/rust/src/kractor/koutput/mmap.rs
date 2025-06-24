@@ -27,7 +27,7 @@ pub fn mmap_kractor_koutput(
         .build(patterns)?;
 
     let mut writer =
-        BufWriter::with_capacity(buffer_size, std::fs::File::create(ofile)?);
+        BufWriter::with_capacity(buffer_size, File::create(ofile)?);
 
     // let taxid_sets: HashSet<&[u8]> =
     //     patterns.into_iter().map(|s| s.as_bytes()).collect();
