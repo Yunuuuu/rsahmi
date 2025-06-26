@@ -36,14 +36,13 @@ pub fn ubpatterns(patterns: Robj) -> Option<Vec<RangeKind>> {
                 pattern.as_list().map_or(None, |pair| {
                     if pair.len() == 2 {
                         let start = unsafe { pair.get_unchecked(0) };
-                        let start_usize =
-                            start.as_integer_slice().and_then(|s| {
-                                if s.len() == 1 && s[0] >= 0 {
-                                    Some(s[0] as usize)
-                                } else {
-                                    None
-                                }
-                            });
+                        let start_usize = start.as_integer_slice().and_then(|s| {
+                            if s.len() == 1 && s[0] >= 0 {
+                                Some(s[0] as usize)
+                            } else {
+                                None
+                            }
+                        });
                         let end = unsafe { pair.get_unchecked(1) };
                         let end_usize = end.as_integer_slice().and_then(|s| {
                             if s.len() == 1 && s[0] >= 0 {
@@ -65,8 +64,7 @@ pub fn ubpatterns(patterns: Robj) -> Option<Vec<RangeKind>> {
                                 None
                             }
                         } else {
-                            if let (Some(s), Some(e)) = (start_usize, end_usize)
-                            {
+                            if let (Some(s), Some(e)) = (start_usize, end_usize) {
                                 Some(RangeKind::Range(s, e))
                             } else {
                                 None
@@ -89,10 +87,7 @@ pub fn ubpatterns(patterns: Robj) -> Option<Vec<RangeKind>> {
 }
 
 // Function to extract sequence based on patterns and return Result
-pub fn extract_pattern_from_sequence(
-    seq: &[u8],
-    ranges: &[RangeKind],
-) -> Result<Vec<u8>> {
+pub fn extract_pattern_from_sequence(seq: &[u8], ranges: &[RangeKind]) -> Result<Vec<u8>> {
     let mut extracted = Vec::with_capacity(ranges.len());
 
     for range in ranges {

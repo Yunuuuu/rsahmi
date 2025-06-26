@@ -137,8 +137,7 @@ mod tests {
         let umi = b"UMI1234".to_vec();
         let barcode = b"BC5678".to_vec();
 
-        let wrapped_record =
-            FastaRecordWithUMIBarcode::new(record, umi, barcode);
+        let wrapped_record = FastaRecordWithUMIBarcode::new(record, umi, barcode);
 
         // Create a mutable vector to capture the written output
         let mut output = Vec::new();
@@ -149,7 +148,8 @@ mod tests {
             .expect("Failed to write FASTA record");
 
         // Expected output (including UMI and Barcode in the header)
-        let expected_output = b">seq1@RSAHMI:UMI:UMI1234:BARCODE:BC5678:RSAHMI@ description\nAGCTTAGCTA\n";
+        let expected_output =
+            b">seq1@RSAHMI:UMI:UMI1234:BARCODE:BC5678:RSAHMI@ description\nAGCTTAGCTA\n";
 
         // Assert that the output matches the expected output
         assert_eq!(output, expected_output);

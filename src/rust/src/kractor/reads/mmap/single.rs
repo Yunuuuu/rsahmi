@@ -24,8 +24,7 @@ pub fn mmap_kractor_single_read(
     nqueue: Option<usize>,
 ) -> Result<()> {
     // Open output file and wrap in buffered writer
-    let mut writer =
-        BufWriter::with_capacity(buffer_size, File::create(ofile)?);
+    let mut writer = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
 
     // Open and memory-map the input FASTQ file
     let file = File::open(read)?;
@@ -74,10 +73,7 @@ pub fn mmap_kractor_single_read(
                         return ();
                     }
                     // Initialize a thread-local batch sender for matching records
-                    let mut thread_tx = BatchSender::with_capacity(
-                        batch_size,
-                        parser_tx.clone(),
-                    );
+                    let mut thread_tx = BatchSender::with_capacity(batch_size, parser_tx.clone());
                     // Clone the shared error state for this thread
                     let thread_has_error = has_error.clone();
                     let thread_err_tx = err_tx.clone();

@@ -26,8 +26,7 @@ pub fn mmap_kractor_koutput(
         .kind(Some(AhoCorasickKind::DFA))
         .build(patterns)?;
 
-    let mut writer =
-        BufWriter::with_capacity(buffer_size, File::create(ofile)?);
+    let mut writer = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
 
     // let taxid_sets: HashSet<&[u8]> =
     //     patterns.into_iter().map(|s| s.as_bytes()).collect();
@@ -64,10 +63,8 @@ pub fn mmap_kractor_koutput(
                         return Ok(());
                     }
                     s.spawn(|_| {
-                        let mut thread_tx = BatchSender::with_capacity(
-                            batch_size,
-                            parser_tx.clone(),
-                        );
+                        let mut thread_tx =
+                            BatchSender::with_capacity(batch_size, parser_tx.clone());
                         for line in chunk {
                             if kractor_match_aho(&matcher, &line) {
                                 match thread_tx.send(line) {
@@ -215,7 +212,7 @@ mod tests {
         }
 
         assert_eq!(results, vec![
-            b"line1", b"line2", b"line3", b"line4", b"line5"
+            b"line1\n", b"line2\n", b"line3\n", b"line4\n", b"line5\n"
         ]);
     }
 
@@ -229,7 +226,11 @@ mod tests {
             results.extend(to_lines(chunk));
         }
 
-        assert_eq!(results, vec![b"line1", b"line2", b"line3"]);
+        assert_eq!(results, vec![
+            &b"line1\n"[..],
+            &b"line2\n"[..],
+            &b"line3"[..]
+        ]);
     }
 
     #[test]
@@ -250,7 +251,7 @@ mod tests {
         }
 
         assert_eq!(results, vec![
-            &b"short1"[..],
+            &b"short1\n"[..],
             &b"averyveryveryveryveryverylonglinewithoutnewline"[..]
         ]);
     }
@@ -265,6 +266,6 @@ mod tests {
             results.extend(to_lines(chunk));
         }
 
-        assert_eq!(results, vec![b"abc", b"def", b"ghi"]);
+        assert_eq!(results, vec![b"abc\n", b"def\n", b"ghi\n"]);
     }
 }

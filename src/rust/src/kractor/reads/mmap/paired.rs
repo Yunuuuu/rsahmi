@@ -26,10 +26,8 @@ pub fn mmap_kractor_paired_read(
     nqueue: Option<usize>,
 ) -> Result<()> {
     // Create output file and wrap in buffered writer
-    let mut writer1 =
-        BufWriter::with_capacity(buffer_size, File::create(ofile1)?);
-    let mut writer2 =
-        BufWriter::with_capacity(buffer_size, File::create(ofile2)?);
+    let mut writer1 = BufWriter::with_capacity(buffer_size, File::create(ofile1)?);
+    let mut writer2 = BufWriter::with_capacity(buffer_size, File::create(ofile2)?);
 
     // Open and memory-map the input FASTQ file
     let file1 = File::open(fq1)?;
@@ -65,8 +63,7 @@ pub fn mmap_kractor_paired_read(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
-        let mut reader =
-            SliceChunkPairedReader::with_capacity(chunk_size, &map1, &map2);
+        let mut reader = SliceChunkPairedReader::with_capacity(chunk_size, &map1, &map2);
         reader.set_label1("fq1");
         reader.set_label2("fq2");
 
@@ -87,10 +84,7 @@ pub fn mmap_kractor_paired_read(
                         return Ok(());
                     }
                     // Initialize a thread-local batch sender for matching records
-                    let mut thread_tx = BatchSender::with_capacity(
-                        batch_size,
-                        parser_tx.clone(),
-                    );
+                    let mut thread_tx = BatchSender::with_capacity(batch_size, parser_tx.clone());
                     // Clone the shared error state for this thread
                     let thread_has_error = has_error.clone();
                     let thread_err_tx = err_tx.clone();
@@ -103,9 +97,7 @@ pub fn mmap_kractor_paired_read(
                                             // Attempt to send the matching record to the writer thread.
                                             // If this fails, it means the writer thread has already exited due to an error.
                                             // Since that error will be reported separately, we can safely ignore this send failure.
-                                            match thread_tx
-                                                .send((record1, record2))
-                                            {
+                                            match thread_tx.send((record1, record2)) {
                                                 Ok(_) => continue,
                                                 Err(_) => return (),
                                             };

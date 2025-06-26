@@ -1,11 +1,209 @@
 use memchr::memchr_iter;
 
 use crate::kractor::reads::parser::fasta::FastaRecord;
-use crate::kractor::reads::parser::fastq::{
-    FastqPairedReader, FastqParseError, FastqReader, FastqSource,
-};
+use crate::kractor::reads::parser::fastq::{FastqContainer, FastqParseError};
 
-pub struct SliceChunkReader<'a> {
+#[derive(Debug)]
+pub(crate) struct SliceFastqChunkSource<'a> {
+    pos: usize,
+    newlines: Vec<usize>,
+    newlines_pos: usize,
+    chunk: &'a [u8],
+    offset: usize,
+    label: Option<&'static str>,
+}
+
+impl<'a> SliceFastqChunkSource<'a> {
+    fn new(chunk: &'a [u8], newlines: Vec<usize>) -> Self {
+        Self {
+            pos: 0,
+            newlines,
+            newlines_pos: 0,
+            chunk,
+            offset: 0,
+            label: None,
+        }
+    }
+    fn read_line(&mut self) -> Option<&'a [u8]> {
+        if self.newlines_pos >= self.newlines.len() {
+            return None;
+        }
+        let end = unsafe { *self.newlines.get_unchecked(self.newlines_pos) };
+        let out = unsafe { self.chunk.get_unchecked(self.pos .. end) };
+        self.newlines_pos += 1;
+        self.offset += 1;
+        self.pos = end + 1;
+        Some(out)
+    }
+
+    pub fn set_label(&mut self, label: &'static str) {
+        self.label = Some(label);
+    }
+
+    #[allow(dead_code)]
+    pub fn remove_label(&mut self) {
+        self.label = None;
+    }
+
+    // when split files into multiple chunks, we need adjust position manually.
+    #[allow(dead_code)]
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct MmapFastqReader<'a> {
+    source: SliceFastqChunkSource<'a>,
+    container: FastqContainer<'a>,
+}
+
+impl<'a> MmapFastqReader<'a> {
+    pub fn new(source: SliceFastqChunkSource<'a>) -> Self {
+        Self {
+            source,
+            container: FastqContainer::default(),
+        }
+    }
+
+    pub fn read_record(&mut self) -> Result<Option<FastaRecord<&'a [u8]>>, FastqParseError> {
+        // Try reading the 1st line (head). If EOF, return None.
+        if self.read_head()?.is_none() {
+            return Ok(None);
+        };
+        self.read_tail()?;
+        // SAFETY: We've guaranteed above that 4 lines have been read.
+        // This implies the parser has advanced to the Qual state.
+        // So `self.build()` will return Some.
+        Ok(Some(self.build()))
+    }
+
+    fn read_head(&mut self) -> Result<Option<()>, FastqParseError> {
+        // Try reading the 1st line (head). If EOF, return None.
+        loop {
+            match self.source.read_line() {
+                Some(line) => {
+                    // Skip empty or all-whitespace lines
+                    if line.is_empty() || line.iter().all(|b| b.is_ascii_whitespace()) {
+                        continue;
+                    }
+
+                    self.container
+                        .parse_head(line, self.source.label, self.source.offset - 1)?;
+                    return Ok(Some(()));
+                }
+                None => return Ok(None), // EOF
+            }
+        }
+    }
+
+    fn read_tail(&mut self) -> Result<(), FastqParseError> {
+        // 2nd line (sequence) must exist. Otherwise, incomplete record.
+        if let Some(line) = self.source.read_line() {
+            self.container
+                .parse_seq(line, self.source.label, self.source.offset - 1)?;
+        } else {
+            return Err(FastqParseError::IncompleteRecord {
+                label: self.source.label,
+                record: self.container.to_string(),
+                pos: self.source.offset,
+            });
+        }
+
+        // 3rd line (separator). Must exist.
+        if let Some(line) = self.source.read_line() {
+            self.container
+                .parse_sep(line, self.source.label, self.source.offset - 1)?;
+        } else {
+            return Err(FastqParseError::IncompleteRecord {
+                label: self.source.label,
+                record: self.container.to_string(),
+                pos: self.source.offset,
+            });
+        }
+
+        // 4th line (quality). Must exist.
+        if let Some(line) = self.source.read_line() {
+            self.container
+                .parse_qual(line, self.source.label, self.source.offset - 1)?;
+        } else {
+            return Err(FastqParseError::IncompleteRecord {
+                label: self.source.label,
+                record: self.container.to_string(),
+                pos: self.source.offset,
+            });
+        }
+        Ok(())
+    }
+
+    fn build(&mut self) -> FastaRecord<&'a [u8]> {
+        let out = unsafe {
+            FastaRecord::new(
+                self.container.id().unwrap_unchecked(),
+                self.container.desc().unwrap_unchecked(),
+                self.container.seq().unwrap_unchecked(),
+            )
+        };
+        self.container.reset();
+        out
+    }
+}
+
+pub(crate) struct FastqPairedReader<'a, 'b> {
+    reader1: MmapFastqReader<'a>,
+    reader2: MmapFastqReader<'b>,
+}
+
+impl<'a, 'b> FastqPairedReader<'a, 'b> {
+    pub fn new(reader1: MmapFastqReader<'a>, reader2: MmapFastqReader<'b>) -> Self {
+        Self { reader1, reader2 }
+    }
+
+    pub fn read_record(
+        &mut self,
+    ) -> Result<Option<(FastaRecord<&'a [u8]>, FastaRecord<&'b [u8]>)>, FastqParseError> {
+        match (self.reader1.read_head()?, self.reader2.read_head()?) {
+            (Some(()), None) => {
+                return Err(FastqParseError::OutOfSync {
+                    eof_label: self.reader2.source.label,
+                    continueal_label: self.reader1.source.label,
+                    eof_pos: self.reader2.source.offset,
+                    continueal_pos: self.reader1.source.offset - 1,
+                });
+            }
+            (None, Some(())) => {
+                return Err(FastqParseError::OutOfSync {
+                    eof_label: self.reader1.source.label,
+                    continueal_label: self.reader2.source.label,
+                    eof_pos: self.reader1.source.offset,
+                    continueal_pos: self.reader2.source.offset - 1,
+                });
+            }
+            (Some(()), Some(())) => {
+                let id1 = unsafe { self.reader1.container.id().unwrap_unchecked() };
+                let id2 = unsafe { self.reader2.container.id().unwrap_unchecked() };
+                if id1 != id2 {
+                    return Err(FastqParseError::FastqPairError {
+                        read1_label: self.reader1.source.label,
+                        read2_label: self.reader2.source.label,
+                        read1_id: String::from_utf8_lossy(id1).into_owned(),
+                        read2_id: String::from_utf8_lossy(id2).into_owned(),
+                        read1_pos: self.reader1.source.offset - 1,
+                        read2_pos: self.reader2.source.offset - 1,
+                    });
+                }
+                self.reader1.read_tail()?;
+                self.reader2.read_tail()?;
+                return Ok(Some((self.reader1.build(), self.reader2.build())));
+            }
+            (None, None) => {
+                return Ok(None);
+            }
+        }
+    }
+}
+
+pub(crate) struct SliceChunkReader<'a> {
     label: Option<&'static str>,
     pos: usize,
     line_offset: usize,
@@ -14,45 +212,10 @@ pub struct SliceChunkReader<'a> {
 }
 
 impl<'a> Iterator for SliceChunkReader<'a> {
-    type Item = FastqReader<'a, SliceFastqChunkSource<'a>>;
+    type Item = MmapFastqReader<'a>;
     fn next(&mut self) -> Option<Self::Item> {
         self.chunk_reader()
     }
-}
-
-fn slice_chunk<'a>(
-    slice: &'a [u8],
-    pos: usize,
-    chunk_size: usize,
-) -> (&'a [u8], Vec<usize>) {
-    let chunk;
-    let mut newlines: Vec<usize>;
-    let end = pos + chunk_size;
-    // take consideration of the last chunk
-    if end >= slice.len() {
-        // SAFETY: We're within bounds because pos < bytes.len()
-        chunk = *unsafe { &slice.get_unchecked(pos ..) };
-        // Find all newline character positions in the chunk
-        newlines = memchr_iter(b'\n', chunk).collect();
-
-        // If there are no newlines, treat the whole chunk as a single (newline-less) line
-        if newlines.is_empty() {
-            newlines.push(chunk.len());
-        } else if (chunk.len() - 1)
-            // Ensure the last line is included even if it doesn't end with `\n`
-            // SAFETY: newlines is non-empty, so unwrap_unchecked is safe
-                != *unsafe { newlines.get_unchecked(newlines.len() - 1) }
-        {
-            newlines.push(chunk.len());
-        }
-    } else {
-        // SAFETY: end < bytes.len() is guaranteed here
-        chunk = *unsafe { &slice.get_unchecked(pos .. end) };
-
-        // Find newline offsets within this chunk
-        newlines = memchr_iter(b'\n', chunk).collect();
-    }
-    (chunk, newlines)
 }
 
 impl<'a> SliceChunkReader<'a> {
@@ -80,20 +243,17 @@ impl<'a> SliceChunkReader<'a> {
         self.label = None;
     }
 
-    pub fn chunk_reader(
-        &mut self,
-    ) -> Option<FastqReader<'a, SliceFastqChunkSource<'a>>> {
+    pub fn chunk_reader(&mut self) -> Option<MmapFastqReader<'a>> {
         // If we've reached or passed the end of the input buffer, stop reading
         if self.pos >= self.slice.len() {
             return None;
         }
-        let (mut chunk, mut newlines) =
-            slice_chunk(self.slice, self.pos, self.chunk_size);
+        let (mut chunk, mut newlines) = slice_chunk(self.slice, self.pos, self.chunk_size);
 
         // If the chunk contains fewer than 4 lines, the FASTQ record is incomplete
         // so we expand the buffer and try again with a larger chunk
-        if newlines.len() < 4 && (self.pos + self.chunk_size) < self.slice.len()
-        {
+        // we also make sure the file contain other data
+        if newlines.len() < 4 && (self.pos + self.chunk_size) < self.slice.len() {
             // we always double the buffer size, if there no enough buffer to hold a whole fastq record
             self.chunk_size *= 2;
             return self.chunk_reader();
@@ -115,16 +275,16 @@ impl<'a> SliceChunkReader<'a> {
         self.pos += chunk.len();
         let line_offset = self.line_offset;
         self.line_offset += newlines.len(); // Increment the number of chunk lines
-        let source = SliceFastqChunkSource::new(chunk, newlines);
-        let mut out = FastqReader::with_offset(line_offset, source);
+        let mut source = SliceFastqChunkSource::new(chunk, newlines);
+        source.set_offset(line_offset);
         if let Some(label) = self.label {
-            out.set_label(label);
+            source.set_label(label);
         }
-        return Some(out);
+        return Some(MmapFastqReader::new(source));
     }
 }
 
-pub struct SliceChunkPairedReader<'a, 'b> {
+pub(crate) struct SliceChunkPairedReader<'a, 'b> {
     label1: Option<&'static str>,
     label2: Option<&'static str>,
     pos1: usize,
@@ -137,15 +297,7 @@ pub struct SliceChunkPairedReader<'a, 'b> {
 }
 
 impl<'a, 'b> Iterator for SliceChunkPairedReader<'a, 'b> {
-    type Item = std::result::Result<
-        FastqPairedReader<
-            'a,
-            'b,
-            SliceFastqChunkSource<'a>,
-            SliceFastqChunkSource<'b>,
-        >,
-        FastqParseError,
-    >;
+    type Item = std::result::Result<FastqPairedReader<'a, 'b>, FastqParseError>;
     fn next(&mut self) -> Option<Self::Item> {
         self.chunk_reader().transpose()
     }
@@ -157,11 +309,7 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
         Self::with_capacity(8 * 1024, slice1, slice2)
     }
 
-    pub fn with_capacity(
-        capacity: usize,
-        slice1: &'a [u8],
-        slice2: &'b [u8],
-    ) -> Self {
+    pub fn with_capacity(capacity: usize, slice1: &'a [u8], slice2: &'b [u8]) -> Self {
         Self {
             label1: None,
             label2: None,
@@ -193,26 +341,17 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
         self.label2 = None;
     }
 
-    pub fn chunk_reader(
-        &mut self,
-    ) -> Result<
-        Option<
-            FastqPairedReader<
-                'a,
-                'b,
-                SliceFastqChunkSource<'a>,
-                SliceFastqChunkSource<'b>,
-            >,
-        >,
-        FastqParseError,
-    > {
+    pub fn chunk_reader(&mut self) -> Result<Option<FastqPairedReader<'a, 'b>>, FastqParseError> {
         // Handle EOF logic for paired files
         let eof1 = self.pos1 >= self.slice1.len();
         let eof2 = self.pos2 >= self.slice2.len();
 
         match (eof1, eof2) {
-            (true, true) => return Ok(None),
+            (true, true) => return Ok(None), // Both inputs exhausted: normal EOF
+
+            // One file is fully read, but the other isn't
             (true, false) => {
+                // Allow trailing whitespace in second slice
                 if self.slice2[self.pos2 ..]
                     .iter()
                     .all(|b| b.is_ascii_whitespace())
@@ -242,133 +381,120 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
                     continueal_pos: self.line_offset1,
                 });
             }
-            (false, false) => {}
+            (false, false) => {} // Continue reading normally
         }
         let end1 = self.pos1 + self.chunk_size;
         let end2 = self.pos2 + self.chunk_size;
 
-        let (mut chunk1, mut newlines1) =
-            slice_chunk(self.slice1, self.pos1, self.chunk_size);
-
-        let (mut chunk2, mut newlines2) =
-            slice_chunk(self.slice2, self.pos2, self.chunk_size);
+        // Slice each input at current position to retrieve a chunk and its line breaks
+        let (mut chunk1, mut newlines1) = slice_chunk(self.slice1, self.pos1, self.chunk_size);
+        let (mut chunk2, mut newlines2) = slice_chunk(self.slice2, self.pos2, self.chunk_size);
 
         // Truncate to a multiple of 4 lines to ensure only complete records are included
         let count = usize::min(newlines1.len(), newlines2.len());
-        if count < 4 && end1 < self.slice1.len() && end2 < self.slice2.len() {
-            self.chunk_size *= 2;
-            return self.chunk_reader();
-        }
 
-        // If one file only contain few lines, it means it has incompleted record
-        if count < 4 && (end1 >= self.slice1.len() || end2 >= self.slice2.len())
-        {
-            let (label, pos, record) = if end1 >= self.slice1.len() {
-                (
-                    self.label1,
-                    self.line_offset1,
-                    String::from_utf8_lossy(chunk1).to_string(),
-                )
+        // If we didn't capture a complete record
+        if count < 4 {
+            // more data is available,
+            // double chunk size and try again (adaptive chunking)
+            if end1 < self.slice1.len() && end2 < self.slice2.len() {
+                self.chunk_size *= 2;
+                return self.chunk_reader();
             } else {
-                (
-                    self.label2,
-                    self.line_offset2,
-                    String::from_utf8_lossy(chunk2).to_string(),
-                )
-            };
-            return Err(FastqParseError::IncompleteRecord {
-                label,
-                record,
-                pos,
-            });
+                // If one side has incomplete records at EOF, raise error
+                let (label, pos, record) = if end1 >= self.slice1.len() {
+                    (
+                        self.label1,
+                        self.line_offset1,
+                        String::from_utf8_lossy(chunk1).to_string(),
+                    )
+                } else {
+                    (
+                        self.label2,
+                        self.line_offset2,
+                        String::from_utf8_lossy(chunk2).to_string(),
+                    )
+                };
+                return Err(FastqParseError::IncompleteRecord { label, record, pos });
+            }
         }
 
+        // Truncate to a multiple of 4 lines to ensure whole records only
         let nkeep = count - (count % 4);
         newlines1.truncate(nkeep);
         newlines2.truncate(nkeep);
-        // SAFETY: newlines1 won't be empty
+
+        // SAFETY: newlines won't be empty
         let endpoint1 = unsafe { *newlines1.last().unwrap_unchecked() };
-        if endpoint1 == chunk1.len() {
-            chunk1 = &chunk1[.. endpoint1]; // we have no endpoint '\n'
-        } else {
-            chunk1 = &chunk1[..= endpoint1];
+        // no trailing newline
+        if endpoint1 < chunk1.len() {
+            chunk1 = &chunk1[..= endpoint1]; // include newline
         }
         let endpoint2 = unsafe { *newlines2.last().unwrap_unchecked() };
-        if endpoint2 == chunk2.len() {
-            chunk2 = &chunk2[.. endpoint2]; // we have no endpoint '\n'
-        } else {
+        // no trailing newline
+        if endpoint2 < chunk2.len() {
             chunk2 = &chunk2[..= endpoint2];
         }
 
+        // Update position offsets for next chunk
         self.pos1 += chunk1.len();
         self.pos2 += chunk2.len();
 
+        // Line offsets are in terms of logical FASTQ lines
         let line_offset1 = self.line_offset1;
         let line_offset2 = self.line_offset2;
 
         self.line_offset1 += newlines1.len();
         self.line_offset2 += newlines2.len();
 
-        let mut reader1 = FastqReader::with_offset(
-            line_offset1,
-            SliceFastqChunkSource::new(chunk1, newlines1),
-        );
-        let mut reader2 = FastqReader::with_offset(
-            line_offset2,
-            SliceFastqChunkSource::new(chunk2, newlines2),
-        );
-
+        // Wrap chunks into source readers with correct offset and label
+        let mut source1 = SliceFastqChunkSource::new(chunk1, newlines1);
+        source1.set_offset(line_offset1);
         if let Some(label1) = self.label1 {
-            reader1.set_label(label1);
+            source1.set_label(label1);
         }
+        let mut source2 = SliceFastqChunkSource::new(chunk2, newlines2);
+        source2.set_offset(line_offset2);
         if let Some(label2) = self.label2 {
-            reader2.set_label(label2);
+            source2.set_label(label2);
         }
-        Ok(Some(FastqPairedReader::new(reader1, reader2)))
+        // Return paired reader
+        Ok(Some(FastqPairedReader::new(
+            MmapFastqReader::new(source1),
+            MmapFastqReader::new(source2),
+        )))
     }
 }
 
-#[derive(Debug)]
-pub struct SliceFastqChunkSource<'a> {
-    pos: usize,
-    newlines: Vec<usize>,
-    newlines_pos: usize,
-    chunk: &'a [u8],
-}
+fn slice_chunk<'a>(slice: &'a [u8], pos: usize, chunk_size: usize) -> (&'a [u8], Vec<usize>) {
+    let chunk;
+    let mut newlines: Vec<usize>;
+    let end = pos + chunk_size;
+    // take consideration of the last chunk
+    if end >= slice.len() {
+        // SAFETY: We're within bounds because pos < bytes.len()
+        chunk = *unsafe { &slice.get_unchecked(pos ..) };
+        // Find all newline character positions in the chunk
+        newlines = memchr_iter(b'\n', chunk).collect();
 
-impl<'a> SliceFastqChunkSource<'a> {
-    fn new(chunk: &'a [u8], newlines: Vec<usize>) -> Self {
-        Self {
-            pos: 0,
-            newlines,
-            newlines_pos: 0,
-            chunk,
+        // If there are no newlines, treat the whole chunk as a single (newline-less) line
+        if newlines.is_empty() {
+            newlines.push(chunk.len());
+        } else if (chunk.len() - 1)
+            // Ensure the last line is included even if it doesn't end with `\n`
+            // SAFETY: newlines is non-empty, so unwrap_unchecked is safe
+                != *unsafe { newlines.get_unchecked(newlines.len() - 1) }
+        {
+            newlines.push(chunk.len());
         }
-    }
-}
+    } else {
+        // SAFETY: end < bytes.len() is guaranteed here
+        chunk = *unsafe { &slice.get_unchecked(pos .. end) };
 
-impl<'a> FastqSource<'a> for SliceFastqChunkSource<'a> {
-    type Record = FastaRecord<&'a [u8]>;
-    fn read_line(&mut self) -> Option<&'a [u8]> {
-        if self.newlines_pos >= self.newlines.len() {
-            return None;
-        }
-        let end = unsafe { *self.newlines.get_unchecked(self.newlines_pos) };
-        let out = unsafe { self.chunk.get_unchecked(self.pos .. end) };
-        self.newlines_pos += 1;
-        self.pos = end + 1;
-        Some(out)
+        // Find newline offsets within this chunk
+        newlines = memchr_iter(b'\n', chunk).collect();
     }
-    fn build_record(
-        &mut self,
-        id: &'a [u8],
-        desc: Option<&'a [u8]>,
-        seq: &'a [u8],
-        _: &'a [u8],
-        _: &'a [u8],
-    ) -> Self::Record {
-        FastaRecord::new(id, desc, seq)
-    }
+    (chunk, newlines)
 }
 
 #[cfg(test)]

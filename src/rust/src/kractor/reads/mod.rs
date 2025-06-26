@@ -6,15 +6,12 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashSet as HashSet;
 
-mod parser;
 mod io;
 mod mmap;
+mod parser;
 pub mod range;
 
-use mmap::{
-    mmap_kractor_paired_read, mmap_kractor_single_read,
-    mmap_kractor_ubread_read,
-};
+use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read, mmap_kractor_ubread_read};
 use range::RangeKind;
 
 pub fn mmap_kractor_reads(
@@ -92,8 +89,7 @@ pub fn read_sequence_id_from_koutput<P>(
 where
     P: AsRef<Path> + Display,
 {
-    let opened =
-        File::open(file).map_err(|e| format!("Open file failed: {}", e))?;
+    let opened = File::open(file).map_err(|e| format!("Open file failed: {}", e))?;
     let buffer = BufReader::with_capacity(buffersize, opened);
     let id_sets = buffer
         .lines()

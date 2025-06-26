@@ -25,8 +25,7 @@ pub fn reader_kractor_koutput(
     let matcher = AhoCorasick::builder()
         .kind(Some(AhoCorasickKind::DFA))
         .build(patterns)?;
-    let mut writer =
-        BufWriter::with_capacity(buffer_size, File::create(ofile)?);
+    let mut writer = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
 
     std::thread::scope(|scope| {
         // Create a channel between the parser and writer threads
@@ -58,10 +57,8 @@ pub fn reader_kractor_koutput(
                         return Ok(());
                     }
                     s.spawn(|_| {
-                        let mut thread_tx = BatchSender::with_capacity(
-                            batch_size,
-                            parser_tx.clone(),
-                        );
+                        let mut thread_tx =
+                            BatchSender::with_capacity(batch_size, parser_tx.clone());
                         for line in chunk {
                             if kractor_match_aho(&matcher, &line) {
                                 match thread_tx.send(line) {
@@ -234,7 +231,7 @@ mod tests {
         }
 
         assert_eq!(all_lines, vec![
-            "line1", "line2", "line3", "line4", "line5"
+            "line1\n", "line2\n", "line3\n", "line4\n", "line5\n"
         ]);
         Ok(())
     }
@@ -256,8 +253,8 @@ mod tests {
         }
 
         assert_eq!(all_lines, vec![
-            "line1",
-            "line2",
+            "line1\n",
+            "line2\n",
             "last_line_without_newline"
         ]);
         Ok(())
@@ -271,9 +268,7 @@ mod tests {
 
         match reader.next() {
             None => Ok(()), // expected None means iterator exhausted
-            Some(Ok(_)) => {
-                Err(anyhow::anyhow!("Expected None but got Some(Ok(_))"))
-            }
+            Some(Ok(_)) => Err(anyhow::anyhow!("Expected None but got Some(Ok(_))")),
             Some(Err(e)) => Err(e.into()),
         }
     }

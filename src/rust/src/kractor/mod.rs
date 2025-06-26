@@ -27,9 +27,7 @@ fn kractor_koutput(
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
-        .map_err(|e| {
-            format!("Failed to initialize rayon thread pool: {:?}", e)
-        })?;
+        .map_err(|e| format!("Failed to initialize rayon thread pool: {:?}", e))?;
     rayon_pool
         .install(|| {
             if mmap {
@@ -87,9 +85,7 @@ fn kractor_reads(
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
-        .map_err(|e| {
-            format!("Failed to initialize rayon thread pool: {:?}", e)
-        })?;
+        .map_err(|e| format!("Failed to initialize rayon thread pool: {:?}", e))?;
     rayon_pool.install(|| {
         reads::mmap_kractor_reads(
             id_sets,
@@ -139,16 +135,13 @@ fn pprof_kractor_koutput(
         mmap,
     );
     if let Ok(report) = guard.report().build() {
-        let file = std::fs::File::create(pprof_file).map_err(|e| {
-            format!("Failed to create file {}: {}", pprof_file, e)
-        })?;
+        let file = std::fs::File::create(pprof_file)
+            .map_err(|e| format!("Failed to create file {}: {}", pprof_file, e))?;
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
         report
             .flamegraph_with_options(file, &mut options)
-            .map_err(|e| {
-                format!("Failed to write flamegraph to {}: {}", pprof_file, e)
-            })?;
+            .map_err(|e| format!("Failed to write flamegraph to {}: {}", pprof_file, e))?;
     };
     out
 }
@@ -192,16 +185,13 @@ fn pprof_kractor_reads(
         threads,
     );
     if let Ok(report) = guard.report().build() {
-        let file = std::fs::File::create(pprof_file).map_err(|e| {
-            format!("Failed to create file {}: {}", pprof_file, e)
-        })?;
+        let file = std::fs::File::create(pprof_file)
+            .map_err(|e| format!("Failed to create file {}: {}", pprof_file, e))?;
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
         report
             .flamegraph_with_options(file, &mut options)
-            .map_err(|e| {
-                format!("Failed to write flamegraph to {}: {}", pprof_file, e)
-            })?;
+            .map_err(|e| format!("Failed to write flamegraph to {}: {}", pprof_file, e))?;
     };
     out
 }
@@ -238,12 +228,10 @@ mod bench {
     #[test]
     fn bench_io() -> std::io::Result<()> {
         let mut rng = StdRng::seed_from_u64(42);
-        let mut file =
-            BufWriter::with_capacity(CHUNK_SIZE, File::create(FILE_PATH)?);
+        let mut file = BufWriter::with_capacity(CHUNK_SIZE, File::create(FILE_PATH)?);
 
         // === Pre-generate all chunks in memory ===
-        let mut chunks: Vec<Vec<u8>> =
-            Vec::with_capacity(TOTAL_SIZE / CHUNK_SIZE);
+        let mut chunks: Vec<Vec<u8>> = Vec::with_capacity(TOTAL_SIZE / CHUNK_SIZE);
         for _ in 0 .. (TOTAL_SIZE / CHUNK_SIZE) {
             let mut buffer = vec![0u8; CHUNK_SIZE];
             rng.fill_bytes(&mut buffer);
@@ -263,11 +251,7 @@ mod bench {
             TOTAL_SIZE as f64 / 1024.0 / 1024.0,
             elapsed,
             TOTAL_SIZE as f64 / 1024.0 / 1024.0 / elapsed.as_secs_f64(),
-            TOTAL_SIZE as f64
-                / 1024.0
-                / 1024.0
-                / 1024.0
-                / elapsed.as_secs_f64()
+            TOTAL_SIZE as f64 / 1024.0 / 1024.0 / 1024.0 / elapsed.as_secs_f64()
         );
 
         // === Benchmark only read time ===
@@ -292,11 +276,7 @@ mod bench {
             total_read as f64 / 1024.0 / 1024.0,
             elapsed,
             total_read as f64 / 1024.0 / 1024.0 / elapsed.as_secs_f64(),
-            total_read as f64
-                / 1024.0
-                / 1024.0
-                / 1024.0
-                / elapsed.as_secs_f64()
+            total_read as f64 / 1024.0 / 1024.0 / 1024.0 / elapsed.as_secs_f64()
         );
 
         assert_eq!(total_read, TOTAL_SIZE);

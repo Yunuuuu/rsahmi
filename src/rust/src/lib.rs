@@ -4,9 +4,7 @@ use extendr_api::prelude::*;
 mod batchsender;
 mod kractor;
 
-pub(crate) fn new_channel<T>(
-    nqueue: Option<usize>,
-) -> (Sender<T>, Receiver<T>) {
+pub(crate) fn new_channel<T>(nqueue: Option<usize>) -> (Sender<T>, Receiver<T>) {
     if let Some(queue) = nqueue {
         bounded(queue)
     } else {

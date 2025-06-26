@@ -1,3 +1,7 @@
+use memchr::memchr2;
+
+use super::FastqParseError;
+
 #[derive(Debug, Default)]
 pub struct FastqContainer<'a> {
     id: Option<&'a [u8]>,
@@ -94,6 +98,90 @@ impl<'a> FastqContainer<'a> {
 
     pub fn qual(&self) -> Option<&'a [u8]> {
         self.qual
+    }
+
+    // --- internal method, must call for cautious, they use unsafe code;
+    pub fn parse_head(
+        &mut self,
+        line: &'a [u8],
+        label: Option<&'static str>,
+        pos: usize,
+    ) -> Result<(), FastqParseError> {
+        // SAFETY: we must ensure line is not empty, this is ensured by the caller function
+        if unsafe { *line.get_unchecked(0) } != b'@' {
+            return Err(FastqParseError::InvalidHead {
+                label: label,
+                record: format!("{}", String::from_utf8_lossy(line)),
+                pos: pos,
+            });
+        }
+        let id;
+        let desc;
+        if let Some(line_pos) = memchr2(b' ', b'\t', line) {
+            // remove the '@' from the start of the sequence ID
+            id = &line[1 .. line_pos];
+            // check if description exits
+            if line_pos + 1 == line.len() {
+                desc = None
+            } else {
+                desc = Some(&line[line_pos + 1 ..]);
+            }
+        } else {
+            // remove the '@' from the start of the sequence ID
+            id = &line[1 ..];
+            desc = None;
+        }
+        self.set_id(id);
+        self.set_desc(desc);
+        Ok(())
+    }
+
+    pub fn parse_seq(
+        &mut self,
+        line: &'a [u8],
+        _label: Option<&'static str>,
+        _pos: usize,
+    ) -> Result<(), FastqParseError> {
+        self.set_seq(line);
+        Ok(())
+    }
+
+    pub fn parse_sep(
+        &mut self,
+        line: &'a [u8],
+        label: Option<&'static str>,
+        pos: usize,
+    ) -> Result<(), FastqParseError> {
+        // Separator: begins with a '+' character and is optionally followed by the same sequence identifier
+        if line.is_empty() || unsafe { *line.get_unchecked(0) } != b'+' {
+            return Err(FastqParseError::InvalidSep {
+                label: label,
+                record: format!("{}\n{}", self.to_string(), String::from_utf8_lossy(line)),
+                pos: pos,
+            });
+        }
+        self.set_sep(line);
+        Ok(())
+    }
+
+    pub fn parse_qual(
+        &mut self,
+        line: &'a [u8],
+        label: Option<&'static str>,
+        pos: usize,
+    ) -> Result<(), FastqParseError> {
+        let seq = unsafe { self.seq().unwrap_unchecked() };
+        if seq.len() != line.len() {
+            return Err(FastqParseError::UnequalLength {
+                label: label,
+                seq: seq.len(),
+                qual: line.len(),
+                record: format!("{}\n{}", self.to_string(), String::from_utf8_lossy(line)),
+                pos: pos,
+            });
+        }
+        self.set_qual(line);
+        Ok(())
     }
 }
 
