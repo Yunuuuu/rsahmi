@@ -1,5 +1,11 @@
 #' Identifying contaminants and false positives taxa (cell line quantile test)
 #'
+#' This function detects likely contaminant or false-positive microbial taxa
+#' by comparing read abundance (in reads per million microbiome reads, RPMM)
+#' from input Kraken2 reports with a curated reference of known contaminants
+#' derived from cell lines. It performs a one-sample quantile test on each taxon
+#' and reports taxa with significant enrichment above reference levels.
+#'
 #' @param kreports A character of path to all kraken report files.
 #' @param study A string of the study name, used to differentiate with cell line
 #' data.
@@ -53,13 +59,13 @@
 #'     )
 #' }
 #' @export
-remove_contaminants <- function(kreports, study = "current study",
-                                taxon = c(
-                                    "d__Bacteria", "d__Fungi", "d__Viruses"
-                                ),
-                                quantile = 0.95, alpha = 0.05,
-                                alternative = "greater",
-                                drop_unmatched_taxa = TRUE) {
+rpmm_quantile <- function(kreports, study = "current study",
+                          taxon = c(
+                              "d__Bacteria", "d__Fungi", "d__Viruses"
+                          ),
+                          quantile = 0.95, alpha = 0.05,
+                          alternative = "greater",
+                          drop_unmatched_taxa = TRUE) {
     use_polars()
     alternative <- match.arg(alternative, c("two.sided", "less", "greater"))
     cli::cli_alert_info("Parsing reads per million microbiome reads (rpmm)")
