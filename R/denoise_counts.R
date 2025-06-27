@@ -93,7 +93,7 @@ denoise_counts <- function(kreports,
 
         # filter UMI data
         umi_data$umi$filter(pl$col("taxid")$is_in(real_taxids))
-    })
+    }, list(kmers, umis), NULL)
     counts <- taxa_counts(umi_list, samples %||% names(umis))
     structure(
         list(
