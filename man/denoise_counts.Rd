@@ -8,6 +8,7 @@ denoise_counts(
   kreports,
   kmers,
   umis,
+  samples = NULL,
   taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   drop_unmatched_taxa = TRUE,
   quantile = 0.95,
@@ -36,6 +37,9 @@ typically output by \code{\link[=kuactor]{kuactor()}}, one per sample.}
 
 \item{umis}{A character vector of paths to UMI quantification files,
 typically output by \code{\link[=kuactor]{kuactor()}}, one per sample.}
+
+\item{samples}{A character of sample identifier for each element in \code{umis}.
+If not provided, the names of the \code{umis} vector will be used.}
 
 \item{taxon}{An atomic character specify the taxa name wanted. Should follow
 the kraken style, connected by rank codes, two underscores, and the

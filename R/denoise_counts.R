@@ -12,6 +12,8 @@
 #' typically output by [`kuactor()`], one per sample.
 #' @param umis A character vector of paths to UMI quantification files,
 #' typically output by [`kuactor()`], one per sample.
+#' @param samples A character of sample identifier for each element in `umis`.
+#' If not provided, the names of the `umis` vector will be used.
 #' @param cor_threshold Minimum correlation coefficient required in sample-level
 #'   filtering. Default is `0`.
 #' @param p_threshold Significance threshold for sample-level correlation
@@ -21,10 +23,11 @@
 #' @inheritParams rpmm_quantile
 #' @inheritParams slsd
 #' @inheritParams blsd
+#' @inheritParams taxa_counts
 #' @export
 denoise_counts <- function(kreports,
                            kmers,
-                           umis,
+                           umis, samples = NULL,
                            taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                            drop_unmatched_taxa = TRUE,
                            quantile = 0.95, alpha = 0.05,
@@ -91,7 +94,7 @@ denoise_counts <- function(kreports,
         # filter UMI data
         umi_data$umi$filter(pl$col("taxid")$is_in(real_taxids))
     })
-    counts <- taxa_counts(umi_list, basename(names(umi_list)))
+    counts <- taxa_counts(umi_list, samples %||% names(umis))
     structure(
         list(
             counts = counts, slsd = slsd_out,
