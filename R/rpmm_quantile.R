@@ -104,12 +104,13 @@ rpmm_quantile <- function(kreports, study = "current study",
     }
 
     # collect results and return ----------------
-    structure(
-        pl$concat(
-            kreports$with_columns(study = pl$lit(study)),
-            celllines$with_columns(study = pl$lit("cell lines")),
-            how = "vertical"
-        ),
+    out <- pl$concat(
+        kreports$with_columns(study = pl$lit(study)),
+        celllines$with_columns(study = pl$lit("cell lines")),
+        how = "vertical"
+    )
+    class(out) <- c("rsahmi_rpmm_quantile", class(out))
+    structure(out,
         pvalues = structure(pvalues, names = taxids),
         unmatched_taxa = unmatched_taxa,
         significant = significant,
@@ -166,4 +167,35 @@ quantile_test <- function(x, ref = 0, p = .5, alternative) {
             stats::pbinom(T1, n, p)
         )
     )
+}
+
+#' @importFrom ggplot2 autoplot
+#' @importFrom rlang .data
+#' @export
+autoplot.rsahmi_rpmm_quantile <- function(object, ...) {
+    microbe_for_plot <- attr(object, "truly")[
+        order(attr(object, "pvalue")[attr(object, "truly")])
+    ]
+    microbe_for_plot <- microbe_for_plot[
+        !microbe_for_plot %in% attr(object, "unmatched_taxa")
+    ]
+    ggplot2::ggplot(
+        object$filter(pl$col("taxid")$is_in(microbe_for_plot))$
+            to_data_frame(),
+        ggplot2::aes(x = .data$rpmm),
+    ) +
+        ggplot2::geom_density(ggplot2::aes(fill = .data$study), alpha = 0.5) +
+        ggplot2::scale_x_log10() +
+        ggplot2::facet_wrap(
+            facets = ggplot2::vars(.data$taxa),
+            scales = "free"
+        ) +
+        ggplot2::theme(
+            strip.clip = "off",
+            axis.text = ggplot2::element_blank(),
+            axis.ticks = ggplot2::element_blank(),
+            legend.position = "inside",
+            legend.position.inside = c(1, 0),
+            legend.justification.inside = c(1, 0)
+        )
 }

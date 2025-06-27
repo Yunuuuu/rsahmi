@@ -16,6 +16,7 @@ Imports:
     mirai,
     cli,
     rlang,
+    ggplot2,
     ShortRead,
     utils
 Suggests:
