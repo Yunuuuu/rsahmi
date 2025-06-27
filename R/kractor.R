@@ -7,15 +7,6 @@
 #' @param koutput Path to the Kraken2 output file.
 #' @param reads A character vector of FASTQ files used as input to Kraken2.
 #' Can be one file (single-end) or two files (paired-end).
-#' @param extract_koutput Path to the file where the extracted Kraken2 output
-#' matching the specified `taxon` will be saved. Defaults to
-#' `"kraken_microbiome_output.txt"`.
-#' @param extract_reads A character vector of the same length as `reads`,
-#' specifying the output FASTQ file(s) where the matching reads will be saved.
-#' Defaults to `"kraken_microbiome_reads(_1|2).txt"`.
-#' @param taxon An atomic character specify the taxa name wanted. Should follow
-#' the kraken style, connected by rank codes, two underscores, and the
-#' scientific name of the taxon (e.g., "d__Viruses").
 #' @param ubread Path to the input sequence file that contains UMI and/or
 #'   barcode sequences. If `NULL`, UMI/barcode parsing is disabled. When
 #'   specified, `reads` must contain only a single FASTQ file. This is commonly
@@ -28,6 +19,15 @@
 #' @param barcode_ranges A range or a list of ranges specifying where cell
 #'   barcode sequences are located in the reads. Must be created using the
 #'   `ubrange()` function.  Only used when `ubread` is not `NULL`.
+#' @param extract_koutput Path to the file where the extracted Kraken2 output
+#' matching the specified `taxon` will be saved. Defaults to
+#' `"kraken_microbiome_output.txt"`.
+#' @param extract_reads A character vector of the same length as `reads`,
+#' specifying the output FASTQ file(s) where the matching reads will be saved.
+#' Defaults to `"kraken_microbiome_reads(_1|2).txt"`.
+#' @param taxon An atomic character specify the taxa name wanted. Should follow
+#' the kraken style, connected by rank codes, two underscores, and the
+#' scientific name of the taxon (e.g., "d__Viruses").
 #' @param batch_size Integer. Number of records to accumulate before triggering
 #' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
 #' @param chunk_size Integer. Size in bytes of the intermediate chunk used to
@@ -49,7 +49,7 @@
 #'   and file system, and it is not always the fastest option. In most cases,
 #'   standard file reading is already sufficiently fast. Therefore, the default
 #'   is set to `FALSE`.
-#' @seealso [`kraken_taxon()`]
+#' @seealso [`krakenx()`]
 #' @return None. This function generates the following files:
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
 #'   `taxon`, extracted from koutput.
@@ -83,13 +83,12 @@
 #' }
 #' @export
 kractor <- function(kreport, koutput, reads,
+                    ubread = NULL, umi_ranges = NULL, barcode_ranges = NULL,
                     extract_koutput = NULL, extract_reads = NULL,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
-                    ubread = NULL, umi_ranges = NULL, barcode_ranges = NULL,
                     chunk_size = NULL, buffer_size = NULL,
                     batch_size = NULL, nqueue = NULL,
-                    threads = NULL, odir = getwd(),
-                    mmap = FALSE) {
+                    threads = NULL, odir = NULL, mmap = FALSE) {
     rust_kractor_koutput(
         kreport, koutput,
         extract_koutput = extract_koutput,
@@ -103,7 +102,10 @@ kractor <- function(kreport, koutput, reads,
         mmap = mmap
     )
     rust_kractor_reads(
-        file.path(odir, extract_koutput %||% "kraken_microbiome_output.txt"),
+        file.path(
+            odir %||% getwd(),
+            extract_koutput %||% "kraken_microbiome_output.txt"
+        ),
         reads = reads,
         extract_reads = extract_reads,
         ubread = ubread,
@@ -131,7 +133,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
                                  ),
                                  chunk_size = NULL, buffer_size = NULL,
                                  batch_size = NULL, nqueue = NULL,
-                                 threads = NULL, odir = getwd(),
+                                 threads = NULL, odir = NULL,
                                  mmap = TRUE, pprof = NULL) {
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
@@ -158,7 +160,8 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
         min = 0, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    assert_string(odir, allow_empty = FALSE)
+    assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
+    if (is.null(odir)) odir <- getwd()
     assert_bool(mmap)
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)
@@ -215,13 +218,13 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
 }
 
 rust_kractor_reads <- function(koutput, reads,
-                               extract_reads = NULL,
                                ubread = NULL,
                                umi_ranges = NULL, barcode_ranges = NULL,
+                               extract_reads = NULL,
                                chunk_size = NULL, buffer_size = NULL,
                                batch_size = NULL,
                                nqueue = NULL, threads = NULL,
-                               odir = getwd(), mmap = TRUE, pprof = NULL) {
+                               odir = NULL, mmap = TRUE, pprof = NULL) {
     assert_string(koutput, allow_empty = FALSE)
     reads <- as.character(reads)
     if (length(reads) < 1L || length(reads) > 2L) {
@@ -277,7 +280,8 @@ rust_kractor_reads <- function(koutput, reads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    assert_string(odir, allow_empty = FALSE)
+    assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
+    if (is.null(odir)) odir <- getwd()
     assert_bool(mmap)
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)

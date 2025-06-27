@@ -64,7 +64,8 @@ are also discarded.}
 \item{exclude}{A character of taxid to exclude, for \code{SAHMI}, the host taxid.
 Reads with any k-mers mapped to the \code{exclude} are discarded.}
 
-\item{threads}{Number of threads to use.}
+\item{threads}{Integer. Number of threads to use. Default to all
+available threads.}
 
 \item{odir}{A string of directory to save the output files. Please see
 \code{Value} section for details.}

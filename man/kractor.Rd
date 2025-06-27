@@ -8,18 +8,18 @@ kractor(
   kreport,
   koutput,
   reads,
-  extract_koutput = NULL,
-  extract_reads = NULL,
-  taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   ubread = NULL,
   umi_ranges = NULL,
   barcode_ranges = NULL,
+  extract_koutput = NULL,
+  extract_reads = NULL,
+  taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
   chunk_size = NULL,
   buffer_size = NULL,
   batch_size = NULL,
   nqueue = NULL,
   threads = NULL,
-  odir = getwd(),
+  odir = NULL,
   mmap = FALSE
 )
 }
@@ -30,18 +30,6 @@ kractor(
 
 \item{reads}{A character vector of FASTQ files used as input to Kraken2.
 Can be one file (single-end) or two files (paired-end).}
-
-\item{extract_koutput}{Path to the file where the extracted Kraken2 output
-matching the specified \code{taxon} will be saved. Defaults to
-\code{"kraken_microbiome_output.txt"}.}
-
-\item{extract_reads}{A character vector of the same length as \code{reads},
-specifying the output FASTQ file(s) where the matching reads will be saved.
-Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
-
-\item{taxon}{An atomic character specify the taxa name wanted. Should follow
-the kraken style, connected by rank codes, two underscores, and the
-scientific name of the taxon (e.g., "d__Viruses").}
 
 \item{ubread}{Path to the input sequence file that contains UMI and/or
 barcode sequences. If \code{NULL}, UMI/barcode parsing is disabled. When
@@ -57,6 +45,18 @@ Only used when \code{ubread} is not \code{NULL}.}
 \item{barcode_ranges}{A range or a list of ranges specifying where cell
 barcode sequences are located in the reads. Must be created using the
 \code{ubrange()} function.  Only used when \code{ubread} is not \code{NULL}.}
+
+\item{extract_koutput}{Path to the file where the extracted Kraken2 output
+matching the specified \code{taxon} will be saved. Defaults to
+\code{"kraken_microbiome_output.txt"}.}
+
+\item{extract_reads}{A character vector of the same length as \code{reads},
+specifying the output FASTQ file(s) where the matching reads will be saved.
+Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
+
+\item{taxon}{An atomic character specify the taxa name wanted. Should follow
+the kraken style, connected by rank codes, two underscores, and the
+scientific name of the taxon (e.g., "d__Viruses").}
 
 \item{chunk_size}{Integer. Size in bytes of the intermediate chunk used to
 split and distribute data to worker threads during processing. Default is
@@ -127,5 +127,5 @@ kractor(
 }
 }
 \seealso{
-\code{\link[=kraken_taxon]{kraken_taxon()}}
+\code{\link[=krakenx]{krakenx()}}
 }

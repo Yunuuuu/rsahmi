@@ -30,7 +30,8 @@
 #' are also discarded.
 #' @param exclude A character of taxid to exclude, for `SAHMI`, the host taxid.
 #' Reads with any k-mers mapped to the `exclude` are discarded.
-#' @param threads Number of threads to use.
+#' @param threads Integer. Number of threads to use. Default to all
+#' available threads.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @examples
 #' \dontrun{
