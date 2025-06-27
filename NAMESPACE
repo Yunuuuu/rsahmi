@@ -3,6 +3,7 @@
 S3method(autoplot,rsahmi_rpmm_quantile)
 S3method(c,rsahmi_ubrange)
 S3method(c,rsahmi_ubranges)
+S3method(plot,rsahmi_rpmm_quantile)
 S3method(print,rsahmi_ubrange)
 S3method(print,rsahmi_ubranges)
 export(blsd)

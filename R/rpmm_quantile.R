@@ -173,6 +173,7 @@ quantile_test <- function(x, ref = 0, p = .5, alternative) {
 #' @importFrom rlang .data
 #' @export
 autoplot.rsahmi_rpmm_quantile <- function(object, ...) {
+    rlang::check_dots_empty()
     microbe_for_plot <- attr(object, "truly")[
         order(attr(object, "pvalue")[attr(object, "truly")])
     ]
@@ -198,4 +199,10 @@ autoplot.rsahmi_rpmm_quantile <- function(object, ...) {
             legend.position.inside = c(1, 0),
             legend.justification.inside = c(1, 0)
         )
+}
+
+#' @export
+plot.rsahmi_rpmm_quantile <- function(x, y, ...) {
+    rlang::check_dots_empty()
+    ggplot2::autoplot(object = x, ...)
 }
