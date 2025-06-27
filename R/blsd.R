@@ -5,7 +5,7 @@
 #' Spearman correlation between the number of total and unique k-mers across
 #' barcodes. (`padj < 0.05`)
 #'
-#' @param kmer kmer data returned by [`prep_dataset()`].
+#' @param kmer kmer data returned by [`kuactor()`].
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be
 #'   abbreviated.
@@ -18,25 +18,6 @@
 #' `4`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @return A polars [DataFrame][polars::DataFrame_class]
-#' @examples
-#' \dontrun{
-#' # 1. `sahmi_datasets` should be the output of all samples from 
-#'       `prep_dataset()` 
-#' # 2. `real_taxids_slsd` should be the output of `slsd()`
-#' umi_list <- lapply(sahmi_datasets, function(dataset) {
-#'     # Barcode level signal denoising (barcode k-mer correlation test)
-#'     blsd <- blsd(dataset$kmer)
-#'     real_taxids <- blsd$filter(pl$col("padj")$lt(0.05))$get_column("taxid")
-#'     # only keep taxids pass Sample level signal denoising
-#'     real_taxids <- real_taxids$filter(real_taxids$is_in(real_taxids_slsd))
-#'     # remove contaminants
-#'     real_taxids <- real_taxids$filter(
-#'         real_taxids$is_in(attr(truly_microbe, "truly"))
-#'     )
-#'     # filter UMI data
-#'     dataset$umi$filter(pl$col("taxid")$is_in(real_taxids))
-#' })
-#' }
 #' @export
 blsd <- function(kmer, method = "spearman", ..., p.adjust = "BH",
                  min_kmer_len = 3L, min_number = 3L) {

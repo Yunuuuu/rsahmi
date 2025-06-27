@@ -2,7 +2,7 @@
 % Please edit documentation in R/kractor.R
 \name{kractor}
 \alias{kractor}
-\title{Extract Reads and Output from Kraken2 (kraken2 extractor)}
+\title{Extract Kraken2 Output and Reads (Kraken2 output and reads extractor)}
 \usage{
 kractor(
   kreport,
@@ -75,7 +75,8 @@ amount of in-flight data awaiting writing. Default: \code{3}.}
 \item{threads}{Integer. Number of threads to use. Default will determined
 atomatically by rayon.}
 
-\item{odir}{A string of directory to save the \code{ofile}.}
+\item{odir}{A string of directory to save the output files. Please see
+\code{Value} section for details.}
 
 \item{mmap}{Logical. Whether to enable memory-mapped file access. When set to
 \code{TRUE}, the function uses memory mapping, which can be highly efficient for

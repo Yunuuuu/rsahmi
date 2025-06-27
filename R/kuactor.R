@@ -1,26 +1,27 @@
-#' Prepare kraken report, k-mer statistics, UMI data
+#' Extract K-mers and UMI Data (kmer and umi extractor)
 #'
-#' @description Three elements returned by this function:
+#' The function quantifies total and unique k-mers per taxon across cell
+#' barcodes, using both cell barcode and unique molecular identifier (UMI) to
+#' resolve read identity. It aggregates data for taxonomic ranks of interest (by
+#' default, genus and species), including all descendant taxa.
 #'
-#' * `kreport`: Used by [`slsd()`].
-#'
-#' * `kmer`: Used by [`blsd()`]. The function count the number of k-mers and
-#'        unique k-mers assigned to a taxon across barcodes. The cell barcode
-#'        and unique molecular identifier (UMI) are used to identify unique
-#'        barcodes and reads.  Data is reported for taxa of pre-specified ranks
-#'        (default genus + species) taking into account all subsequently higher
-#'        resolution ranks. The output is a table of barcodes, taxonomic IDs,
-#'        number of k-mers, and number of unique k-mers.
-#'
-#' * `umi`: Used by [`taxa_counts()`].
-#'
-#' @param fa1,fa2 Paths to the extracted FASTA files (from [`kractor()`]).
 #' @inheritParams kractor
 #' @param koutput Path to the extracted Kraken2 output file, typically
 #'   filtered using [`kractor()`].
-#' @param cb_and_umi A function takes sequence IDs, read1, read2 and return a
-#' list of 2 corresponding to cell barcode and UMI respectively., each should
-#' have the same length of the input.
+#' @param reads A character vector of extracted FASTA files (from
+#' [`kractor()`]). Can be one file (single-end) or two files (paired-end).
+#' @param extract_kreport Path to the file where the extracted Kraken2 report,
+#'   matched to `koutput`, will be saved. Defaults to
+#'   `"kraken_microbiome_report.txt"`.
+#' @param extract_kmer Path to the file where the quantified k-mer data,
+#'   derived from `koutput`, will be saved. Defaults to
+#'   `"kraken_microbiome_kmer.txt"`.
+#' @param extract_umi Path to the file where the quantified UMI data,
+#'   derived from `koutput`, will be saved. Defaults to
+#'   `"kraken_microbiome_umi.txt"`.
+#' @param barcode_extractor,umi_extractor A function takes sequence IDs, read1,
+#' read2 and return a character corresponding to cell barcode and UMI
+#' respectively, each should have the same length of the input.
 #' @param ranks Taxa ranks to analyze.
 #' @param kmer_len Kraken kmer length. Default: `35L`, which is the default kmer
 #' size of kraken2.
@@ -30,84 +31,72 @@
 #' @param exclude A character of taxid to exclude, for `SAHMI`, the host taxid.
 #' Reads with any k-mers mapped to the `exclude` are discarded.
 #' @param threads Number of threads to use.
-#' @param odir A string of directory to save the results.
-#' @param overwrite A bool indicates whether to overwrite the files in `odir`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @examples
-#' # for sequence from `umi-tools`, we can use following function
-#' cb_and_umi <- function(sequence_id, read1, read2) {
-#'     out <- lapply(
-#'         strsplit(sequence_id, "_", fixed = TRUE),
-#'         `[`, 2:3
-#'     )
-#'     lapply(1:2, function(i) {
-#'         vapply(out, function(o) as.character(.subset2(o, i)), character(1L))
-#'     })
-#' }
-#'
 #' \dontrun{
-#' # 1. `fa1` and `fa2` should be the output of `kractor()`
-#' # 2. `kreport` should be the output of `blit::kraken2()`.
-#' # 3. `koutput` should be the extracted kraken2 output by `kractor()`
-#' # 4. `odir`: you may want to specify the output directory since this process
-#' #            is time-consuming
-#' sahmi_dataset <- prep_dataset(
-#'     fa1 = "kraken_microbiome_reads.fa",
-#'     # if you have paired sequence, please also specify `fa2`,
-#'     # !!! Also pay attention to the file name of `fa1` (add suffix `_1`)
-#'     # if you use paired reads.
-#'     # fa2 = "kraken_microbiome_reads_2.fa",
+#' # 1. `kreport` should be the output of `blit::kraken2()`.
+#' # 2. `koutput` should be the extracted kraken2 output by `kractor()`
+#' # 3. `reads` should be the output of `kractor()`
+#' kuactor(
 #'     kreport = "kraken_report.txt",
 #'     koutput = "kraken_microbiome_output.txt",
+#'     reads = "kraken_microbiome_reads.fa",
+#'     # if you use paired reads.
+#'     # reads = c(
+#'     #   "kraken_microbiome_reads_1.fa",
+#'     #   "kraken_microbiome_reads_2.fa"
+#'     # ),
 #'     odir = NULL
 #' )
-#'
-#' # you may want to prepare all datasets for subsequent workflows.
-#' # `paths` should be the output directory for each sample from
-#' # `blit::kraken2()` and `kractor()`.
-#' sahmi_datasets <- lapply(paths, function(dir) {
-#'     prep_dataset(
-#'         fa1 = file.path(dir, "kraken_microbiome_reads.fa"),
-#'         # fa2 = file.path(dir, "kraken_microbiome_reads_2.fa"),
-#'         kreport = file.path(dir, "kraken_report.txt"),
-#'         koutput = file.path(dir, "kraken_microbiome_output.txt"),
-#'         odir = dir
-#'     )
-#' })
 #' }
-#' @return A list of three polars [DataFrame][polars::DataFrame_class]:
-#'  - kreport: Used by [`slsd()`].
-#'  - kmer: Used by [`blsd()`].
-#'  - umi: Used by [`taxa_counts()`].
+#' @return None. This function generates the following files:
+#'  - `extract_kreport`: A filtered version of the Kraken2 taxonomic report,
+#'   containing only taxa that meet the `ranks` criteria and are observed in
+#'   `koutput`.  Used by [`slsd()`].
+#'  - `extract_kmer`: A table quantifying total and unique k-mers assigned to
+#'   each taxon across barcodes. Used by [`blsd()`].
+#'  - `extract_umi`: A table of taxon–barcode–UMI combinations indicating all
+#'   observed UMI-tagged reads per taxon. Used by [`taxa_counts()`].
 #' @export
-prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
-                         cb_and_umi = function(sequence_id, read1, read2) {
-                             list(
-                                 substring(read1, 1L, 16L),
-                                 substring(read1, 17L, 28L)
-                             )
-                         },
-                         ranks = c("G", "S"), kmer_len = 35L,
-                         min_frac = 0.5, exclude = "9606",
-                         threads = NULL, overwrite = FALSE, odir = NULL) {
+kuactor <- function(kreport, koutput, reads,
+                    extract_kreport = NULL,
+                    extract_kmer = NULL,
+                    extract_umi = NULL,
+                    barcode_extractor = function(sequence_id, read1, read2) {
+                        substring(read1, 1L, 16L)
+                    },
+                    umi_extractor = function(sequence_id, read1, read2) {
+                        substring(read1, 17L, 28L)
+                    },
+                    ranks = c("G", "S"), kmer_len = 35L,
+                    min_frac = 0.5, exclude = "9606",
+                    threads = NULL, odir = NULL) {
     use_polars()
-    assert_string(fa1, allow_empty = FALSE)
-    assert_string(fa2, allow_empty = FALSE, allow_null = TRUE)
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
+    reads <- as.character(reads)
+    if (length(reads) == 1L) {
+        fa1 <- reads
+        fa2 <- NULL
+    } else if (length(reads) > 2L) {
+        fa1 <- reads[1L]
+        fa2 <- reads[2L]
+    } else {
+        cli::cli_abort("{.arg reads} must be of length 1 or 2")
+    }
+    assert_string(extract_kreport, allow_empty = FALSE, allow_null = TRUE)
+    assert_string(extract_kmer, allow_empty = FALSE, allow_null = TRUE)
+    assert_string(extract_umi, allow_empty = FALSE, allow_null = TRUE)
     assert_number_whole(threads,
         min = 1, max = parallel::detectCores(),
         allow_null = TRUE
     )
     threads <- threads %||% parallel::detectCores()
-    assert_bool(overwrite)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     if (is.null(odir)) odir <- getwd()
-    ofiles <- paste0(file.path(odir, c("kreport", "kmer", "umi")), ".parquet")
-    if (!overwrite && all(file.exists(ofiles))) {
-        cli::cli_inform("Using files exist: {.path {ofiles}}")
-        return(read_dataset(odir))
-    }
+    extract_kreport <- extract_kreport %||% "kraken_microbiome_report.txt"
+    extract_kmer <- extract_kmer %||% "kraken_microbiome_kmer.txt"
+    extract_umi <- extract_umi %||% "kraken_microbiome_umi.txt"
 
     cli::cli_alert_info("Parsing {.path {kreport}}")
     kreport <- parse_kraken_report(kreport)
@@ -185,8 +174,8 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
     if (length(read_nms) == 1L) {
         if (!is.null(fa2)) {
             cli::cli_warn(paste(
-                "{.arg fa2} will be ignored",
-                "only one read was found in {.field kraken}",
+                "the second {.arg reads} will be ignored",
+                "only one read was found in {.arg koutput}",
                 sep = ", "
             ))
             fa2 <- NULL
@@ -195,7 +184,7 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
         if (is.null(fa2)) {
             cli::cli_warn(paste(
                 "read2 in {.arg kreport} will be ignored",
-                "since {.arg fa2} was not provided"
+                "since only one {.arg reads} was provided"
             ))
             read_nms <- "read1"
             kout <- kout$select(
@@ -245,13 +234,13 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
         collect()
 
     # read in fasta data -----------------------------------------------
-    cli::cli_alert_info("Reading {.path {fa1}}")
+    cli::cli_alert_info("Reading the first read: {.path {fa1}}")
     read1 <- ShortRead::readFasta(fa1)
     id1 <- as.character(ShortRead::id(read1))
     read1 <- ShortRead::sread(read1)
 
     if (!is.null(fa2)) {
-        cli::cli_alert_info("Reading {.path {fa2}}")
+        cli::cli_alert_info("Reading the second read: {.path {fa2}}")
         read2 <- ShortRead::readFasta(fa2)
         id2 <- as.character(ShortRead::id(read2))
         read2 <- ShortRead::sread(read2)
@@ -277,24 +266,17 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
         unique()
 
     # extract cell barcode and umi -----------------------------------
-    cli::cli_alert_info("Parsing {.field cell barcode} and {.field UMI}")
-    cb_and_umi <- cb_and_umi(ids, read1, read2)
-    if (length(cb_and_umi) != 2L) {
-        cli::cli_abort(c(
-            "{.code length(cb_and_umi) == 2L} is not {.code TRUE}",
-            i = "{.fn cb_and_umi} must return a list of length 2"
-        ))
-    } else if (!all(lengths(cb_and_umi) == length(ids))) {
-        cli::cli_abort(c(
-            paste(
-                "{.code all(lengths(cb_and_umi) == length(sequence_id))}",
-                "is not {.code TRUE}"
-            ),
-            i = paste(
-                "{.fn cb_and_umi} must return cell barcode and umi",
-                "for each reads"
-            )
-        ))
+    cli::cli_alert_info("Parsing {.field cell barcode}")
+    barcode <- as.character(barcode_extractor(ids, read1, read2))
+    if (length(barcode) != length(ids)) {
+        cli::cli_abort(
+            "{.fn barcode_extractor} must return cell barcode for each read"
+        )
+    }
+    cli::cli_alert_info("Parsing {.field UMI}")
+    umi <- as.character(umi_extractor(ids, read1, read2))
+    if (length(umi) != length(ids)) {
+        cli::cli_abort("{.fn umi_extractor} must return umi for each read")
     }
 
     # integrate sequence, cell barcode and umi ----------------------
@@ -309,8 +291,8 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
 
     # every row correspond to a single sequence read
     kout <- kout$with_columns(
-        cb = pl$Series(values = cb_and_umi[[1L]]),
-        umi = pl$Series(values = cb_and_umi[[2L]])
+        cb = pl$Series(values = barcode),
+        umi = pl$Series(values = umi)
     )
 
     # prepare data for blsa ----------------------
@@ -368,27 +350,13 @@ prep_dataset <- function(fa1, kreport, koutput, fa2 = NULL,
             exclude(c("taxid", "taxa", "rank", "taxids", "taxon", "ranks"))$
             list$last()
     )
-    # save all results ---------------------------
-    if (!is.null(odir)) {
-        kreport$write_parquet(file.path(odir, "kreport.parquet"))
-        kmer$write_parquet(file.path(odir, "kmer.parquet"))
-        umi$write_parquet(file.path(odir, "umi.parquet"))
-    }
-    # combine all result and return
-    list(kreport = kreport, kmer = kmer, umi = umi)
-}
 
-#' @param dir A string of directory containing the files returned by
-#' `prep_dataset`.
-#' @export
-#' @rdname prep_dataset
-read_dataset <- function(dir) {
-    use_polars()
-    list(
-        kreport = pl$read_parquet(file.path(dir, "kreport.parquet")),
-        kmer = pl$read_parquet(file.path(dir, "kmer.parquet")),
-        umi = pl$read_parquet(file.path(dir, "umi.parquet"))
-    )
+    # save all results ---------------------------
+    kreport$write_parquet(file.path(odir, extract_kreport))
+    kmer$write_parquet(file.path(odir, extract_kmer))
+    umi$write_parquet(file.path(odir, extract_umi))
+
+    cli::cli_inform(c("v" = "Finished"))
 }
 
 taxon_children <- function(kreport, taxon) {

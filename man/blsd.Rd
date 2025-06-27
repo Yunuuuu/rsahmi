@@ -14,7 +14,7 @@ blsd(
 )
 }
 \arguments{
-\item{kmer}{kmer data returned by \code{\link[=prep_dataset]{prep_dataset()}}.}
+\item{kmer}{kmer data returned by \code{\link[=kuactor]{kuactor()}}.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
@@ -39,26 +39,6 @@ True taxa are detected on multiple barcodes and with a proprotional number of
 total and unique k-mer sequences across barcodes, measured as a significant
 Spearman correlation between the number of total and unique k-mers across
 barcodes. (\code{padj < 0.05})
-}
-\examples{
-\dontrun{
-# 1. `sahmi_datasets` should be the output of all samples from 
-      `prep_dataset()` 
-# 2. `real_taxids_slsd` should be the output of `slsd()`
-umi_list <- lapply(sahmi_datasets, function(dataset) {
-    # Barcode level signal denoising (barcode k-mer correlation test)
-    blsd <- blsd(dataset$kmer)
-    real_taxids <- blsd$filter(pl$col("padj")$lt(0.05))$get_column("taxid")
-    # only keep taxids pass Sample level signal denoising
-    real_taxids <- real_taxids$filter(real_taxids$is_in(real_taxids_slsd))
-    # remove contaminants
-    real_taxids <- real_taxids$filter(
-        real_taxids$is_in(attr(truly_microbe, "truly"))
-    )
-    # filter UMI data
-    dataset$umi$filter(pl$col("taxid")$is_in(real_taxids))
-})
-}
 }
 \seealso{
 \url{https://github.com/sjdlabgroup/SAHMI}

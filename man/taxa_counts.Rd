@@ -8,7 +8,7 @@ taxa_counts(umi_list, samples = NULL)
 }
 \arguments{
 \item{umi_list}{A list of polars \link[polars:DataFrame_class]{DataFrame} for UMI
-data returned by \link{prep_dataset}.}
+data returned by \link{kuactor}.}
 
 \item{samples}{A character of sample identifier for each element in
 \code{umi_list}.}
@@ -25,7 +25,7 @@ counts assigned to each clade are tabulated.
 }
 \examples{
 \dontrun{
-# `umi_list` should be the output of all samples from `prep_dataset()`, and 
+# `umi_list` should be the output of all samples from `kuactor()`, and
 # filtered by `slsd()` and `blsd()`
 taxa_counts(umi_list, basename(names(umi_list)))
 }

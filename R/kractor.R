@@ -1,4 +1,4 @@
-#' Extract Reads and Output from Kraken2 (kraken2 extractor)
+#' Extract Kraken2 Output and Reads (Kraken2 output and reads extractor)
 #'
 #' This function extracts reads and classification results from Kraken2 output,
 #' based on a set of specified taxonomic IDs.
@@ -40,7 +40,8 @@
 #'   amount of in-flight data awaiting writing. Default: `3`.
 #' @param threads Integer. Number of threads to use. Default will determined
 #' atomatically by rayon.
-#' @param odir A string of directory to save the `ofile`.
+#' @param odir A string of directory to save the output files. Please see
+#' `Value` section for details.
 #' @param mmap Logical. Whether to enable memory-mapped file access. When set to
 #'   `TRUE`, the function uses memory mapping, which can be highly efficient for
 #'   multi-threaded reading and avoids redundant data copying. However, the

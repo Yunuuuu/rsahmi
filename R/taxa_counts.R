@@ -6,14 +6,14 @@
 #' counts assigned to each clade are tabulated.
 #'
 #' @param umi_list A list of polars [DataFrame][polars::DataFrame_class] for UMI
-#' data returned by [prep_dataset].
+#' data returned by [kuactor].
 #' @param samples A character of sample identifier for each element in
 #' `umi_list`.
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @return A polars [DataFrame][polars::DataFrame_class].
-#' @examples 
+#' @examples
 #' \dontrun{
-#' # `umi_list` should be the output of all samples from `prep_dataset()`, and 
+#' # `umi_list` should be the output of all samples from `kuactor()`, and
 #' # filtered by `slsd()` and `blsd()`
 #' taxa_counts(umi_list, basename(names(umi_list)))
 #' }
