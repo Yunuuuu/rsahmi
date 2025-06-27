@@ -110,3 +110,29 @@ reader_bench_reads_10m <- bench::mark(
     iterations = 1, memory = FALSE, check = FALSE
 )
 saveRDS(reader_bench_reads_10m, "bench/reader_bench_reads_10m.rds")
+
+mmap_bench_reads_1m <- bench::mark(
+    rsahmi:::rust_kractor_reads(
+        "bench/data/kraken_microbiome_output.txt",
+        "bench/data/CNP000460_P01N_read1.fq",
+        extract_reads = "bench/data/kraken_microbiome_reads.fa",
+        chunk_size = 1 * 1024 * 1024,
+        mmap = TRUE,
+        pprof = "bench/pprof_mmap_kractor_reads_1m.svg"
+    ),
+    iterations = 1, memory = FALSE, check = FALSE
+)
+saveRDS(mmap_bench_reads_1m, "bench/mmap_bench_reads_1m.rds")
+
+mmap_bench_reads_10m <- bench::mark(
+    rsahmi:::rust_kractor_reads(
+        "bench/data/kraken_microbiome_output.txt",
+        "bench/data/CNP000460_P01N_read1.fq",
+        extract_reads = "bench/data/kraken_microbiome_reads.fa",
+        chunk_size = 10 * 1024 * 1024,
+        mmap = TRUE,
+        pprof = "bench/pprof_mmap_kractor_reads_10m.svg"
+    ),
+    iterations = 1, memory = FALSE, check = FALSE
+)
+saveRDS(mmap_bench_reads_10m, "bench/mmap_bench_reads_10m.rds")
