@@ -99,7 +99,7 @@ kractor <- function(kreport, koutput, reads,
         nqueue = nqueue,
         threads = threads,
         odir = odir,
-        mmap = mmap,
+        mmap = mmap
     )
     rust_kractor_reads(
         file.path(odir, extract_koutput %||% "kraken_microbiome_output.txt"),
@@ -113,7 +113,8 @@ kractor <- function(kreport, koutput, reads,
         batch_size = batch_size,
         nqueue = nqueue,
         threads = threads,
-        odir = odir
+        odir = odir,
+        mmap = mmap
     )
     cli::cli_inform(c("v" = "Finished"))
 }
@@ -157,6 +158,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
         allow_null = TRUE
     )
     assert_string(odir, allow_empty = FALSE)
+    assert_bool(mmap)
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)
 
@@ -218,7 +220,7 @@ rust_kractor_reads <- function(koutput, reads,
                                chunk_size = NULL, buffer_size = NULL,
                                batch_size = NULL,
                                nqueue = NULL, threads = NULL,
-                               odir = getwd(), pprof = NULL) {
+                               odir = getwd(), mmap = TRUE, pprof = NULL) {
     assert_string(koutput, allow_empty = FALSE)
     reads <- as.character(reads)
     if (length(reads) < 1L || length(reads) > 2L) {
@@ -275,6 +277,7 @@ rust_kractor_reads <- function(koutput, reads,
         allow_null = TRUE
     )
     assert_string(odir, allow_empty = FALSE)
+    assert_bool(mmap)
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)
 
@@ -313,7 +316,8 @@ rust_kractor_reads <- function(koutput, reads,
             buffer_size = buffer_size,
             batch_size = batch_size,
             nqueue = nqueue,
-            threads = threads
+            threads = threads,
+            mmap = mmap
         )
     } else {
         rust_call(
@@ -328,6 +332,7 @@ rust_kractor_reads <- function(koutput, reads,
             batch_size = batch_size,
             nqueue = nqueue,
             threads = threads,
+            mmap = mmap,
             pprof_file = file.path(odir, pprof)
         )
     }

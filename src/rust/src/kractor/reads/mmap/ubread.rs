@@ -80,8 +80,8 @@ pub fn mmap_kractor_ubread_read(
             let barcode_ranges = &barcode_ranges;
             // Rayon scope for spawning parsing threads
             rayon::scope(|s| -> Result<()> {
-                for parser_result in reader {
-                    let mut parser = parser_result?;
+                for chunk_result in reader {
+                    let mut chunk = chunk_result?;
                     // If an error already occurred, stop spawning new threads
                     if has_error.load(Relaxed) {
                         return Ok(());
@@ -93,7 +93,7 @@ pub fn mmap_kractor_ubread_read(
                     let thread_err_tx = err_tx.clone();
                     s.spawn(move |_| {
                         loop {
-                            match parser.read_record() {
+                            match chunk.read_record() {
                                 Ok(value) => match value {
                                     Some((record1, record2)) => {
                                         if id_sets.contains(record1.id) {
@@ -126,11 +126,15 @@ pub fn mmap_kractor_ubread_read(
                                                 record1, umi, barcode,
                                             );
                                             // Attempt to send the matching record to the writer thread.
-                                            // If this fails, it means the writer thread has already exited due to an error.
-                                            // Since that error will be reported separately, we can safely ignore this send failure.
                                             match thread_tx.send(record) {
                                                 Ok(_) => continue,
-                                                Err(_) => return (),
+                                                Err(_) => {
+                                                    // If this fails, it means the writer thread has already exited due to an error.
+                                                    // Since that error will be reported separately, we can safely ignore this send failure.
+                                                    // Mark that an error has occurred
+                                                    thread_has_error.store(true, Relaxed);
+                                                    return ();
+                                                }
                                             };
                                         }
                                     }

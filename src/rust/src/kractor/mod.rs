@@ -71,6 +71,7 @@ fn kractor_reads(
     batch_size: usize,
     nqueue: Option<usize>,
     threads: usize,
+    mmap: bool,
 ) -> std::result::Result<(), String> {
     rprintln!("Extracting sequence IDs");
     let ids = reads::read_sequence_id_from_koutput(koutput, 126 * 1024)
@@ -87,7 +88,7 @@ fn kractor_reads(
         .build()
         .map_err(|e| format!("Failed to initialize rayon thread pool: {:?}", e))?;
     rayon_pool.install(|| {
-        reads::mmap_kractor_reads(
+        reads::kractor_reads(
             id_sets,
             fq1,
             ofile1,
@@ -100,6 +101,7 @@ fn kractor_reads(
             buffer_size,
             batch_size,
             nqueue,
+            mmap,
         )
         .map_err(|e| format!("{}", e))
     })
@@ -163,6 +165,7 @@ fn pprof_kractor_reads(
     batch_size: usize,
     nqueue: Option<usize>,
     threads: usize,
+    mmap: bool,
     pprof_file: &str,
 ) -> std::result::Result<(), String> {
     let guard = pprof::ProfilerGuardBuilder::default()
@@ -183,6 +186,7 @@ fn pprof_kractor_reads(
         batch_size,
         nqueue,
         threads,
+        mmap,
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file)

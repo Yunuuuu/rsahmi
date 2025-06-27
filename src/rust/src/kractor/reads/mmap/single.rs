@@ -67,7 +67,7 @@ pub fn mmap_kractor_single_read(
             let id_sets = &id_sets;
             // Rayon scope for spawning parsing threads
             rayon::scope(|s| {
-                for mut parser in reader {
+                for mut chunk in reader {
                     // If an error already occurred, stop spawning new threads
                     if has_error.load(Relaxed) {
                         return ();
@@ -79,16 +79,20 @@ pub fn mmap_kractor_single_read(
                     let thread_err_tx = err_tx.clone();
                     s.spawn(move |_| {
                         loop {
-                            match parser.read_record() {
+                            match chunk.read_record() {
                                 Ok(value) => match value {
                                     Some(record) => {
                                         if id_sets.contains(record.id) {
                                             // Attempt to send the matching record to the writer thread.
-                                            // If this fails, it means the writer thread has already exited due to an error.
-                                            // Since that error will be reported separately, we can safely ignore this send failure.
                                             match thread_tx.send(record) {
                                                 Ok(_) => continue,
-                                                Err(_) => return (),
+                                                Err(_) => {
+                                                    // If this fails, it means the writer thread has already exited due to an error.
+                                                    // Since that error will be reported separately, we can safely ignore this send failure.
+                                                    // Mark that an error has occurred
+                                                    thread_has_error.store(true, Relaxed);
+                                                    return ();
+                                                }
                                             };
                                         }
                                     }

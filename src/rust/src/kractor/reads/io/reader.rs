@@ -1,5 +1,4 @@
 use std::cell::Cell;
-use std::cell::RefCell;
 use std::io::Read;
 
 use anyhow::{anyhow, Result};
@@ -71,32 +70,37 @@ impl BytesFastqChunkSource {
 }
 
 #[derive(Debug)]
-pub(crate) struct BytesFastqReader<'a> {
+pub(crate) struct BytesFastqReader {
     source: BytesFastqChunkSource,
-    container: RefCell<FastqContainer<'a>>,
 }
 
-impl<'s, 'a> BytesFastqReader<'a>
-where
-    's: 'a,
-{
+impl BytesFastqReader {
     pub fn new(source: BytesFastqChunkSource) -> Self {
-        Self {
-            source,
-            container: RefCell::new(FastqContainer::<'a>::default()),
-        }
+        Self { source }
     }
 
-    fn read_record(&'s self) -> Result<Option<FastaRecord<Bytes>>, FastqParseError> {
+    pub fn read_record<'inner, 'outer>(
+        &'outer self,
+        container: &mut FastqContainer<'inner>,
+    ) -> Result<Option<FastaRecord<Bytes>>, FastqParseError>
+    where
+        'outer: 'inner,
+    {
         // Try reading the 1st line (head). If EOF, return None.
-        if self.read_head()?.is_none() {
+        if self.read_head(container)?.is_none() {
             return Ok(None);
         };
-        self.read_tail()?;
-        Ok(Some(self.build()))
+        self.read_tail(container)?;
+        Ok(Some(self.build(container)))
     }
 
-    fn read_head(&'s self) -> Result<Option<()>, FastqParseError> {
+    fn read_head<'inner, 'outer>(
+        &'outer self,
+        container: &mut FastqContainer<'inner>,
+    ) -> Result<Option<()>, FastqParseError>
+    where
+        'outer: 'inner,
+    {
         // Try reading the 1st line (head). If EOF, return None.
         loop {
             match self.source.read_line() {
@@ -105,11 +109,7 @@ where
                     if line.is_empty() || line.iter().all(|b| b.is_ascii_whitespace()) {
                         continue;
                     }
-                    self.container.borrow_mut().parse_head(
-                        line,
-                        self.source.label(),
-                        self.source.offset() - 1,
-                    )?;
+                    container.parse_head(line, self.source.label(), self.source.offset() - 1)?;
                     return Ok(Some(()));
                 }
                 None => return Ok(None), // EOF
@@ -117,93 +117,97 @@ where
         }
     }
 
-    fn read_tail(&'s self) -> Result<(), FastqParseError> {
+    fn read_tail<'inner, 'outer>(
+        &'outer self,
+        container: &mut FastqContainer<'inner>,
+    ) -> Result<(), FastqParseError>
+    where
+        'outer: 'inner,
+    {
         // 2nd line (sequence) must exist. Otherwise, incomplete record.
         if let Some(line) = self.source.read_line() {
-            self.container.borrow_mut().parse_seq(
-                line,
-                self.source.label,
-                self.source.offset() - 1,
-            )?;
+            container.parse_seq(line, self.source.label, self.source.offset() - 1)?;
         } else {
             return Err(FastqParseError::IncompleteRecord {
                 label: self.source.label,
-                record: self.container.borrow().to_string(),
+                record: container.to_string(),
                 pos: self.source.offset(),
             });
         }
 
         // 3rd line (separator). Must exist.
         if let Some(line) = self.source.read_line() {
-            self.container.borrow_mut().parse_sep(
-                line,
-                self.source.label,
-                self.source.offset() - 1,
-            )?;
+            container.parse_sep(line, self.source.label, self.source.offset() - 1)?;
         } else {
             return Err(FastqParseError::IncompleteRecord {
                 label: self.source.label,
-                record: self.container.borrow().to_string(),
+                record: container.to_string(),
                 pos: self.source.offset(),
             });
         }
 
         // 4th line (quality). Must exist.
         if let Some(line) = self.source.read_line() {
-            self.container.borrow_mut().parse_qual(
-                line,
-                self.source.label,
-                self.source.offset() - 1,
-            )?;
+            container.parse_qual(line, self.source.label, self.source.offset() - 1)?;
         } else {
             return Err(FastqParseError::IncompleteRecord {
                 label: self.source.label,
-                record: self.container.borrow().to_string(),
+                record: container.to_string(),
                 pos: self.source.offset(),
             });
         }
         Ok(())
     }
 
-    fn build(&self) -> FastaRecord<Bytes> {
+    fn build<'inner, 'outer>(
+        &'outer self,
+        container: &mut FastqContainer<'inner>,
+    ) -> FastaRecord<Bytes>
+    where
+        'outer: 'inner,
+    {
         let out = unsafe {
             FastaRecord::new(
                 self.source
                     .chunk
-                    .slice_ref(self.container.borrow().id().unwrap_unchecked()),
-                self.container
-                    .borrow()
+                    .slice_ref(container.id().unwrap_unchecked()),
+                container
                     .desc()
                     .unwrap_unchecked()
                     .map(|slice| self.source.chunk.slice_ref(slice)),
                 self.source
                     .chunk
-                    .slice_ref(self.container.borrow().seq().unwrap_unchecked()),
+                    .slice_ref(container.seq().unwrap_unchecked()),
             )
         };
-        self.container.borrow_mut().reset();
+        container.reset();
         out
     }
 }
 
-pub(crate) struct BytesFastqPairedChunkReader<'a, 'b> {
-    reader1: BytesFastqReader<'a>,
-    reader2: BytesFastqReader<'b>,
+pub(crate) struct BytesFastqPairedChunkReader {
+    reader1: BytesFastqReader,
+    reader2: BytesFastqReader,
 }
 
-impl<'s, 'a, 'b> BytesFastqPairedChunkReader<'a, 'b>
-where
-    's: 'a,
-    's: 'b,
-{
-    pub fn new(reader1: BytesFastqReader<'a>, reader2: BytesFastqReader<'b>) -> Self {
+impl BytesFastqPairedChunkReader {
+    pub fn new(reader1: BytesFastqReader, reader2: BytesFastqReader) -> Self {
         Self { reader1, reader2 }
     }
 
-    pub fn read_record(
-        &'s self,
-    ) -> Result<Option<(FastaRecord<Bytes>, FastaRecord<Bytes>)>, FastqParseError> {
-        match (self.reader1.read_head()?, self.reader2.read_head()?) {
+    pub fn read_record<'outer, 'inner1, 'inner2>(
+        &'outer self,
+        container1: &mut FastqContainer<'inner1>,
+        container2: &mut FastqContainer<'inner2>,
+    ) -> Result<Option<(FastaRecord<Bytes>, FastaRecord<Bytes>)>, FastqParseError>
+    where
+        'outer: 'inner1,
+        'outer: 'inner2,
+    {
+        match (
+            self.reader1.read_head(container1)?,
+            self.reader2.read_head(container2)?,
+        ) {
             (Some(()), None) => {
                 return Err(FastqParseError::OutOfSync {
                     eof_label: self.reader2.source.label,
@@ -221,8 +225,8 @@ where
                 });
             }
             (Some(()), Some(())) => {
-                let id1 = unsafe { self.reader1.container.borrow().id().unwrap_unchecked() };
-                let id2 = unsafe { self.reader2.container.borrow().id().unwrap_unchecked() };
+                let id1 = unsafe { container1.id().unwrap_unchecked() };
+                let id2 = unsafe { container2.id().unwrap_unchecked() };
                 if id1 != id2 {
                     return Err(FastqParseError::FastqPairError {
                         read1_label: self.reader1.source.label,
@@ -233,9 +237,12 @@ where
                         read2_pos: self.reader2.source.offset() - 1,
                     });
                 }
-                self.reader1.read_tail()?;
-                self.reader2.read_tail()?;
-                return Ok(Some((self.reader1.build(), self.reader2.build())));
+                self.reader1.read_tail(container1)?;
+                self.reader2.read_tail(container2)?;
+                return Ok(Some((
+                    self.reader1.build(container1),
+                    self.reader2.build(container2),
+                )));
             }
             (None, None) => {
                 return Ok(None);
@@ -283,7 +290,7 @@ where
         self.label = None;
     }
 
-    pub fn chunk_reader<'a>(&'a mut self) -> Result<Option<BytesFastqReader<'a>>> {
+    pub fn chunk_reader(&mut self) -> Result<Option<BytesFastqReader>> {
         // read files
         let (mut buf, nbytes) = read(&mut self.reader, &self.leftover, self.chunk_size)?;
 
@@ -617,18 +624,18 @@ mod tests {
 
         let mut chunk_reader = BytesChunkReader::new(File::open(&path)?);
         let reader = chunk_reader.chunk_reader()?.unwrap();
-
-        let record1 = reader.read_record().unwrap().unwrap();
+        let mut container = FastqContainer::new();
+        let record1 = reader.read_record(&mut container).unwrap().unwrap();
         assert_eq!(to_string(&record1.id), "SEQ_ID1");
         assert_eq!(record1.desc, None);
         assert_eq!(to_string(&record1.seq), "GATTA");
 
-        let record2 = reader.read_record().unwrap().unwrap();
+        let record2 = reader.read_record(&mut container).unwrap().unwrap();
         assert_eq!(to_string(&record2.id), "SEQ_ID2");
         assert_eq!(record2.desc, None);
         assert_eq!(to_string(&record2.seq), "ACGTA");
 
-        assert!(reader.read_record().unwrap().is_none());
+        assert!(reader.read_record(&mut container).unwrap().is_none());
 
         Ok(())
     }
@@ -651,20 +658,28 @@ mod tests {
             BytesChunkPairedReader::new(File::open(&path1)?, File::open(&path2)?);
 
         let chunk = paired_reader.chunk_reader()?.unwrap();
+        let mut container1 = FastqContainer::new();
+        let mut container2 = FastqContainer::new();
 
-        let (rec1_r1, rec1_r2) = chunk.read_record()?.unwrap();
+        let (rec1_r1, rec1_r2) = chunk
+            .read_record(&mut container1, &mut container2)?
+            .unwrap();
         assert_eq!(to_string(&rec1_r1.id), "SEQ_ID1");
         assert_eq!(to_string(&rec1_r1.seq), "GATTA");
         assert_eq!(to_string(&rec1_r2.id), "SEQ_ID1");
         assert_eq!(to_string(&rec1_r2.seq), "TTTAA");
 
-        let (rec2_r1, rec2_r2) = chunk.read_record()?.unwrap();
+        let (rec2_r1, rec2_r2) = chunk
+            .read_record(&mut container1, &mut container2)?
+            .unwrap();
         assert_eq!(to_string(&rec2_r1.id), "SEQ_ID2");
         assert_eq!(to_string(&rec2_r1.seq), "ACGTA");
         assert_eq!(to_string(&rec2_r2.id), "SEQ_ID2");
         assert_eq!(to_string(&rec2_r2.seq), "GGCCC");
 
-        assert!(chunk.read_record()?.is_none());
+        assert!(chunk
+            .read_record(&mut container1, &mut container2)?
+            .is_none());
 
         Ok(())
     }

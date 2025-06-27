@@ -11,10 +11,11 @@ mod mmap;
 mod parser;
 pub mod range;
 
+use io::{reader_kractor_paired_read, reader_kractor_single_read, reader_kractor_ubread_read};
 use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read, mmap_kractor_ubread_read};
 use range::RangeKind;
 
-pub fn mmap_kractor_reads(
+pub fn kractor_reads(
     id_sets: HashSet<&[u8]>,
     fq1: &str,
     ofile1: &str,
@@ -27,32 +28,61 @@ pub fn mmap_kractor_reads(
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
+    mmap: bool,
 ) -> Result<()> {
     match (fq2, ubread) {
-        (None, None) => mmap_kractor_single_read(
-            id_sets,
-            fq1,
-            ofile1,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-        ),
+        (None, None) => {
+            if mmap {
+                mmap_kractor_single_read(
+                    id_sets,
+                    fq1,
+                    ofile1,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            } else {
+                reader_kractor_single_read(
+                    id_sets,
+                    fq1,
+                    ofile1,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            }
+        }
         (Some(fq2), None) => {
             let ofile2 = ofile2.ok_or(anyhow!(
                 "`ofile2` must be provided when processing paired-end reads"
             ))?;
-            mmap_kractor_paired_read(
-                id_sets,
-                fq1,
-                ofile1,
-                fq2,
-                ofile2,
-                chunk_size,
-                buffer_size,
-                batch_size,
-                nqueue,
-            )
+            if mmap {
+                mmap_kractor_paired_read(
+                    id_sets,
+                    fq1,
+                    ofile1,
+                    fq2,
+                    ofile2,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            } else {
+                reader_kractor_paired_read(
+                    id_sets,
+                    fq1,
+                    ofile1,
+                    fq2,
+                    ofile2,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            }
         }
         (None, Some(ubread)) => {
             let umi_ranges = umi_ranges.ok_or(anyhow!(
@@ -61,18 +91,33 @@ pub fn mmap_kractor_reads(
             let barcode_ranges = barcode_ranges.ok_or(anyhow!(
                 "`barcode_ranges` must be provided when processing `ubread` reads"
             ))?;
-            mmap_kractor_ubread_read(
-                id_sets,
-                fq1,
-                ofile1,
-                ubread,
-                umi_ranges,
-                barcode_ranges,
-                chunk_size,
-                buffer_size,
-                batch_size,
-                nqueue,
-            )
+            if mmap {
+                mmap_kractor_ubread_read(
+                    id_sets,
+                    fq1,
+                    ofile1,
+                    ubread,
+                    umi_ranges,
+                    barcode_ranges,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            } else {
+                reader_kractor_ubread_read(
+                    id_sets,
+                    fq1,
+                    ofile1,
+                    ubread,
+                    umi_ranges,
+                    barcode_ranges,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            }
         }
         (Some(_), Some(_)) => {
             return Err(anyhow!(

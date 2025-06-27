@@ -44,7 +44,10 @@ impl<'a> std::fmt::Display for FastqContainer<'a> {
     }
 }
 
-impl<'a> FastqContainer<'a> {
+impl<'a, 'line> FastqContainer<'a>
+where
+    'line: 'a,
+{
     #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
@@ -92,10 +95,12 @@ impl<'a> FastqContainer<'a> {
         self.seq
     }
 
+    #[allow(dead_code)]
     pub fn sep(&self) -> Option<&'a [u8]> {
         self.sep
     }
 
+    #[allow(dead_code)]
     pub fn qual(&self) -> Option<&'a [u8]> {
         self.qual
     }
@@ -103,7 +108,7 @@ impl<'a> FastqContainer<'a> {
     // --- internal method, must call for cautious, they use unsafe code;
     pub fn parse_head(
         &mut self,
-        line: &'a [u8],
+        line: &'line [u8],
         label: Option<&'static str>,
         pos: usize,
     ) -> Result<(), FastqParseError> {
@@ -138,7 +143,7 @@ impl<'a> FastqContainer<'a> {
 
     pub fn parse_seq(
         &mut self,
-        line: &'a [u8],
+        line: &'line [u8],
         _label: Option<&'static str>,
         _pos: usize,
     ) -> Result<(), FastqParseError> {
@@ -148,7 +153,7 @@ impl<'a> FastqContainer<'a> {
 
     pub fn parse_sep(
         &mut self,
-        line: &'a [u8],
+        line: &'line [u8],
         label: Option<&'static str>,
         pos: usize,
     ) -> Result<(), FastqParseError> {
@@ -166,7 +171,7 @@ impl<'a> FastqContainer<'a> {
 
     pub fn parse_qual(
         &mut self,
-        line: &'a [u8],
+        line: &'line [u8],
         label: Option<&'static str>,
         pos: usize,
     ) -> Result<(), FastqParseError> {
