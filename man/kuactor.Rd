@@ -75,7 +75,7 @@ None. This function generates the following files:
 \itemize{
 \item \code{extract_kreport}: A filtered version of the Kraken2 taxonomic report,
 containing only taxa that meet the \code{ranks} criteria and are observed in
-\code{koutput}.  Used by \code{\link[=slsd]{slsd()}}.
+\code{koutput}. Used by \code{\link[=rpmm_quantile]{rpmm_quantile()}} and \code{\link[=slsd]{slsd()}}.
 \item \code{extract_kmer}: A table quantifying total and unique k-mers assigned to
 each taxon across barcodes. Used by \code{\link[=blsd]{blsd()}}.
 \item \code{extract_umi}: A table of taxon–barcode–UMI combinations indicating all

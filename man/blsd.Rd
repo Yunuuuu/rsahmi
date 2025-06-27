@@ -8,13 +8,13 @@ blsd(
   kmer,
   method = "spearman",
   ...,
-  p.adjust = "BH",
   min_kmer_len = 3L,
-  min_number = 3L
+  min_cells = 3L,
+  p.adjust = "BH"
 )
 }
 \arguments{
-\item{kmer}{kmer data returned by \code{\link[=kuactor]{kuactor()}}.}
+\item{kmer}{kmer file returned by \code{\link[=kuactor]{kuactor()}}.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
@@ -22,14 +22,14 @@ abbreviated.}
 
 \item{...}{Other arguments passed to \link[stats:cor.test]{cor.test}.}
 
-\item{p.adjust}{Pvalue correction method, a character string. Can be
-abbreviated. Details see \link[stats:p.adjust]{p.adjust}.}
-
 \item{min_kmer_len}{An integer, the minimal number of kmer to filter taxa.
 SAHMI use \code{2}.}
 
-\item{min_number}{An integer, the minimal number of cell per taxid. SAHMI use
+\item{min_cells}{An integer, the minimal number of cell per taxid. SAHMI use
 \code{4}.}
+
+\item{p.adjust}{Pvalue correction method, a character string. Can be
+abbreviated. Details see \link[stats:p.adjust]{p.adjust}.}
 }
 \value{
 A polars \link[polars:DataFrame_class]{DataFrame}

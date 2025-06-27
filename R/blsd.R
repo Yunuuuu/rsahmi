@@ -5,26 +5,27 @@
 #' Spearman correlation between the number of total and unique k-mers across
 #' barcodes. (`padj < 0.05`)
 #'
-#' @param kmer kmer data returned by [`kuactor()`].
+#' @param kmer kmer file returned by [`kuactor()`].
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be
 #'   abbreviated.
 #' @param ... Other arguments passed to [cor.test][stats::cor.test].
-#' @param p.adjust Pvalue correction method, a character string. Can be
-#'   abbreviated. Details see [p.adjust][stats::p.adjust].
 #' @param min_kmer_len An integer, the minimal number of kmer to filter taxa.
 #' SAHMI use `2`.
-#' @param min_number An integer, the minimal number of cell per taxid. SAHMI use
+#' @param min_cells An integer, the minimal number of cell per taxid. SAHMI use
 #' `4`.
+#' @param p.adjust Pvalue correction method, a character string. Can be
+#'   abbreviated. Details see [p.adjust][stats::p.adjust].
 #' @seealso <https://github.com/sjdlabgroup/SAHMI>
 #' @return A polars [DataFrame][polars::DataFrame_class]
 #' @export
-blsd <- function(kmer, method = "spearman", ..., p.adjust = "BH",
-                 min_kmer_len = 3L, min_number = 3L) {
+blsd <- function(kmer, method = "spearman", ...,
+                 min_kmer_len = 3L, min_cells = 3L, p.adjust = "BH") {
     use_polars()
+    kmer <- pl$read_parquet(kmer)
     data_list <- kmer$
         filter(pl$col("kmer_len")$gt_eq(min_kmer_len))$
-        filter(pl$len()$over("taxid", "taxa")$gt_eq(min_number))$
+        filter(pl$len()$over("taxid", "taxa")$gt_eq(min_cells))$
         partition_by("taxid", "taxa")
     out_list <- lapply(data_list, function(data) {
         cor_res <- stats::cor.test(

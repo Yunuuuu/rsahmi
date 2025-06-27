@@ -53,7 +53,7 @@
 #' @return None. This function generates the following files:
 #'  - `extract_kreport`: A filtered version of the Kraken2 taxonomic report,
 #'   containing only taxa that meet the `ranks` criteria and are observed in
-#'   `koutput`.  Used by [`slsd()`].
+#'   `koutput`. Used by [`rpmm_quantile()`] and [`slsd()`].
 #'  - `extract_kmer`: A table quantifying total and unique k-mers assigned to
 #'   each taxon across barcodes. Used by [`blsd()`].
 #'  - `extract_umi`: A table of taxon–barcode–UMI combinations indicating all

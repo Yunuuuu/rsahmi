@@ -10,11 +10,11 @@ slsd(
   ...,
   min_reads = 3L,
   min_minimizer_n_unique = 3L,
-  min_number = 3L
+  min_samples = 3L
 )
 }
 \arguments{
-\item{kreports}{kreports data returned by \code{\link[=kuactor]{kuactor()}} for all samples.}
+\item{kreports}{kreport files returned by \code{\link[=kuactor]{kuactor()}} for all samples.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be
@@ -28,7 +28,7 @@ taxa. SAHMI use \code{2}.}
 \item{min_minimizer_n_unique}{An integer, the minimal number of the unique
 number of minimizer to filter taxa. SAHMI use \code{2}.}
 
-\item{min_number}{An integer, the minimal number of samples per taxid. SAHMI
+\item{min_samples}{An integer, the minimal number of samples per taxid. SAHMI
 use \code{4}.}
 }
 \value{
