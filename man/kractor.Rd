@@ -101,10 +101,6 @@ based on a set of specified taxonomic IDs.
 }
 \examples{
 \dontrun{
-# For 10x Genomic data, `fq1` only contain barcode and umi, but the official
-# didn't give any information for this. In this way, I prefer using
-# `umi-tools` to transform the `umi` into fq2 and then run `rsahmi` with
-# only fq2.
 blit::kraken2(
     fq1 = fq1,
     fq2 = fq2,
