@@ -30,13 +30,13 @@ denoise_counts(
 }
 \arguments{
 \item{kreports}{A character vector of paths to Kraken2 report files,
-typically output by \code{\link[=kuactor]{kuactor()}}, one per sample.}
+typically output by \code{\link[=sckmer]{sckmer()}}, one per sample.}
 
 \item{kmers}{A character vector of paths to k-mer quantification files,
-typically output by \code{\link[=kuactor]{kuactor()}}, one per sample.}
+typically output by \code{\link[=sckmer]{sckmer()}}, one per sample.}
 
 \item{umis}{A character vector of paths to UMI quantification files,
-typically output by \code{\link[=kuactor]{kuactor()}}, one per sample.}
+typically output by \code{\link[=sckmer]{sckmer()}}, one per sample.}
 
 \item{samples}{A character of sample identifier for each element in \code{umis}.
 If not provided, the names of the \code{umis} vector will be used.}

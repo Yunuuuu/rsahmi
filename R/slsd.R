@@ -8,7 +8,7 @@
 #' `cor(minimizer_len, total_reads)` and `cor(total_reads, minimizer_n_unique)`.
 #' (`r1>0 & r2>0 & r3>0 & p1<0.05 & p2<0.05 & p3<0.05`).
 #'
-#' @param kreports kreport files returned by [`kuactor()`] for all samples.
+#' @param kreports kreport files returned by [`sckmer()`] for all samples.
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be
 #'   abbreviated.

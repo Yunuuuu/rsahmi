@@ -42,7 +42,7 @@ krakenx(
   mmap_reads = TRUE,
   kraken2_threads = NULL,
   kractor_threads = NULL,
-  kuactor_threads = NULL,
+  sckmer_threads = NULL,
   kraken2 = NULL,
   envpath = NULL,
   overwrite = FALSE,
@@ -152,7 +152,7 @@ available threads.}
 \item{kractor_threads}{Integer. Number of threads to use. Default will
 determined atomatically by rayon.}
 
-\item{kuactor_threads}{Integer. Number of threads to use. Default to all
+\item{sckmer_threads}{Integer. Number of threads to use. Default to all
 available threads.}
 
 \item{kraken2}{A string of path to \code{kraken2} command.}
@@ -194,6 +194,6 @@ Quantification
 \itemize{
 \item \code{\link[blit:kraken2]{blit::kraken2()}}
 \item \code{\link[=kractor]{kractor()}}
-\item \code{\link[=kuactor]{kuactor()}}
+\item \code{\link[=sckmer]{sckmer()}}
 }
 }

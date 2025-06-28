@@ -7,12 +7,12 @@
 #'   following the instructions at
 #'   <https://github.com/DerrickWood/kraken2/wiki/Manual#kraken-2-databases>.
 #' @inheritParams kractor
-#' @inheritParams kuactor
+#' @inheritParams sckmer
 #' @param kraken2_threads Integer. Number of threads to use. Default to all
 #' available threads.
 #' @param kractor_threads Integer. Number of threads to use. Default will
 #' determined atomatically by rayon.
-#' @param kuactor_threads Integer. Number of threads to use. Default to all
+#' @param sckmer_threads Integer. Number of threads to use. Default to all
 #' available threads.
 #' @param envpath String. Additional path to include in the `PATH` environment
 #'   variable. Used to locate the `kraken2` executable.
@@ -20,7 +20,7 @@
 #' @seealso
 #' - [`blit::kraken2()`]
 #' - [`kractor()`]
-#' - [`kuactor()`]
+#' - [`sckmer()`]
 #' @return None. This function generates the following files:
 #' - `kreport`: the `kraken2` report file.
 #' - `koutput`: the `kraken2` output file.
@@ -66,7 +66,7 @@ krakenx <- function(reads, ...,
                     mmap_koutput = FALSE, mmap_reads = TRUE,
                     kraken2_threads = NULL,
                     kractor_threads = NULL,
-                    kuactor_threads = NULL,
+                    sckmer_threads = NULL,
                     kraken2 = NULL, envpath = NULL,
                     overwrite = FALSE, odir = getwd()) {
     assert_bool(overwrite)
@@ -216,16 +216,16 @@ krakenx <- function(reads, ...,
     extract_kreport <- extract_kreport %||% "kraken_microbiome_report.txt"
     extract_kmer <- extract_kmer %||% "kraken_microbiome_kmer.txt"
     extract_umi <- extract_umi %||% "kraken_microbiome_umi.txt"
-    kuactor_files <- file.path(
+    sckmer_files <- file.path(
         odir,
         c(extract_kreport, extract_kmer, extract_umi)
     )
-    if (overwrite || !all(file.exists(kuactor_files))) {
-        assert_number_whole(kuactor_threads,
+    if (overwrite || !all(file.exists(sckmer_files))) {
+        assert_number_whole(sckmer_threads,
             min = 1, max = as.double(parallel::detectCores()),
             allow_null = TRUE
         )
-        kuactor(
+        sckmer(
             kreport = file.path(odir, kreport),
             koutput = file.path(odir, extract_koutput),
             reads = file.path(odir, extract_reads),
@@ -238,15 +238,15 @@ krakenx <- function(reads, ...,
             kmer_len = kmer_len,
             min_frac = min_frac,
             exclude = exclude,
-            threads = kuactor_threads,
+            threads = sckmer_threads,
             odir = odir
         )
     } else {
-        cli::cli_inform("Using file exist: {.path {kuactor_files}}")
+        cli::cli_inform("Using file exist: {.path {sckmer_files}}")
     }
 
     if (!overwrite &&
-        all(file.exists(c(kraken2_files, kractor_files, kuactor_files)))) {
+        all(file.exists(c(kraken2_files, kractor_files, sckmer_files)))) {
         cli::cli_warn(paste(
             "Nothing to do, please set {.code overwrite = TRUE}",
             "if you want to overwrite the files exist"

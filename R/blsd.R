@@ -5,7 +5,7 @@
 #' Spearman correlation between the number of total and unique k-mers across
 #' barcodes. (`padj < 0.05`)
 #'
-#' @param kmer kmer file returned by [`kuactor()`].
+#' @param kmer kmer file returned by [`sckmer()`].
 #' @param method A character string indicating which correlation coefficient is
 #'   to be used for the test. One of "pearson", "kendall", or "spearman", can be
 #'   abbreviated.

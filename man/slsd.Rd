@@ -14,7 +14,7 @@ slsd(
 )
 }
 \arguments{
-\item{kreports}{kreport files returned by \code{\link[=kuactor]{kuactor()}} for all samples.}
+\item{kreports}{kreport files returned by \code{\link[=sckmer]{sckmer()}} for all samples.}
 
 \item{method}{A character string indicating which correlation coefficient is
 to be used for the test. One of "pearson", "kendall", or "spearman", can be

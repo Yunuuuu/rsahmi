@@ -7,11 +7,11 @@
 #' after filtering out likely contaminants and false positives.
 #'
 #' @param kreports A character vector of paths to Kraken2 report files,
-#' typically output by [`kuactor()`], one per sample.
+#' typically output by [`sckmer()`], one per sample.
 #' @param kmers A character vector of paths to k-mer quantification files,
-#' typically output by [`kuactor()`], one per sample.
+#' typically output by [`sckmer()`], one per sample.
 #' @param umis A character vector of paths to UMI quantification files,
-#' typically output by [`kuactor()`], one per sample.
+#' typically output by [`sckmer()`], one per sample.
 #' @param samples A character of sample identifier for each element in `umis`.
 #' If not provided, the names of the `umis` vector will be used.
 #' @param cor_threshold Minimum correlation coefficient required in sample-level

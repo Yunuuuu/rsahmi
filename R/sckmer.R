@@ -38,7 +38,7 @@
 #' # 1. `kreport` should be the output of `blit::kraken2()`.
 #' # 2. `koutput` should be the extracted kraken2 output by `kractor()`
 #' # 3. `reads` should be the output of `kractor()`
-#' kuactor(
+#' sckmer(
 #'     kreport = "kraken_report.txt",
 #'     koutput = "kraken_microbiome_output.txt",
 #'     reads = "kraken_microbiome_reads.fa",
@@ -59,19 +59,15 @@
 #'  - `extract_umi`: A table of taxon–barcode–UMI combinations indicating all
 #'   observed UMI-tagged reads per taxon. Used by [`taxa_counts()`].
 #' @export
-kuactor <- function(kreport, koutput, reads,
-                    extract_kreport = NULL,
-                    extract_kmer = NULL,
-                    extract_umi = NULL,
-                    barcode_extractor = function(sequence_id, read1, read2) {
-                        substring(read1, 1L, 16L)
-                    },
-                    umi_extractor = function(sequence_id, read1, read2) {
-                        substring(read1, 17L, 28L)
-                    },
-                    ranks = c("G", "S"), kmer_len = 35L,
-                    min_frac = 0.5, exclude = "9606",
-                    threads = NULL, odir = NULL) {
+sckmer <- function(kreport, koutput, reads,
+                   extract_kreport = NULL,
+                   extract_kmer = NULL,
+                   extract_umi = NULL,
+                   barcode_extractor = NULL,
+                   umi_extractor = NULL,
+                   ranks = c("G", "S"), kmer_len = 35L,
+                   min_frac = 0.5, exclude = "9606",
+                   threads = NULL, odir = NULL) {
     use_polars()
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
@@ -268,16 +264,45 @@ kuactor <- function(kreport, koutput, reads,
 
     # extract cell barcode and umi -----------------------------------
     cli::cli_alert_info("Parsing {.field cell barcode}")
-    barcode <- as.character(barcode_extractor(ids, read1, read2))
-    if (length(barcode) != length(ids)) {
-        cli::cli_abort(
-            "{.fn barcode_extractor} must return cell barcode for each read"
-        )
+    if (is.null(barcode_extractor)) {
+        if (grepl("@RSAHMI:UMI:[a-zA-Z]+:BARCODE:[a-zA-Z]+:RSAHMI@", ids[1L])) {
+            barcode <- sub(
+                "@RSAHMI:UMI:[a-zA-Z]+:BARCODE:([a-zA-Z]+):RSAHMI@",
+                "\\1", ids
+            )
+        } else {
+            cli::cli_abort(c(
+                "x" = "No recognizable barcode pattern found in sequence id",
+                "!" = "try to provide {.arg barcode_extractor} instead."
+            ))
+        }
+    } else {
+        barcode <- as.character(barcode_extractor(ids, read1, read2))
+        if (length(barcode) != length(ids)) {
+            cli::cli_abort(
+                "{.fn barcode_extractor} must return cell barcode for each read"
+            )
+        }
     }
+
     cli::cli_alert_info("Parsing {.field UMI}")
-    umi <- as.character(umi_extractor(ids, read1, read2))
-    if (length(umi) != length(ids)) {
-        cli::cli_abort("{.fn umi_extractor} must return umi for each read")
+    if (is.null(umi_extractor)) {
+        if (grepl("@RSAHMI:UMI:[a-zA-Z]+:BARCODE:[a-zA-Z]+:RSAHMI@", ids[1L])) {
+            umi <- sub(
+                "@RSAHMI:UMI:([a-zA-Z]+):BARCODE:([a-zA-Z]+):RSAHMI@",
+                "\\1", ids
+            )
+        } else {
+            cli::cli_abort(c(
+                "x" = "No recognizable UMI pattern found in sequence id",
+                "!" = "try to provide {.arg umi_extractor} instead."
+            ))
+        }
+    } else {
+        umi <- as.character(umi_extractor(ids, read1, read2))
+        if (length(umi) != length(ids)) {
+            cli::cli_abort("{.fn umi_extractor} must return umi for each read")
+        }
     }
 
     # integrate sequence, cell barcode and umi ----------------------
