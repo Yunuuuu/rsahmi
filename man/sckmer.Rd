@@ -2,7 +2,7 @@
 % Please edit documentation in R/sckmer.R
 \name{sckmer}
 \alias{sckmer}
-\title{Extract K-mers and UMI Data (kmer and umi extractor)}
+\title{Quantify K-mers and UMI Data by Taxon}
 \usage{
 sckmer(
   kreport,
@@ -77,10 +77,11 @@ observed UMI-tagged reads per taxon. Used by \code{\link[=taxa_counts]{taxa_coun
 }
 }
 \description{
-The function quantifies total and unique k-mers per taxon across cell
-barcodes, using both cell barcode and unique molecular identifier (UMI) to
-resolve read identity. It aggregates data for taxonomic ranks of interest (by
-default, genus and species), including all descendant taxa.
+This function counts total and unique k-mers per taxon across cell barcodes,
+using both the cell barcode and unique molecular identifier (UMI) to resolve
+read identity at the single-cell level. It aggregates k-mer counts for each
+taxonomic rank of interest (by default, genus and species), including all
+descendant taxa within those ranks.
 }
 \examples{
 \dontrun{

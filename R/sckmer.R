@@ -1,9 +1,10 @@
-#' Extract K-mers and UMI Data (kmer and umi extractor)
+#' Quantify K-mers and UMI Data by Taxon
 #'
-#' The function quantifies total and unique k-mers per taxon across cell
-#' barcodes, using both cell barcode and unique molecular identifier (UMI) to
-#' resolve read identity. It aggregates data for taxonomic ranks of interest (by
-#' default, genus and species), including all descendant taxa.
+#' This function counts total and unique k-mers per taxon across cell barcodes,
+#' using both the cell barcode and unique molecular identifier (UMI) to resolve
+#' read identity at the single-cell level. It aggregates k-mer counts for each
+#' taxonomic rank of interest (by default, genus and species), including all
+#' descendant taxa within those ranks.
 #'
 #' @inheritParams kractor
 #' @param koutput Path to the extracted Kraken2 output file, typically
