@@ -23,8 +23,7 @@
 #' @return None. This function generates the following files:
 #' - `kreport`: the `kraken2` report file.
 #' - `koutput`: the `kraken2` output file.
-#' - `classified_out`: the classified sequence file(s) from `kraken2`. Not
-#'   required for downstream processing.
+#' - `classified_out`: the classified sequence file(s) from `kraken2`..
 #' - `unclassified_out`: the unclassified sequence file(s) from `kraken2`. Not
 #'   required for downstream processing.
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
@@ -74,25 +73,66 @@ krakenx <- function(reads, ...,
 
     # For kraken2 command
     reads <- as.character(reads)
-    if (length(reads) == 1L) {
-        fq1 <- reads
-        fq2 <- NULL
-    } else if (length(reads) > 2L) {
-        fq1 <- reads[1L]
-        fq2 <- reads[2L]
-    } else {
+    if (length(reads) < 1L || length(reads) > 2L) {
         cli::cli_abort("{.arg reads} must be of length 1 or 2")
     }
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
     assert_string(classified_out, allow_empty = FALSE)
+    if (!is.null(classified_out)) {
+        if (!grepl("\\.(fq|fastq)$", classified_out, ignore.case = TRUE)) {
+            cli::cli_abort("{.arg classified_out} must have a file extension {.field .fq} or {.field .fastq}")
+        }
+        if (length(reads) == 2L) {
+            classified_files <- c(
+                sub(
+                    "\\.(fq|fastq)", "_1.\\1",
+                    classified_out,
+                    ignore.case = TRUE
+                ),
+                sub(
+                    "\\.(fq|fastq)", "_2.\\1",
+                    classified_out,
+                    ignore.case = TRUE
+                )
+            )
+        } else {
+            classified_files <- classified_out
+        }
+    } else {
+        classified_files <- NULL
+    }
     assert_string(unclassified_out, allow_empty = FALSE, allow_null = TRUE)
+    if (!is.null(unclassified_out)) {
+        if (!grepl("\\.(fq|fastq)$", unclassified_out, ignore.case = TRUE)) {
+            cli::cli_abort("{.arg unclassified_out} must have a file extension {.field .fq} or {.field .fastq}")
+        }
+        if (length(reads) == 2L) {
+            unclassified_files <- c(
+                sub(
+                    "\\.(fq|fastq)", "_1.\\1",
+                    unclassified_out,
+                    ignore.case = TRUE
+                ),
+                sub(
+                    "\\.(fq|fastq)", "_2.\\1",
+                    unclassified_out,
+                    ignore.case = TRUE
+                )
+            )
+        } else {
+            unclassified_files <- unclassified_out
+        }
+    } else {
+        unclassified_files <- NULL
+    }
     kraken2_files <- file.path(
         odir,
-        c(koutput, kreport, classified_out, unclassified_out)
+        c(koutput, kreport, classified_files, unclassified_files)
     )
     if (overwrite || !all(file.exists(kraken2_files))) {
         assert_string(db, allow_empty = FALSE, allow_null = TRUE)
+        assert_number_whole(kmer_len, min = 1, allow_null = FALSE)
         assert_number_whole(kraken2_threads,
             min = 1, max = as.double(parallel::detectCores()),
             allow_null = TRUE
@@ -100,14 +140,14 @@ krakenx <- function(reads, ...,
         if (!is.null(db)) db <- sprintf("--db %s", db)
         kraken2_threads <- kraken2_threads %||% parallel::detectCores()
         command <- blit::kraken2(
-            fq1 = fq1,
-            fq2 = fq2,
+            reads = reads,
             ...,
             ofile = koutput,
             report = kreport,
             classified_out = classified_out,
             unclassified_out = unclassified_out,
             db,
+            sprintf("--kmer-len %d", kmer_len),
             "--use-names",
             "--report-minimizer-data",
             sprintf("--threads %d", kraken2_threads),
@@ -147,7 +187,7 @@ krakenx <- function(reads, ...,
         kractor(
             kreport = file.path(odir, kreport),
             koutput = file.path(odir, koutput),
-            reads = reads, ubread = ubread,
+            reads = classified_files %||% reads, ubread = ubread,
             umi_ranges = umi_ranges, barcode_ranges = barcode_ranges,
             extract_koutput = extract_koutput,
             extract_reads = extract_reads,

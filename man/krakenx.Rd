@@ -49,8 +49,9 @@ krakenx(
 )
 }
 \arguments{
-\item{reads}{A character vector of FASTQ files used as input to Kraken2.
-Can be one file (single-end) or two files (paired-end).}
+\item{reads}{A character vector of FASTQ files, either used as input to
+Kraken2 or as classified output (recommended for efficiency due to smaller
+size). Supports one file (single-end) or two files (paired-end).}
 
 \item{...}{<\link[rlang:dyn-dots]{dynamic dots}> Additional arguments passed to \code{kraken2} command. Empty arguments are automatically trimmed. If a single argument, such as a file path, contains spaces, it must be quoted, for example using \code{\link[=shQuote]{shQuote()}}. Details see: \code{cmd_help(kraken2())}.}
 
@@ -169,8 +170,7 @@ None. This function generates the following files:
 \itemize{
 \item \code{kreport}: the \code{kraken2} report file.
 \item \code{koutput}: the \code{kraken2} output file.
-\item \code{classified_out}: the classified sequence file(s) from \code{kraken2}. Not
-required for downstream processing.
+\item \code{classified_out}: the classified sequence file(s) from \code{kraken2}..
 \item \code{unclassified_out}: the unclassified sequence file(s) from \code{kraken2}. Not
 required for downstream processing.
 \item \code{extract_koutput}: Kraken2 output entries corresponding to the specified
