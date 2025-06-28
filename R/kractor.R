@@ -101,7 +101,7 @@ kractor <- function(kreport, koutput, reads,
         mmap = mmap
     )
     rust_kractor_reads(
-        file.path(
+        koutput = file.path(
             odir %||% getwd(),
             extract_koutput %||% "kraken_microbiome_output.txt"
         ),
