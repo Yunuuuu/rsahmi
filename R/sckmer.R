@@ -75,7 +75,7 @@ sckmer <- function(kreport, koutput, reads,
     if (length(reads) == 1L) {
         fa1 <- reads
         fa2 <- NULL
-    } else if (length(reads) > 2L) {
+    } else if (length(reads) == 2L) {
         fa1 <- reads[1L]
         fa2 <- reads[2L]
     } else {
