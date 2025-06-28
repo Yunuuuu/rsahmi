@@ -132,7 +132,6 @@ krakenx <- function(reads, ...,
     )
     if (overwrite || !all(file.exists(kraken2_files))) {
         assert_string(db, allow_empty = FALSE, allow_null = TRUE)
-        assert_number_whole(kmer_len, min = 1, allow_null = FALSE)
         assert_number_whole(kraken2_threads,
             min = 1, max = as.double(parallel::detectCores()),
             allow_null = TRUE
@@ -147,7 +146,6 @@ krakenx <- function(reads, ...,
             classified_out = classified_out,
             unclassified_out = unclassified_out,
             db,
-            sprintf("--kmer-len %d", kmer_len),
             "--use-names",
             "--report-minimizer-data",
             sprintf("--threads %d", kraken2_threads),
