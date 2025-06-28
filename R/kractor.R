@@ -86,7 +86,7 @@ kractor <- function(kreport, koutput, reads,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                     chunk_size = NULL, buffer_size = NULL,
                     batch_size = NULL, nqueue = NULL,
-                    threads = NULL, odir = NULL, 
+                    threads = NULL, odir = NULL,
                     mmap_koutput = FALSE, mmap_reads = TRUE) {
     rust_kractor_koutput(
         kreport, koutput,
