@@ -12,7 +12,7 @@ Description: A computational resource designed to accurately detect microbial
 Depends: 
     R (>= 4.2)
 Imports: 
-    blit (>= 0.1.0),
+    blit (>= 0.2.0.9000),
     mirai,
     cli,
     rlang,
