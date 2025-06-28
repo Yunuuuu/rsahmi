@@ -30,14 +30,8 @@ krakenx(
   kmer_len = 35L,
   min_frac = 0.5,
   exclude = "9606",
-  barcode_extractor = function(sequence_id, read1, read2) {
-     substring(read1, 1L,
-    16L)
- },
-  umi_extractor = function(sequence_id, read1, read2) {
-     substring(read1, 17L, 28L)
-
-    },
+  barcode_extractor = NULL,
+  umi_extractor = NULL,
   mmap_koutput = FALSE,
   mmap_reads = TRUE,
   kraken2_threads = NULL,

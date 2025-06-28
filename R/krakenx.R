@@ -57,18 +57,20 @@ krakenx <- function(reads, ...,
                     chunk_size = NULL, buffer_size = NULL,
                     batch_size = NULL, nqueue = NULL,
                     kmer_len = 35L, min_frac = 0.5, exclude = "9606",
-                    barcode_extractor = function(sequence_id, read1, read2) {
-                        substring(read1, 1L, 16L)
-                    },
-                    umi_extractor = function(sequence_id, read1, read2) {
-                        substring(read1, 17L, 28L)
-                    },
+                    barcode_extractor = NULL, umi_extractor = NULL,
                     mmap_koutput = FALSE, mmap_reads = TRUE,
                     kraken2_threads = NULL,
                     kractor_threads = NULL,
                     sckmer_threads = NULL,
                     kraken2 = NULL, envpath = NULL,
                     overwrite = FALSE, odir = getwd()) {
+    if (is.null(ubread) &&
+        (is.null(barcode_extractor) || is.null(umi_extractor))) {
+        cli::cli_abort(paste(
+            "When {.arg ubread} is NULL, both {.arg barcode_extractor} and",
+            "{.arg umi_extractor} must be provided to extract the UMI and cell barcode."
+        ))
+    }
     assert_bool(overwrite)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     if (is.null(odir)) odir <- getwd()
