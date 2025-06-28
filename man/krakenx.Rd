@@ -49,9 +49,8 @@ krakenx(
 )
 }
 \arguments{
-\item{reads}{A character vector of FASTQ files, either used as input to
-Kraken2 or as classified output (recommended for efficiency due to smaller
-size). Supports one file (single-end) or two files (paired-end).}
+\item{reads}{A character vector of FASTQ files used as input to Kraken2.
+Can be one file (single-end) or two files (paired-end).}
 
 \item{...}{<\link[rlang:dyn-dots]{dynamic dots}> Additional arguments passed to \code{kraken2} command. Empty arguments are automatically trimmed. If a single argument, such as a file path, contains spaces, it must be quoted, for example using \code{\link[=shQuote]{shQuote()}}. Details see: \code{cmd_help(kraken2())}.}
 
