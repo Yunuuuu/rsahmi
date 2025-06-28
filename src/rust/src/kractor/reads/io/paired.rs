@@ -56,8 +56,8 @@ pub fn reader_kractor_paired_read(
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
         let mut reader = BytesChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
-        reader.set_label1("fq1");
-        reader.set_label2("fq2");
+        reader.set_label1("read1");
+        reader.set_label2("read2");
 
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, and `id_sets`

@@ -55,7 +55,7 @@ pub fn reader_kractor_single_read(
         // Each chunk is parsed in parallel using Rayon.
         // Matching records (based on `id_sets`) are sent to the writer via the channel.
         let mut reader = BytesChunkReader::with_capacity(chunk_size, reader);
-        reader.set_label("fq1"); // Set label for error context
+        reader.set_label("reads"); // Set label for error context
 
         let parser_handle = scope.spawn(move || -> Result<()> {
             // will move `reader`, `parser_tx`, and `id_sets`
