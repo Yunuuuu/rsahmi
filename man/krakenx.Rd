@@ -32,7 +32,7 @@ krakenx(
   kmer_len = 35L,
   min_frac = 0.5,
   exclude = "9606",
-  mmap_koutput = FALSE,
+  mmap_koutput = TRUE,
   mmap_reads = TRUE,
   kraken2_threads = NULL,
   kractor_threads = NULL,
