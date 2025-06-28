@@ -118,7 +118,7 @@ sckmer <- function(kreport, koutput, reads,
     )
 
     # prepare taxid:kmer data ------------------------------------------
-    cli::cli_alert_info("Parsing {.path {koutput}")
+    cli::cli_alert_info("Parsing {.path {koutput}}")
     kout <- pl$scan_csv(koutput, has_header = FALSE, separator = "\t")$
         filter(
         pl$col("column_5")$str$
