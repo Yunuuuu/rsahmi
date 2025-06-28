@@ -169,14 +169,6 @@ autoplot.rsahmi_rpmm_quantile <- function(object, ...) {
         ggplot2::facet_wrap(
             facets = ggplot2::vars(.data$taxa),
             scales = "free"
-        ) +
-        ggplot2::theme(
-            strip.clip = "off",
-            axis.text = ggplot2::element_blank(),
-            axis.ticks = ggplot2::element_blank(),
-            legend.position = "inside",
-            legend.position.inside = c(1, 0),
-            legend.justification.inside = c(1, 0)
         )
 }
 
