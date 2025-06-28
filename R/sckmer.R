@@ -236,12 +236,14 @@ sckmer <- function(kreport, koutput, reads,
     cli::cli_alert_info("Reading the first read: {.path {fa1}}")
     read1 <- ShortRead::readFasta(fa1)
     id1 <- as.character(ShortRead::id(read1))
+    id1 <- vapply(strsplit(id1, " |\t"), .subset2, character(1L), 1L)
     read1 <- ShortRead::sread(read1)
 
     if (!is.null(fa2)) {
         cli::cli_alert_info("Reading the second read: {.path {fa2}}")
         read2 <- ShortRead::readFasta(fa2)
         id2 <- as.character(ShortRead::id(read2))
+        id2 <- vapply(strsplit(id2, " |\t"), .subset2, character(1L), 1L)
         read2 <- ShortRead::sread(read2)
 
         # only keep data in both sequence ----------------------------------
