@@ -46,11 +46,11 @@
 #' @param odir A string of directory to save the output files. Please see
 #' `Value` section for details.
 #' @param mmap_koutput,mmap_reads Logical. Whether to enable memory-mapped file
-#'   access. When set to `TRUE`, the function uses memory mapping, which can be
-#'   highly efficient for multi-threaded reading and avoids redundant data
-#'   copying. However, the performance of memory mapping may vary depending on
-#'   the operating system and file system, and it is not always the fastest
-#'   option.
+#'   access for reading input files (`mmap_reads`) and writing Kraken2 output
+#'   (`mmap_koutput`). When set to `TRUE`, the function uses memory mapping to
+#'   reduce data copying and improve performance in multi-threaded environments.
+#'   This can be highly efficient on some systems, but performance gains may
+#'   vary depending on the operating system and file system. Defaults to `TRUE`.
 #' @seealso [`krakenx()`]
 #' @return None. This function generates the following files:
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
@@ -87,7 +87,7 @@ kractor <- function(kreport, koutput, reads,
                     chunk_size = NULL, buffer_size = NULL,
                     batch_size = NULL, nqueue = NULL,
                     threads = NULL, odir = NULL,
-                    mmap_koutput = FALSE, mmap_reads = TRUE) {
+                    mmap_koutput = TRUE, mmap_reads = TRUE) {
     rust_kractor_koutput(
         kreport, koutput,
         extract_koutput = extract_koutput,

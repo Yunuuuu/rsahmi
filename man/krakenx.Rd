@@ -140,11 +140,11 @@ read2 and return a character corresponding to cell barcode and UMI
 respectively, each should have the same length of the input.}
 
 \item{mmap_koutput, mmap_reads}{Logical. Whether to enable memory-mapped file
-access. When set to \code{TRUE}, the function uses memory mapping, which can be
-highly efficient for multi-threaded reading and avoids redundant data
-copying. However, the performance of memory mapping may vary depending on
-the operating system and file system, and it is not always the fastest
-option.}
+access for reading input files (\code{mmap_reads}) and writing Kraken2 output
+(\code{mmap_koutput}). When set to \code{TRUE}, the function uses memory mapping to
+reduce data copying and improve performance in multi-threaded environments.
+This can be highly efficient on some systems, but performance gains may
+vary depending on the operating system and file system. Defaults to \code{TRUE}.}
 
 \item{kraken2_threads}{Integer. Number of threads to use. Default to all
 available threads.}
