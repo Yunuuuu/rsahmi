@@ -82,7 +82,11 @@ fn kractor_reads(
         .collect::<HashSet<&[u8]>>();
     let umi_ranges = ubpatterns(umi_ranges);
     let barcode_ranges = ubpatterns(barcode_ranges);
-    rprintln!("Extracting the matching sequence from: {}", fq1);
+    rprintln!(
+        "Extracting the matching sequence from: {} {}",
+        fq1,
+        fq2.map_or_else(|| String::from(""), |s| format!("and {}", s))
+    );
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
