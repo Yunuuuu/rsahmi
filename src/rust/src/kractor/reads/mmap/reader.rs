@@ -1,3 +1,4 @@
+use indicatif::ProgressBar;
 use memchr::memchr_iter;
 
 use crate::kractor::reads::parser::fasta::FastaRecord;
@@ -209,6 +210,7 @@ pub(crate) struct SliceChunkReader<'a> {
     line_offset: usize,
     slice: &'a [u8],
     chunk_size: usize,
+    bar: Option<ProgressBar>,
 }
 
 impl<'a> Iterator for SliceChunkReader<'a> {
@@ -231,7 +233,11 @@ impl<'a> SliceChunkReader<'a> {
             line_offset: 0,
             slice,
             chunk_size: capacity,
+            bar: None,
         }
+    }
+    pub fn attach_bar(&mut self, bar: ProgressBar) {
+        self.bar = Some(bar);
     }
 
     pub fn set_label(&mut self, label: &'static str) {
@@ -275,6 +281,9 @@ impl<'a> SliceChunkReader<'a> {
         self.pos += chunk.len();
         let line_offset = self.line_offset;
         self.line_offset += newlines.len(); // Increment the number of chunk lines
+        if let Some(bar) = &self.bar {
+            bar.inc(chunk.len() as u64);
+        }
         let mut source = SliceFastqChunkSource::new(chunk, newlines);
         source.set_offset(line_offset);
         if let Some(label) = self.label {
@@ -294,6 +303,8 @@ pub(crate) struct SliceChunkPairedReader<'a, 'b> {
     slice1: &'a [u8],
     slice2: &'b [u8],
     chunk_size: usize,
+    bar1: Option<ProgressBar>,
+    bar2: Option<ProgressBar>,
 }
 
 impl<'a, 'b> Iterator for SliceChunkPairedReader<'a, 'b> {
@@ -320,7 +331,14 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
             slice1,
             slice2,
             chunk_size: capacity,
+            bar1: None,
+            bar2: None,
         }
+    }
+
+    pub fn attach_bars(&mut self, bar1: ProgressBar, bar2: ProgressBar) {
+        self.bar1 = Some(bar1);
+        self.bar2 = Some(bar2);
     }
 
     pub fn set_label1(&mut self, label: &'static str) {
@@ -448,10 +466,17 @@ impl<'a, 'b> SliceChunkPairedReader<'a, 'b> {
         self.line_offset2 += newlines2.len();
 
         // Wrap chunks into source readers with correct offset and label
+        if let Some(bar) = &self.bar1 {
+            bar.inc(chunk1.len() as u64);
+        }
         let mut source1 = SliceFastqChunkSource::new(chunk1, newlines1);
         source1.set_offset(line_offset1);
         if let Some(label1) = self.label1 {
             source1.set_label(label1);
+        }
+
+        if let Some(bar) = &self.bar2 {
+            bar.inc(chunk2.len() as u64);
         }
         let mut source2 = SliceFastqChunkSource::new(chunk2, newlines2);
         source2.set_offset(line_offset2);

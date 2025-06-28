@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Error, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use rustc_hash::FxHashSet as HashSet;
 
 use super::reader::BytesChunkPairedReader;
@@ -32,6 +33,11 @@ pub fn reader_kractor_ubread_read(
     // Open and memory-map the input FASTQ file
     let reader1 = File::open(fq)?;
     let reader2 = File::open(ubread)?;
+    let size1 = reader1.metadata()?.len();
+    let size2 = reader2.metadata()?.len();
+    let progress_style = ProgressStyle::with_template(
+        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})"
+    )?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -55,9 +61,18 @@ pub fn reader_kractor_ubread_read(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let m = MultiProgress::new();
+        let pb1 = m.add(ProgressBar::new(size1).with_finish(ProgressFinish::Abandon));
+        pb1.set_prefix("Parsing reads");
+        pb1.set_style(progress_style.clone());
+        let pb2 = m.add(ProgressBar::new(size2).with_finish(ProgressFinish::Abandon));
+        pb2.set_prefix("Parsing ubread");
+        pb2.set_style(progress_style);
         let mut reader = BytesChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
         reader.set_label1("reads");
         reader.set_label2("ubread");
+        reader.attach_bars(pb1, pb2);
+
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, and `id_sets`
             // Shared atomic flag to signal if any thread encountered an error

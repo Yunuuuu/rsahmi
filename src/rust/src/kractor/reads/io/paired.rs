@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use rustc_hash::FxHashSet as HashSet;
 
 use super::reader::BytesChunkPairedReader;
@@ -31,6 +32,11 @@ pub fn reader_kractor_paired_read(
     // Open and memory-map the input FASTQ file
     let reader1 = File::open(fq1)?;
     let reader2 = File::open(fq2)?;
+    let size1 = reader1.metadata()?.len();
+    let size2 = reader2.metadata()?.len();
+    let progress_style = ProgressStyle::with_template(
+        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
+    )?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -55,9 +61,18 @@ pub fn reader_kractor_paired_read(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let progress = MultiProgress::new();
+        let pb1 = progress.add(ProgressBar::new(size1).with_finish(ProgressFinish::Abandon));
+        pb1.set_prefix("Parsing read1");
+        pb1.set_style(progress_style.clone());
+
+        let pb2 = progress.add(ProgressBar::new(size2).with_finish(ProgressFinish::Abandon));
+        pb2.set_prefix("Parsing read2");
+        pb2.set_style(progress_style);
         let mut reader = BytesChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
         reader.set_label1("read1");
         reader.set_label2("read2");
+        reader.attach_bars(pb1, pb2);
 
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, and `id_sets`
@@ -138,4 +153,72 @@ pub fn reader_kractor_paired_read(
             .map_err(|e| anyhow!("Parser thread panicked: {:?}", e))??;
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{self, File};
+    use std::io::Write;
+
+    use tempfile::tempdir;
+
+    use super::*;
+
+    fn write_temp_fastq(file_path: &str, records: &[(&str, &str)]) {
+        let mut file = File::create(file_path).unwrap();
+        for (id, seq) in records {
+            writeln!(file, "@{}", id).unwrap();
+            writeln!(file, "{}", seq).unwrap();
+            writeln!(file, "+").unwrap();
+            writeln!(file, "{}", "I".repeat(seq.len())).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_reader_kractor_paired_read() {
+        // Create a temporary directory
+        let dir = tempdir().unwrap();
+        let fq1_path = dir.path().join("test_R1.fq");
+        let fq2_path = dir.path().join("test_R2.fq");
+        let ofile1_path = dir.path().join("out_R1.fq");
+        let ofile2_path = dir.path().join("out_R2.fq");
+
+        // Create paired records
+        let records = vec![
+            ("read1", "ACTGACTGACTG"),
+            ("read2", "TGCATGCATGCA"),
+            ("read3", "GGGGCCCCAAAA"),
+        ];
+
+        // Write input FASTQ files
+        write_temp_fastq(fq1_path.to_str().unwrap(), &records);
+        write_temp_fastq(fq2_path.to_str().unwrap(), &records);
+
+        // Create an ID set containing only read2
+        let id_set: HashSet<&[u8]> = vec![b"read2"].into_iter().map(|s| s.as_ref()).collect();
+
+        // Run the paired reader
+        reader_kractor_paired_read(
+            id_set,
+            fq1_path.to_str().unwrap(),
+            ofile1_path.to_str().unwrap(),
+            fq2_path.to_str().unwrap(),
+            ofile2_path.to_str().unwrap(),
+            2,
+            4096,
+            2,
+            Some(10),
+        )
+        .unwrap();
+
+        // Read and verify output
+        let out_r1 = fs::read_to_string(ofile1_path).unwrap();
+        let out_r2 = fs::read_to_string(ofile2_path).unwrap();
+        assert!(out_r1.contains("read2"));
+        assert!(out_r2.contains("read2"));
+        assert!(!out_r1.contains("read1"));
+        assert!(!out_r2.contains("read1"));
+        assert!(!out_r1.contains("read3"));
+        assert!(!out_r2.contains("read3"));
+    }
 }

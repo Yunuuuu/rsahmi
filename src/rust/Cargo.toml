@@ -13,6 +13,7 @@ name = 'rsahmi'
 extendr-api = { version = "0.8.0", features = [ "result_list" ] }
 anyhow = '*'
 memmap2 = '*'
+indicatif = '*'
 bytes = '*'
 rayon = '*'
 crossbeam-channel = { version = "*" }

@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Error, Result};
 use crossbeam_channel::{Receiver, Sender};
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 #[cfg(unix)]
 use memmap2::Advice;
 use memmap2::Mmap;
@@ -40,6 +41,9 @@ pub fn mmap_kractor_ubread_read(
     let map2 = unsafe { Mmap::map(&file2) }?;
     #[cfg(unix)]
     map2.advise(Advice::Sequential)?;
+    let progress_style = ProgressStyle::with_template(
+        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
+    )?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -63,9 +67,22 @@ pub fn mmap_kractor_ubread_read(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let progress = MultiProgress::new();
+        let pb1 =
+            progress.add(ProgressBar::new(map1.len() as u64).with_finish(ProgressFinish::Abandon));
+        pb1.set_prefix("Parsing reads");
+        pb1.set_style(progress_style.clone());
+
+        let pb2 =
+            progress.add(ProgressBar::new(map2.len() as u64).with_finish(ProgressFinish::Abandon));
+        pb2.set_prefix("Parsing ubread");
+        pb2.set_style(progress_style);
+
         let mut reader = SliceChunkPairedReader::with_capacity(chunk_size, &map1, &map2);
         reader.set_label1("reads");
         reader.set_label2("ubread");
+        reader.attach_bars(pb1, pb2);
+
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, and `id_sets`
             // Shared atomic flag to signal if any thread encountered an error

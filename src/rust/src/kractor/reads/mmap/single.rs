@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
+use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 #[cfg(unix)]
 use memmap2::Advice;
 use memmap2::Mmap;
@@ -31,6 +32,9 @@ pub fn mmap_kractor_single_read(
     let map = unsafe { Mmap::map(&file) }?;
     #[cfg(unix)]
     map.advise(Advice::Sequential)?;
+    let progress_style = ProgressStyle::with_template(
+        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
+    )?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -54,8 +58,13 @@ pub fn mmap_kractor_single_read(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let pb = ProgressBar::new(map.len() as u64).with_finish(ProgressFinish::Abandon);
+        pb.set_prefix("Parsing reads");
+        pb.set_style(progress_style);
+
         let mut reader = SliceChunkReader::with_capacity(chunk_size, &map);
         reader.set_label("reads");
+        reader.attach_bar(pb);
 
         let parser_handle = scope.spawn(move || -> Result<()> {
             // will move `reader`, `parser_tx`, and `id_sets`

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
+use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rustc_hash::FxHashSet as HashSet;
 
 use super::reader::BytesChunkReader;
@@ -29,6 +30,10 @@ pub fn reader_kractor_single_read(
 
     // Open and memory-map the input FASTQ file
     let reader = File::open(read)?;
+    let size = reader.metadata()?.len();
+    let progress_style = ProgressStyle::with_template(
+        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
+    )?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -54,8 +59,13 @@ pub fn reader_kractor_single_read(
         // Reads and splits the input FASTQ into chunks.
         // Each chunk is parsed in parallel using Rayon.
         // Matching records (based on `id_sets`) are sent to the writer via the channel.
+        let pb = ProgressBar::new(size).with_finish(ProgressFinish::Abandon);
+        pb.set_prefix("Parsing reads");
+        pb.set_style(progress_style);
+
         let mut reader = BytesChunkReader::with_capacity(chunk_size, reader);
         reader.set_label("reads"); // Set label for error context
+        reader.attach_bar(pb);
 
         let parser_handle = scope.spawn(move || -> Result<()> {
             // will move `reader`, `parser_tx`, and `id_sets`
