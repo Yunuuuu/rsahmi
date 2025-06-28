@@ -18,6 +18,7 @@
 #'   variable. Used to locate the `kraken2` executable.
 #' @param overwrite Logical. Whether to overwrite existing files in `odir`.
 #' @seealso
+#' - [`blit::kraken2()`]
 #' - [`kractor()`]
 #' - [`kuactor()`]
 #' @return None. This function generates the following files:

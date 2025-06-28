@@ -192,6 +192,7 @@ Quantification
 }
 \seealso{
 \itemize{
+\item \code{\link[blit:kraken2]{blit::kraken2()}}
 \item \code{\link[=kractor]{kractor()}}
 \item \code{\link[=kuactor]{kuactor()}}
 }
