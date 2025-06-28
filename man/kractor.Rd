@@ -28,9 +28,11 @@ kractor(
 
 \item{koutput}{Path to the Kraken2 output file.}
 
-\item{reads}{A character vector of FASTQ files, either used as input to
-Kraken2 or as classified output (recommended for efficiency due to smaller
-size). Supports one file (single-end) or two files (paired-end).}
+\item{reads}{A character vector of FASTQ file paths, either the original
+reads used as input to Kraken2 or the classified output reads (recommended
+for efficiency as they are smaller). Accepts one file for single-end or two
+files for paired-end. Note: if \code{ubread} is specified, \code{reads} must be the
+original Kraken2 input reads to ensure correct barcode/UMI pairing.}
 
 \item{ubread}{Path to the input sequence file that contains UMI and/or
 barcode sequences. If \code{NULL}, UMI/barcode parsing is disabled. When

@@ -5,9 +5,11 @@
 #'
 #' @param kreport Path to the Kraken2 report file.
 #' @param koutput Path to the Kraken2 output file.
-#' @param reads A character vector of FASTQ files, either used as input to
-#' Kraken2 or as classified output (recommended for efficiency due to smaller
-#' size). Supports one file (single-end) or two files (paired-end).
+#' @param reads A character vector of FASTQ file paths, either the original
+#' reads used as input to Kraken2 or the classified output reads (recommended
+#' for efficiency as they are smaller). Accepts one file for single-end or two
+#' files for paired-end. Note: if `ubread` is specified, `reads` must be the
+#' original Kraken2 input reads to ensure correct barcode/UMI pairing.
 #' @param ubread Path to the input sequence file that contains UMI and/or
 #'   barcode sequences. If `NULL`, UMI/barcode parsing is disabled. When
 #'   specified, `reads` must contain only a single FASTQ file. This is commonly
