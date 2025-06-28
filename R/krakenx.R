@@ -24,7 +24,8 @@
 #' @return None. This function generates the following files:
 #' - `kreport`: the `kraken2` report file.
 #' - `koutput`: the `kraken2` output file.
-#' - `classified_out`: the classified sequence file(s) from `kraken2`..
+#' - `classified_out`: the classified sequence file(s) from `kraken2`. Not
+#'   required for downstream processing.
 #' - `unclassified_out`: the unclassified sequence file(s) from `kraken2`. Not
 #'   required for downstream processing.
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
@@ -183,10 +184,18 @@ krakenx <- function(reads, ...,
             min = 1, max = as.double(parallel::detectCores()),
             allow_null = TRUE
         )
+        # Use original input reads if classified files are not provided,
+        # or if `ubread` is specified (implying pairing with `reads` is
+        # required).
+        if (is.null(classified_files) || !is.null(ubread)) {
+            input_reads <- reads
+        } else {
+            input_reads <- classified_files
+        }
         kractor(
             kreport = file.path(odir, kreport),
             koutput = file.path(odir, koutput),
-            reads = classified_files %||% reads, ubread = ubread,
+            reads = input_reads, ubread = ubread,
             umi_ranges = umi_ranges, barcode_ranges = barcode_ranges,
             extract_koutput = extract_koutput,
             extract_reads = extract_reads,

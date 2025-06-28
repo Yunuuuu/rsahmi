@@ -169,7 +169,8 @@ None. This function generates the following files:
 \itemize{
 \item \code{kreport}: the \code{kraken2} report file.
 \item \code{koutput}: the \code{kraken2} output file.
-\item \code{classified_out}: the classified sequence file(s) from \code{kraken2}..
+\item \code{classified_out}: the classified sequence file(s) from \code{kraken2}. Not
+required for downstream processing.
 \item \code{unclassified_out}: the unclassified sequence file(s) from \code{kraken2}. Not
 required for downstream processing.
 \item \code{extract_koutput}: Kraken2 output entries corresponding to the specified
