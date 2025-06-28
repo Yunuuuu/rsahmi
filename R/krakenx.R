@@ -190,7 +190,7 @@ krakenx <- function(reads, ...,
         if (is.null(classified_files) || !is.null(ubread)) {
             input_reads <- reads
         } else {
-            input_reads <- classified_files
+            input_reads <- file.path(odir, classified_files)
         }
         kractor(
             kreport = file.path(odir, kreport),
