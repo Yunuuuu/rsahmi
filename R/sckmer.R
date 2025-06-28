@@ -332,14 +332,16 @@ sckmer <- function(kreport, koutput, reads,
             query_mirai <- mirai::mirai_map( # nolint
                 seq_len(taxon_struct$len()),
                 kmer_query,
-                kout = kout,
-                kreport = kreport,
-                taxon_struct = taxon_struct,
-                read_nms = read_nms,
-                kmer_len = kmer_len,
-                min_frac = min_frac
+                .args = list(
+                    kout = kout,
+                    kreport = kreport,
+                    taxon_struct = taxon_struct,
+                    read_nms = read_nms,
+                    kmer_len = kmer_len,
+                    min_frac = min_frac
+                )
             )
-            kmer_list <- query_mirai[.progress]
+            kmer_list <- query_mirai[.stop, .progress]
         }
     )
     kmer <- pl$concat(kmer_list, how = "vertical")$
@@ -450,12 +452,12 @@ kmer_query <- function(i, kout, kreport, taxon_struct, read_nms,
             )$alias("kmer")
         )
     })
-    pl$concat(out_list, how = "vertical")$
+    out <- pl$concat(out_list, how = "vertical")$
         group_by("cb", maintain_order = FALSE)$
         agg(
         pl$col("kmer")$len()$alias("kmer_len"),
         pl$col("kmer")$n_unique()$alias("kmer_n_unique")
     )$
-        with_columns(taxid = taxid, taxa = taxa)$
         collect()
+    out$with_columns(taxid = taxid$rep(nrow(out)), taxa = taxa$rep(nrow(out)))
 }
