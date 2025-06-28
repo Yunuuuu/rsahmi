@@ -20,7 +20,7 @@ Imports:
     ShortRead,
     utils
 Suggests:
-    polars (>= 0.17.0)
+    polars (>= 0.18.0)
 Additional_repositories: https://community.r-multiverse.org
 SystemRequirements: Cargo (Rust's package manager), rustc, kraken2
 Config/rextendr/version: 0.3.1.9001

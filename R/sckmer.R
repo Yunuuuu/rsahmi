@@ -159,9 +159,10 @@ sckmer <- function(kreport, koutput, reads,
     )$
         # pivot method must run with DataFrame instead of LazyDataFrame
         collect()$
-        pivot("LCA",
+        pivot(
+        on = "header",
+        values = "LCA",
         index = c("index", "name", "taxid", "sequence_id"),
-        columns = "header"
     )
 
     # check read ----------------------------------------------------
