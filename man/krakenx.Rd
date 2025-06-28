@@ -11,6 +11,8 @@ krakenx(
   ubread = NULL,
   umi_ranges = NULL,
   barcode_ranges = NULL,
+  barcode_extractor = NULL,
+  umi_extractor = NULL,
   db = NULL,
   kreport = "kraken_report.txt",
   koutput = "kraken_output.txt",
@@ -30,8 +32,6 @@ krakenx(
   kmer_len = 35L,
   min_frac = 0.5,
   exclude = "9606",
-  barcode_extractor = NULL,
-  umi_extractor = NULL,
   mmap_koutput = FALSE,
   mmap_reads = TRUE,
   kraken2_threads = NULL,
@@ -63,6 +63,10 @@ Only used when \code{ubread} is not \code{NULL}.}
 \item{barcode_ranges}{A range or a list of ranges specifying where cell
 barcode sequences are located in the reads. Must be created using the
 \code{ubrange()} function.  Only used when \code{ubread} is not \code{NULL}.}
+
+\item{barcode_extractor, umi_extractor}{A function takes sequence IDs, read1,
+read2 and return a character corresponding to cell barcode and UMI
+respectively, each should have the same length of the input.}
 
 \item{db}{Path to the Kraken2 database. You can download prebuilt databases
 from \url{https://benlangmead.github.io/aws-indexes/k2}, or build your own by
@@ -128,10 +132,6 @@ are also discarded.}
 
 \item{exclude}{A character of taxid to exclude, for \code{SAHMI}, the host taxid.
 Reads with any k-mers mapped to the \code{exclude} are discarded.}
-
-\item{barcode_extractor, umi_extractor}{A function takes sequence IDs, read1,
-read2 and return a character corresponding to cell barcode and UMI
-respectively, each should have the same length of the input.}
 
 \item{mmap_koutput, mmap_reads}{Logical. Whether to enable memory-mapped file
 access for reading input files (\code{mmap_reads}) and writing Kraken2 output
