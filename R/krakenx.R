@@ -86,12 +86,12 @@ krakenx <- function(reads, ...,
         if (length(reads) == 2L) {
             classified_files <- c(
                 sub(
-                    "\\.(fq|fastq)", "_1.\\1",
+                    "\\.(fq|fastq)$", "_1.\\1",
                     classified_out,
                     ignore.case = TRUE
                 ),
                 sub(
-                    "\\.(fq|fastq)", "_2.\\1",
+                    "\\.(fq|fastq)$", "_2.\\1",
                     classified_out,
                     ignore.case = TRUE
                 )
@@ -110,12 +110,12 @@ krakenx <- function(reads, ...,
         if (length(reads) == 2L) {
             unclassified_files <- c(
                 sub(
-                    "\\.(fq|fastq)", "_1.\\1",
+                    "\\.(fq|fastq)$", "_1.\\1",
                     unclassified_out,
                     ignore.case = TRUE
                 ),
                 sub(
-                    "\\.(fq|fastq)", "_2.\\1",
+                    "\\.(fq|fastq)$", "_2.\\1",
                     unclassified_out,
                     ignore.case = TRUE
                 )
