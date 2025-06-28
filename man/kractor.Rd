@@ -20,7 +20,8 @@ kractor(
   nqueue = NULL,
   threads = NULL,
   odir = NULL,
-  mmap = FALSE
+  mmap_koutput = FALSE,
+  mmap_reads = TRUE
 )
 }
 \arguments{
@@ -81,13 +82,12 @@ atomatically by rayon.}
 \item{odir}{A string of directory to save the output files. Please see
 \code{Value} section for details.}
 
-\item{mmap}{Logical. Whether to enable memory-mapped file access. When set to
-\code{TRUE}, the function uses memory mapping, which can be highly efficient for
-multi-threaded reading and avoids redundant data copying. However, the
-performance of memory mapping may vary depending on the operating system
-and file system, and it is not always the fastest option. In most cases,
-standard file reading is already sufficiently fast. Therefore, the default
-is set to \code{FALSE}.}
+\item{mmap_koutput, mmap_reads}{Logical. Whether to enable memory-mapped file
+access. When set to \code{TRUE}, the function uses memory mapping, which can be
+highly efficient for multi-threaded reading and avoids redundant data
+copying. However, the performance of memory mapping may vary depending on
+the operating system and file system, and it is not always the fastest
+option.}
 }
 \value{
 None. This function generates the following files:

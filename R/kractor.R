@@ -45,13 +45,12 @@
 #' atomatically by rayon.
 #' @param odir A string of directory to save the output files. Please see
 #' `Value` section for details.
-#' @param mmap Logical. Whether to enable memory-mapped file access. When set to
-#'   `TRUE`, the function uses memory mapping, which can be highly efficient for
-#'   multi-threaded reading and avoids redundant data copying. However, the
-#'   performance of memory mapping may vary depending on the operating system
-#'   and file system, and it is not always the fastest option. In most cases,
-#'   standard file reading is already sufficiently fast. Therefore, the default
-#'   is set to `FALSE`.
+#' @param mmap_koutput,mmap_reads Logical. Whether to enable memory-mapped file
+#'   access. When set to `TRUE`, the function uses memory mapping, which can be
+#'   highly efficient for multi-threaded reading and avoids redundant data
+#'   copying. However, the performance of memory mapping may vary depending on
+#'   the operating system and file system, and it is not always the fastest
+#'   option.
 #' @seealso [`krakenx()`]
 #' @return None. This function generates the following files:
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
@@ -87,7 +86,8 @@ kractor <- function(kreport, koutput, reads,
                     taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
                     chunk_size = NULL, buffer_size = NULL,
                     batch_size = NULL, nqueue = NULL,
-                    threads = NULL, odir = NULL, mmap = FALSE) {
+                    threads = NULL, odir = NULL, 
+                    mmap_koutput = FALSE, mmap_reads = TRUE) {
     rust_kractor_koutput(
         kreport, koutput,
         extract_koutput = extract_koutput,
@@ -98,7 +98,7 @@ kractor <- function(kreport, koutput, reads,
         nqueue = nqueue,
         threads = threads,
         odir = odir,
-        mmap = mmap
+        mmap = mmap_koutput
     )
     rust_kractor_reads(
         koutput = file.path(
@@ -116,7 +116,7 @@ kractor <- function(kreport, koutput, reads,
         nqueue = nqueue,
         threads = threads,
         odir = odir,
-        mmap = mmap
+        mmap = mmap_reads
     )
     cli::cli_inform(c("v" = "Finished"))
 }

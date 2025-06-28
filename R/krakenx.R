@@ -63,7 +63,7 @@ krakenx <- function(reads, ...,
                     umi_extractor = function(sequence_id, read1, read2) {
                         substring(read1, 17L, 28L)
                     },
-                    mmap = FALSE,
+                    mmap_koutput = FALSE, mmap_reads = TRUE,
                     kraken2_threads = NULL,
                     kractor_threads = NULL,
                     kuactor_threads = NULL,
@@ -206,7 +206,8 @@ krakenx <- function(reads, ...,
             nqueue = nqueue,
             threads = kractor_threads,
             odir = odir,
-            mmap = mmap
+            mmap_koutput = mmap_koutput,
+            mmap_reads = mmap_reads
         )
     } else {
         cli::cli_inform("Using file exist: {.path {kractor_files}}")
