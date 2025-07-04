@@ -3,7 +3,7 @@ use memchr::memchr2;
 use super::FastqParseError;
 
 #[derive(Debug, Default)]
-pub struct FastqContainer<'a> {
+pub(crate) struct FastqContainer<'a> {
     id: Option<&'a [u8]>,
     desc: Option<Option<&'a [u8]>>,
     seq: Option<&'a [u8]>,

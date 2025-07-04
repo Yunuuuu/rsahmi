@@ -1,18 +1,17 @@
 use std::io::Write;
 
-#[allow(dead_code)]
 #[derive(Debug)]
-pub struct FastqRecord<T> {
-    pub id: T,
-    pub desc: Option<T>,
-    pub seq: T,
-    pub sep: T,
-    pub qual: T,
+pub(crate) struct FastqRecord<T> {
+    pub(crate) id: T,
+    pub(crate) desc: Option<T>,
+    pub(crate) seq: T,
+    pub(crate) sep: T,
+    pub(crate) qual: T,
 }
 
 impl<T> FastqRecord<T> {
     #[allow(dead_code)]
-    pub fn new(id: T, desc: Option<T>, seq: T, sep: T, qual: T) -> Self {
+    pub(crate) fn new(id: T, desc: Option<T>, seq: T, sep: T, qual: T) -> Self {
         Self {
             id,
             desc,
@@ -25,7 +24,7 @@ impl<T> FastqRecord<T> {
 
 impl<T: AsRef<[u8]>> FastqRecord<T> {
     #[allow(dead_code)]
-    pub fn write<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let id = self.id.as_ref();
         let desc = self.desc.as_ref().map(|d| d.as_ref());
         let seq = self.seq.as_ref();
@@ -56,6 +55,16 @@ impl<T: AsRef<[u8]>> FastqRecord<T> {
         buffer.push(b'\n');
 
         writer.write_all(&buffer)
+    }
+
+    pub(crate) fn as_ref(&self) -> FastqRecord<&[u8]> {
+        FastqRecord {
+            id: self.id.as_ref(),
+            desc: self.desc.as_ref().map(|d| d.as_ref()),
+            seq: self.seq.as_ref(),
+            sep: self.sep.as_ref(),
+            qual: self.qual.as_ref(),
+        }
     }
 }
 

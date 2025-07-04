@@ -9,11 +9,11 @@ use crossbeam_channel::{Receiver, Sender};
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use rustc_hash::FxHashSet as HashSet;
 
-use super::reader::BytesChunkPairedReader;
 use crate::batchsender::BatchSender;
+use crate::kractor::reads::io::reader::BytesChunkPairedReader;
 use crate::kractor::reads::parser::fasta::FastaRecordWithUMIBarcode;
 use crate::kractor::reads::parser::fastq::FastqContainer;
-use crate::kractor::reads::range::*;
+use crate::koutput_reads::range::*;
 
 pub fn reader_kractor_ubread_read(
     id_sets: HashSet<&[u8]>,

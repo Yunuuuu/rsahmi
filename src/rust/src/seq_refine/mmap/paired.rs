@@ -1,23 +1,22 @@
 use std::fs::File;
-use std::io::{BufWriter, Read};
+use std::io::BufWriter;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use rustc_hash::FxHashSet as HashSet;
 
+use super::reader::FastqSliceChunkPairedReader;
 use crate::batchsender::BatchSender;
-use crate::parser::fasta::FastaRecord;
-use crate::parser::fastq::{FastqBytesChunkPairedReader, FastqContainer};
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::kractor::reads::parser::fasta::FastaRecord;
+use crate::reader::slice::SliceProgressBarReader;
 
-pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
+pub fn mmap_kractor_paired_read(
     id_sets: HashSet<&[u8]>,
-    reader1: BytesProgressBarReader<R1>,
+    reader1: SliceProgressBarReader,
     ofile1: &str,
-    reader2: BytesProgressBarReader<R2>,
+    reader2: SliceProgressBarReader,
     ofile2: &str,
     chunk_size: usize,
     buffer_size: usize,
@@ -32,8 +31,8 @@ pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
         let (parser_tx, writer_rx): (
-            Sender<Vec<(FastaRecord<Bytes>, FastaRecord<Bytes>)>>,
-            Receiver<Vec<(FastaRecord<Bytes>, FastaRecord<Bytes>)>>,
+            Sender<Vec<(FastaRecord<&[u8]>, FastaRecord<&[u8]>)>>,
+            Receiver<Vec<(FastaRecord<&[u8]>, FastaRecord<&[u8]>)>>,
         ) = crate::new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
@@ -51,7 +50,7 @@ pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
-        let mut reader = FastqBytesChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
+        let mut reader = FastqSliceChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
 
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, and `id_sets`
@@ -63,7 +62,7 @@ pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
             let id_sets = &id_sets;
             // Rayon scope for spawning parsing threads
             rayon::scope(|s| -> Result<()> {
-                while let Some(chunk) = reader.chunk_reader()? {
+                while let Some(mut chunk) = reader.chunk_reader()? {
                     // If an error already occurred, stop spawning new threads
                     if has_error.load(Relaxed) {
                         return Ok(());
@@ -74,15 +73,13 @@ pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
                     let thread_has_error = has_error.clone();
                     let thread_err_tx = err_tx.clone();
                     s.spawn(move |_| {
-                        let mut container1 = FastqContainer::new();
-                        let mut container2 = FastqContainer::new();
                         loop {
-                            match chunk.read_record(&mut container1, &mut container2) {
+                            match chunk.read_record() {
                                 Ok(value) => match value {
                                     Some((record1, record2)) => {
-                                        if id_sets.contains(&record1.id[..]) {
+                                        if id_sets.contains(record1.id) {
                                             // Attempt to send the matching record to the writer thread.
-                                            match thread_tx.send((record1.into(), record2.into())) {
+                                            match thread_tx.send((record1, record2)) {
                                                 Ok(_) => continue,
                                                 Err(_) => {
                                                     // If this fails, it means the writer thread has already exited due to an error.
@@ -132,72 +129,4 @@ pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
             .map_err(|e| anyhow!("Parser thread panicked: {:?}", e))??;
         Ok(())
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs::{self, File};
-    use std::io::Write;
-
-    use tempfile::tempdir;
-
-    use super::*;
-
-    fn write_temp_fastq(file_path: &str, records: &[(&str, &str)]) {
-        let mut file = File::create(file_path).unwrap();
-        for (id, seq) in records {
-            writeln!(file, "@{}", id).unwrap();
-            writeln!(file, "{}", seq).unwrap();
-            writeln!(file, "+").unwrap();
-            writeln!(file, "{}", "I".repeat(seq.len())).unwrap();
-        }
-    }
-
-    #[test]
-    fn test_reader_kractor_paired_read() {
-        // Create a temporary directory
-        let dir = tempdir().unwrap();
-        let fq1_path = dir.path().join("test_R1.fq");
-        let fq2_path = dir.path().join("test_R2.fq");
-        let ofile1_path = dir.path().join("out_R1.fq");
-        let ofile2_path = dir.path().join("out_R2.fq");
-
-        // Create paired records
-        let records = vec![
-            ("read1", "ACTGACTGACTG"),
-            ("read2", "TGCATGCATGCA"),
-            ("read3", "GGGGCCCCAAAA"),
-        ];
-
-        // Write input FASTQ files
-        write_temp_fastq(fq1_path.to_str().unwrap(), &records);
-        write_temp_fastq(fq2_path.to_str().unwrap(), &records);
-
-        // Create an ID set containing only read2
-        let id_set: HashSet<&[u8]> = vec![b"read2"].into_iter().map(|s| s.as_ref()).collect();
-
-        // Run the paired reader
-        reader_kractor_paired_read(
-            id_set,
-            BytesProgressBarReader::new(File::open(fq1_path.to_str().unwrap()).unwrap()),
-            ofile1_path.to_str().unwrap(),
-            BytesProgressBarReader::new(File::open(fq2_path.to_str().unwrap()).unwrap()),
-            ofile2_path.to_str().unwrap(),
-            2,
-            4096,
-            2,
-            Some(10),
-        )
-        .unwrap();
-
-        // Read and verify output
-        let out_r1 = fs::read_to_string(ofile1_path).unwrap();
-        let out_r2 = fs::read_to_string(ofile2_path).unwrap();
-        assert!(out_r1.contains("read2"));
-        assert!(out_r2.contains("read2"));
-        assert!(!out_r1.contains("read1"));
-        assert!(!out_r2.contains("read1"));
-        assert!(!out_r1.contains("read3"));
-        assert!(!out_r2.contains("read3"));
-    }
 }

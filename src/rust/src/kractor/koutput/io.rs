@@ -2,29 +2,27 @@ use std::fs::File;
 use std::io::{BufWriter, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 
-use aho_corasick::{AhoCorasick, AhoCorasickKind};
+use aho_corasick::AhoCorasick;
 use anyhow::{anyhow, Result};
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
-use memchr::{memchr, memrchr};
+use memchr::memrchr;
 
 use super::kractor_match_aho;
 use crate::batchsender::BatchSender;
+use crate::reader::bytes::{BytesLineReader, BytesProgressBarReader};
 
 #[allow(clippy::too_many_arguments)]
-pub fn reader_kractor_koutput(
-    patterns: &[&str],
-    file: &str,
+pub fn reader_kractor_koutput<R: Read + Send>(
+    include_aho: AhoCorasick,
+    exclude_aho: Option<AhoCorasick>,
+    reader: BytesProgressBarReader<R>,
     ofile: &str,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
 ) -> Result<()> {
-    let reader = File::open(file)?;
-    let matcher = AhoCorasick::builder()
-        .kind(Some(AhoCorasickKind::DFA))
-        .build(patterns)?;
     let mut writer = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
 
     std::thread::scope(|scope| {
@@ -45,22 +43,22 @@ pub fn reader_kractor_koutput(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
-        let reader = BytesChunkReader::with_capacity(chunk_size, reader);
+        let mut reader = KoutputBytesChunkReader::with_capacity(chunk_size, reader);
         let parser_handle = scope.spawn(move || {
-            // will move `reader`, `parser_tx`, and `matcher`
+            // will move `reader`, `parser_tx`, `include_aho` and `exclude_aho`
             let has_error = AtomicBool::new(false);
             let (err_tx, err_rx) = crossbeam_channel::bounded(1);
             rayon::scope(|s| -> Result<()> {
-                for chunk_result in reader {
-                    let chunk = chunk_result?;
+                while let Some(chunk) = reader.chunk_reader()? {
                     if has_error.load(Relaxed) {
                         return Ok(());
                     }
                     s.spawn(|_| {
+                        let mut chunk = chunk; // move the chunk
                         let mut thread_tx =
                             BatchSender::with_capacity(batch_size, parser_tx.clone());
-                        for line in chunk {
-                            if kractor_match_aho(&matcher, &line) {
+                        while let Some(line) = chunk.read_line_inclusive() {
+                            if kractor_match_aho(&include_aho, &exclude_aho, &line) {
                                 match thread_tx.send(line) {
                                     Ok(_) => continue,
                                     Err(e) => {
@@ -106,102 +104,50 @@ pub fn reader_kractor_koutput(
     })
 }
 
-pub struct BytesChunkReader<R>
+pub struct KoutputBytesChunkReader<R>
 where
     R: Read,
 {
-    reader: R,
     chunk_size: usize,
-    leftover: BytesMut, // stores bytes after the last \n
+    reader: BytesProgressBarReader<R>,
 }
 
-impl<R> Iterator for BytesChunkReader<R>
-where
-    R: Read,
-{
-    type Item = Result<BytesKoutputChunk>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.chunk_reader().transpose()
-    }
-}
-
-impl<R> BytesChunkReader<R>
-where
-    R: Read,
-{
+impl<R: Read> KoutputBytesChunkReader<R> {
     #[allow(dead_code)]
-    pub fn new(reader: R) -> Self {
+    pub fn new(reader: BytesProgressBarReader<R>) -> Self {
         Self::with_capacity(8 * 1024, reader)
     }
 
-    pub fn with_capacity(capacity: usize, reader: R) -> Self {
+    pub fn with_capacity(capacity: usize, reader: BytesProgressBarReader<R>) -> Self {
         Self {
-            reader,
             chunk_size: capacity,
-            leftover: BytesMut::new(),
+            reader,
         }
     }
 
-    pub fn chunk_reader(&mut self) -> Result<Option<BytesKoutputChunk>> {
-        let leftover_len = self.leftover.len();
-        let mut buf = BytesMut::with_capacity(self.chunk_size + leftover_len);
-        buf.extend_from_slice(&self.leftover);
+    pub fn chunk_reader(&mut self) -> Result<Option<BytesLineReader>> {
+        let buf = match self.reader.read_bytes(self.chunk_size)? {
+            Some(data) => data,
+            None => return Ok(None),
+        };
 
-        // read files and pass chunks to parser
-        unsafe { buf.set_len(leftover_len + self.chunk_size) };
-        let nbytes = self.reader.read(&mut buf[leftover_len ..])?;
-        unsafe { buf.set_len(leftover_len + nbytes) };
-        if nbytes == 0 {
-            self.leftover = BytesMut::new();
-            if buf.is_empty() {
-                return Ok(None);
+        let chunk;
+        if buf.eof() {
+            chunk = buf.into_bytes();
+        } else {
+            let mut bytes = buf.into_bytes();
+            if let Some(pos) = memrchr(b'\n', &bytes) {
+                chunk = bytes.split_to(pos + 1);
+                self.reader.take_leftover(bytes);
             } else {
-                return Ok(Some(BytesKoutputChunk::new(buf.freeze())));
+                // no newline found — either final chunk or partial
+                // leave all in leftover and try again with larger chunk
+                self.reader.take_leftover(bytes);
+                self.chunk_size *= 2;
+                return self.chunk_reader();
             }
         }
-
-        if let Some(pos) = memrchr(b'\n', &buf) {
-            // split at newline
-            let chunk = buf.split_to(pos + 1);
-            self.leftover = buf; // remainder for next round
-            return Ok(Some(BytesKoutputChunk::new(chunk.freeze())));
-        } else {
-            // no newline found — either final chunk or partial
-            // leave all in leftover and try again with larger chunk
-            self.chunk_size *= 2;
-            self.leftover = buf;
-            self.chunk_reader()
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct BytesKoutputChunk {
-    pos: usize,
-    chunk: Bytes,
-}
-
-impl BytesKoutputChunk {
-    fn new(chunk: Bytes) -> Self {
-        Self { pos: 0, chunk }
-    }
-}
-
-impl Iterator for BytesKoutputChunk {
-    type Item = Bytes;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.chunk.len() {
-            return None;
-        }
-        let out;
-        if let Some(pos) = memchr(b'\n', &self.chunk[self.pos ..]) {
-            out = &self.chunk[self.pos ..= self.pos + pos];
-            self.pos += pos + 1;
-        } else {
-            out = &self.chunk[self.pos ..];
-            self.pos = self.chunk.len();
-        }
-        Some(self.chunk.slice_ref(out))
+        return Ok(Some(BytesLineReader::new(chunk.freeze())));
     }
 }
 
@@ -217,14 +163,15 @@ mod tests {
     fn test_bytes_chunk_reader_basic() -> Result<()> {
         let data = b"line1\nline2\nline3\nline4\nline5\n";
         let cursor = Cursor::new(data.as_ref());
-        let mut reader = BytesChunkReader::with_capacity(10, cursor);
+        let mut reader =
+            KoutputBytesChunkReader::with_capacity(10, BytesProgressBarReader::new(cursor));
 
         let mut all_lines = Vec::new();
 
-        while let Some(chunk_res) = reader.next() {
-            let chunk = chunk_res?;
+        while let Some(mut chunk) = reader.chunk_reader()? {
             // Collect all lines from the chunk
-            for line in chunk {
+            while let Some(line) = chunk.read_line_inclusive() {
+                // println!("Reading line {}", String::from_utf8_lossy(&line));
                 let line_str = std::str::from_utf8(&line).unwrap();
                 all_lines.push(line_str.to_string());
             }
@@ -240,13 +187,15 @@ mod tests {
     fn test_bytes_chunk_reader_no_final_newline() -> Result<()> {
         let data = b"line1\nline2\nlast_line_without_newline";
         let cursor = Cursor::new(data.as_ref());
-        let mut reader = BytesChunkReader::with_capacity(10, cursor);
+        let mut reader =
+            KoutputBytesChunkReader::with_capacity(10, BytesProgressBarReader::new(cursor));
 
         let mut all_lines = Vec::new();
 
-        while let Some(chunk_res) = reader.next() {
-            let chunk = chunk_res?;
-            for line in chunk {
+        while let Some(mut chunk) = reader.chunk_reader()? {
+            // println!("Reading bytes: {}", String::from_utf8_lossy(chunk.borrow_bytes()));
+            while let Some(line) = chunk.read_line_inclusive() {
+                // println!("Reading line {}", String::from_utf8_lossy(&line));
                 let line_str = std::str::from_utf8(&line).unwrap();
                 all_lines.push(line_str.to_string());
             }
@@ -264,12 +213,11 @@ mod tests {
     fn test_bytes_chunk_reader_empty() -> Result<()> {
         let data = b"";
         let cursor = Cursor::new(data.as_ref());
-        let mut reader = BytesChunkReader::new(cursor);
+        let mut reader = KoutputBytesChunkReader::new(BytesProgressBarReader::new(cursor));
 
-        match reader.next() {
+        match reader.chunk_reader()? {
             None => Ok(()), // expected None means iterator exhausted
-            Some(Ok(_)) => Err(anyhow::anyhow!("Expected None but got Some(Ok(_))")),
-            Some(Err(e)) => Err(e.into()),
+            Some(_) => Err(anyhow::anyhow!("Expected None but got Some(Ok(_))")),
         }
     }
 }

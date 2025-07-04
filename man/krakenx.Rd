@@ -49,21 +49,6 @@ Can be one file (single-end) or two files (paired-end).}
 
 \item{...}{<\link[rlang:dyn-dots]{dynamic dots}> Additional arguments passed to \code{kraken2} command. Empty arguments are automatically trimmed. If a single argument, such as a file path, contains spaces, it must be quoted, for example using \code{\link[=shQuote]{shQuote()}}. Details see: \code{cmd_help(kraken2())}.}
 
-\item{ubread}{Path to the input sequence file that contains UMI and/or
-barcode sequences. If \code{NULL}, UMI/barcode parsing is disabled. When
-specified, \code{reads} must contain only a single FASTQ file. This is commonly
-used for 10x Genomics single-cell data, where the first read file contains
-only UMI and barcode sequences. In such cases, you should provide that file
-via \code{ubread}.}
-
-\item{umi_ranges}{A range or a list of ranges specifying where UMI sequences
-are located in the reads. Must be created using the \code{ubrange()} function.
-Only used when \code{ubread} is not \code{NULL}.}
-
-\item{barcode_ranges}{A range or a list of ranges specifying where cell
-barcode sequences are located in the reads. Must be created using the
-\code{ubrange()} function.  Only used when \code{ubread} is not \code{NULL}.}
-
 \item{barcode_extractor, umi_extractor}{A function takes sequence IDs, read1,
 read2 and return a character corresponding to cell barcode and UMI
 respectively, each should have the same length of the input.}
@@ -103,11 +88,8 @@ derived from \code{koutput}, will be saved. Defaults to
 derived from \code{koutput}, will be saved. Defaults to
 \code{"kraken_microbiome_umi.txt"}.}
 
-\item{taxon}{An atomic character specify the taxa name wanted. Should follow
-the kraken style, connected by rank codes, two underscores, and the
-scientific name of the taxon (e.g., "d__Viruses").}
-
-\item{ranks}{Taxa ranks to analyze.}
+\item{ranks}{Character vector. The taxonomic ranks to filter by. Default:
+\code{c("G", "S")} (optional).}
 
 \item{chunk_size}{Integer. Size in bytes of the intermediate chunk used to
 split and distribute data to worker threads during processing. Default is
@@ -134,7 +116,7 @@ are also discarded.}
 Reads with any k-mers mapped to the \code{exclude} are discarded.}
 
 \item{mmap_koutput, mmap_reads}{Logical. Whether to enable memory-mapped file
-access for reading input files (\code{mmap_reads}) and writing Kraken2 output
+access for reading input FASTQ reads (\code{mmap_reads}) or Kraken2 output
 (\code{mmap_koutput}). When set to \code{TRUE}, the function uses memory mapping to
 reduce data copying and improve performance in multi-threaded environments.
 This can be highly efficient on some systems, but performance gains may

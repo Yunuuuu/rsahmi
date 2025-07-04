@@ -5,21 +5,18 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
-use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
-#[cfg(unix)]
-use memmap2::Advice;
-use memmap2::Mmap;
 use rustc_hash::FxHashSet as HashSet;
 
-use super::reader::SliceChunkPairedReader;
 use crate::batchsender::BatchSender;
-use crate::kractor::reads::parser::fasta::FastaRecord;
+use crate::parser::fasta::FastaRecord;
+use crate::parser::fastq::FastqSliceChunkPairedReader;
+use crate::reader::slice::SliceProgressBarReader;
 
 pub fn mmap_kractor_paired_read(
     id_sets: HashSet<&[u8]>,
-    fq1: &str,
+    reader1: SliceProgressBarReader,
     ofile1: &str,
-    fq2: &str,
+    reader2: SliceProgressBarReader,
     ofile2: &str,
     chunk_size: usize,
     buffer_size: usize,
@@ -29,20 +26,6 @@ pub fn mmap_kractor_paired_read(
     // Create output file and wrap in buffered writer
     let mut writer1 = BufWriter::with_capacity(buffer_size, File::create(ofile1)?);
     let mut writer2 = BufWriter::with_capacity(buffer_size, File::create(ofile2)?);
-
-    // Open and memory-map the input FASTQ file
-    let file1 = File::open(fq1)?;
-    let map1 = unsafe { Mmap::map(&file1) }?;
-    #[cfg(unix)]
-    map1.advise(Advice::Sequential)?;
-
-    let file2 = File::open(fq2)?;
-    let map2 = unsafe { Mmap::map(&file2) }?;
-    #[cfg(unix)]
-    map2.advise(Advice::Sequential)?;
-    let progress_style = ProgressStyle::with_template(
-        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
-    )?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -67,21 +50,7 @@ pub fn mmap_kractor_paired_read(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
-        let progress = MultiProgress::new();
-        let pb1 =
-            progress.add(ProgressBar::new(map1.len() as u64).with_finish(ProgressFinish::Abandon));
-        pb1.set_prefix("Parsing read1");
-        pb1.set_style(progress_style.clone());
-
-        let pb2 =
-            progress.add(ProgressBar::new(map2.len() as u64).with_finish(ProgressFinish::Abandon));
-        pb2.set_prefix("Parsing read2");
-        pb2.set_style(progress_style);
-
-        let mut reader = SliceChunkPairedReader::with_capacity(chunk_size, &map1, &map2);
-        reader.set_label1("read1");
-        reader.set_label2("read2");
-        reader.attach_bars(pb1, pb2);
+        let mut reader = FastqSliceChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
 
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, and `id_sets`
@@ -93,8 +62,7 @@ pub fn mmap_kractor_paired_read(
             let id_sets = &id_sets;
             // Rayon scope for spawning parsing threads
             rayon::scope(|s| -> Result<()> {
-                for chunk_result in reader {
-                    let mut chunk = chunk_result?;
+                while let Some(mut chunk) = reader.chunk_reader()? {
                     // If an error already occurred, stop spawning new threads
                     if has_error.load(Relaxed) {
                         return Ok(());
@@ -111,7 +79,7 @@ pub fn mmap_kractor_paired_read(
                                     Some((record1, record2)) => {
                                         if id_sets.contains(record1.id) {
                                             // Attempt to send the matching record to the writer thread.
-                                            match thread_tx.send((record1, record2)) {
+                                            match thread_tx.send((record1.into(), record2.into())) {
                                                 Ok(_) => continue,
                                                 Err(_) => {
                                                     // If this fails, it means the writer thread has already exited due to an error.

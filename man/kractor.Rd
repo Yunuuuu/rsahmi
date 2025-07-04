@@ -8,12 +8,13 @@ kractor(
   kreport,
   koutput,
   reads,
-  ubread = NULL,
-  umi_ranges = NULL,
-  barcode_ranges = NULL,
   extract_koutput = NULL,
   extract_reads = NULL,
-  taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+  taxonomy = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+  ranks = c("G", "S"),
+  taxa = NULL,
+  taxids = NULL,
+  descendants = TRUE,
   chunk_size = NULL,
   buffer_size = NULL,
   batch_size = NULL,
@@ -35,21 +36,6 @@ for efficiency as they are smaller). Accepts one file for single-end or two
 files for paired-end. Note: if \code{ubread} is specified, \code{reads} must be the
 original Kraken2 input reads to ensure correct barcode/UMI pairing.}
 
-\item{ubread}{Path to the input sequence file that contains UMI and/or
-barcode sequences. If \code{NULL}, UMI/barcode parsing is disabled. When
-specified, \code{reads} must contain only a single FASTQ file. This is commonly
-used for 10x Genomics single-cell data, where the first read file contains
-only UMI and barcode sequences. In such cases, you should provide that file
-via \code{ubread}.}
-
-\item{umi_ranges}{A range or a list of ranges specifying where UMI sequences
-are located in the reads. Must be created using the \code{ubrange()} function.
-Only used when \code{ubread} is not \code{NULL}.}
-
-\item{barcode_ranges}{A range or a list of ranges specifying where cell
-barcode sequences are located in the reads. Must be created using the
-\code{ubrange()} function.  Only used when \code{ubread} is not \code{NULL}.}
-
 \item{extract_koutput}{Path to the file where the extracted Kraken2 output
 matching the specified \code{taxon} will be saved. Defaults to
 \code{"kraken_microbiome_output.txt"}.}
@@ -58,9 +44,23 @@ matching the specified \code{taxon} will be saved. Defaults to
 specifying the output FASTQ file(s) where the matching reads will be saved.
 Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
 
-\item{taxon}{An atomic character specify the taxa name wanted. Should follow
-the kraken style, connected by rank codes, two underscores, and the
-scientific name of the taxon (e.g., "d__Viruses").}
+\item{taxonomy}{Character vector. The set of taxonomic groups to include
+(default: \code{c("d__Bacteria", "d__Fungi", "d__Viruses")}). This defines the
+global taxa to consider. If \code{NULL}, all taxa will be used. If \code{descendants = TRUE}, only the descendants within these groups will be considered. The
+selection of taxa can be further refined using the \code{ranks}, \code{taxa}, and
+\code{taxids} parameters. One of \code{taxonomy}, \code{ranks}, \code{taxa}, or \code{taxids} must be
+provided.}
+
+\item{ranks}{Character vector. The taxonomic ranks to filter by. Default:
+\code{c("G", "S")} (optional).}
+
+\item{taxa}{Character vector. Specific taxa to include (optional).}
+
+\item{taxids}{Character vector. A list of taxid values to filter by
+(optional).}
+
+\item{descendants}{Logical. Whether to include descendants of the selected
+taxa (default: \code{TRUE}).}
 
 \item{chunk_size}{Integer. Size in bytes of the intermediate chunk used to
 split and distribute data to worker threads during processing. Default is
@@ -83,7 +83,7 @@ atomatically by rayon.}
 \code{Value} section for details.}
 
 \item{mmap_koutput, mmap_reads}{Logical. Whether to enable memory-mapped file
-access for reading input files (\code{mmap_reads}) and writing Kraken2 output
+access for reading input FASTQ reads (\code{mmap_reads}) or Kraken2 output
 (\code{mmap_koutput}). When set to \code{TRUE}, the function uses memory mapping to
 reduce data copying and improve performance in multi-threaded environments.
 This can be highly efficient on some systems, but performance gains may
@@ -93,7 +93,8 @@ vary depending on the operating system and file system. Defaults to \code{TRUE}.
 None. This function generates the following files:
 \itemize{
 \item \code{extract_koutput}: Kraken2 output entries corresponding to the specified
-\code{taxon}, extracted from koutput.
+\code{taxonomy}, \code{ranks}, \code{taxa}, \code{taxids}, and \code{descendants} extracted from the
+input \code{koutput}.
 \item \code{extract_reads}: Sequence file(s) containing reads assigned to the
 specified \code{taxon}.
 }

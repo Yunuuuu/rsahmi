@@ -1,24 +1,24 @@
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, Read};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
-use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use rustc_hash::FxHashSet as HashSet;
 
-use super::reader::BytesChunkReader;
 use crate::batchsender::BatchSender;
-use crate::kractor::reads::parser::fasta::FastaRecord;
-use crate::kractor::reads::parser::fastq::FastqContainer;
+use crate::parser::fasta::FastaRecord;
+use crate::parser::fastq::FastqBytesChunkReader;
+use crate::parser::fastq::FastqContainer;
+use crate::reader::bytes::BytesProgressBarReader;
 
 /// Reads a single-end FASTQ file in chunks, filters records by ID set, and writes matching records to output.
 /// This function uses thread + rayon + channel architecture for parallelism.
-pub fn reader_kractor_single_read(
+pub fn reader_kractor_single_read<R: Read + Send>(
     id_sets: HashSet<&[u8]>,
-    read: &str,
+    reader: BytesProgressBarReader<R>,
     ofile: &str,
     chunk_size: usize,
     buffer_size: usize,
@@ -27,13 +27,6 @@ pub fn reader_kractor_single_read(
 ) -> Result<()> {
     // Open output file and wrap in buffered writer
     let mut writer = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
-
-    // Open and memory-map the input FASTQ file
-    let reader = File::open(read)?;
-    let size = reader.metadata()?.len();
-    let progress_style = ProgressStyle::with_template(
-        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
-    )?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -59,13 +52,7 @@ pub fn reader_kractor_single_read(
         // Reads and splits the input FASTQ into chunks.
         // Each chunk is parsed in parallel using Rayon.
         // Matching records (based on `id_sets`) are sent to the writer via the channel.
-        let pb = ProgressBar::new(size).with_finish(ProgressFinish::Abandon);
-        pb.set_prefix("Parsing reads");
-        pb.set_style(progress_style);
-
-        let mut reader = BytesChunkReader::with_capacity(chunk_size, reader);
-        reader.set_label("reads"); // Set label for error context
-        reader.attach_bar(pb);
+        let mut reader = FastqBytesChunkReader::with_capacity(chunk_size, reader);
 
         let parser_handle = scope.spawn(move || -> Result<()> {
             // will move `reader`, `parser_tx`, and `id_sets`
@@ -96,7 +83,7 @@ pub fn reader_kractor_single_read(
                                     Some(record) => {
                                         if id_sets.contains(&record.id[..]) {
                                             // Attempt to send the matching record to the writer thread.
-                                            match thread_tx.send(record) {
+                                            match thread_tx.send(record.into()) {
                                                 Ok(_) => continue,
                                                 Err(_) => {
                                                     // If this fails, it means the writer thread has already exited due to an error.

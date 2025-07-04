@@ -1,20 +1,32 @@
 use std::io::Write;
 
+use super::fastq::FastqRecord;
+
 #[derive(Debug)]
-pub struct FastaRecord<T> {
-    pub id: T,
-    pub desc: Option<T>,
-    pub seq: T,
+pub(crate) struct FastaRecord<T> {
+    pub(crate) id: T,
+    pub(crate) desc: Option<T>,
+    pub(crate) seq: T,
+}
+
+impl<T> From<FastqRecord<T>> for FastaRecord<T> {
+    fn from(value: FastqRecord<T>) -> Self {
+        Self {
+            id: value.id,
+            desc: value.desc,
+            seq: value.seq,
+        }
+    }
 }
 
 impl<T> FastaRecord<T> {
-    pub fn new(id: T, desc: Option<T>, seq: T) -> Self {
+    pub(crate) fn new(id: T, desc: Option<T>, seq: T) -> Self {
         Self { id, desc, seq }
     }
 }
 
 impl<T: AsRef<[u8]>> FastaRecord<T> {
-    pub fn write<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let id = self.id.as_ref();
         let desc = self.desc.as_ref().map(|d| d.as_ref());
         let seq = self.seq.as_ref();
@@ -37,6 +49,14 @@ impl<T: AsRef<[u8]>> FastaRecord<T> {
         buffer.push(b'\n');
 
         writer.write_all(&buffer)
+    }
+
+    pub(crate) fn as_ref(&self) -> FastaRecord<&[u8]> {
+        FastaRecord {
+            id: self.id.as_ref(),
+            desc: self.desc.as_ref().map(|d| d.as_ref()),
+            seq: self.seq.as_ref(),
+        }
     }
 }
 

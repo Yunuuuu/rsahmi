@@ -6,128 +6,184 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashSet as HashSet;
 
-mod io;
-mod mmap;
-mod parser;
-pub mod range;
+pub(crate) mod io;
+pub(crate) mod mmap;
 
-use io::{reader_kractor_paired_read, reader_kractor_single_read, reader_kractor_ubread_read};
-use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read, mmap_kractor_ubread_read};
-use range::RangeKind;
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
+use io::{reader_kractor_paired_read, reader_kractor_single_read};
+#[cfg(unix)]
+use memmap2::Advice;
+use memmap2::Mmap;
+use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read};
 
-pub fn kractor_reads(
-    id_sets: HashSet<&[u8]>,
+use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader::slice::SliceProgressBarReader;
+
+pub(crate) fn kractor_reads(
+    koutput: &str,
     fq1: &str,
     ofile1: &str,
     fq2: Option<&str>,
     ofile2: Option<&str>,
-    ubread: Option<&str>,
-    umi_ranges: Option<Vec<RangeKind>>,
-    barcode_ranges: Option<Vec<RangeKind>>,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
     mmap: bool,
 ) -> Result<()> {
-    match (fq2, ubread) {
-        (None, None) => {
-            if mmap {
-                mmap_kractor_single_read(
-                    id_sets,
-                    fq1,
-                    ofile1,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            } else {
-                reader_kractor_single_read(
-                    id_sets,
-                    fq1,
-                    ofile1,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            }
+    println!("Extracting sequence IDs");
+    let ids = read_sequence_id_from_koutput(koutput, 126 * 1024)
+        .map_err(|e| anyhow!("Failed to read sequence IDs: {}", e))?;
+    let id_sets = ids
+        .iter()
+        .map(|id| id.as_slice())
+        .collect::<HashSet<&[u8]>>();
+    println!(
+        "Extracting the matching sequence from: {} {}",
+        fq1,
+        fq2.map_or_else(|| String::from(""), |s| format!("and {}", s))
+    );
+    let file = File::open(fq1)?;
+    let progress_style = ProgressStyle::with_template(
+        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
+    )?;
+
+    if let Some(fq2) = fq2 {
+        let ofile2 = ofile2.ok_or(anyhow!(
+            "`ofile2` must be provided when processing paired-end reads"
+        ))?;
+        let file2 = File::open(fq2)?;
+        // add progres bar
+        let progress = MultiProgress::new();
+        if mmap {
+            let map1 = unsafe { Mmap::map(&file) }?;
+            #[cfg(unix)]
+            map1.advise(Advice::Sequential)?;
+            let mut reader1 = SliceProgressBarReader::new(&map1);
+            reader1.set_label("read1");
+
+            let map2 = unsafe { Mmap::map(&file2) }?;
+            #[cfg(unix)]
+            map2.advise(Advice::Sequential)?;
+            let mut reader2 = SliceProgressBarReader::new(&map2);
+            reader2.set_label("read2");
+
+            let pb1 = progress
+                .add(ProgressBar::new(map1.len() as u64).with_finish(ProgressFinish::Abandon));
+            pb1.set_prefix("Parsing read1");
+            pb1.set_style(progress_style.clone());
+
+            #[cfg(not(test))]
+            reader1.attach_bar(pb1);
+
+            let pb2 = progress
+                .add(ProgressBar::new(map2.len() as u64).with_finish(ProgressFinish::Abandon));
+            pb2.set_prefix("Parsing read2");
+            pb2.set_style(progress_style);
+
+            #[cfg(not(test))]
+            reader2.attach_bar(pb2);
+
+            mmap_kractor_paired_read(
+                id_sets,
+                reader1,
+                ofile1,
+                reader2,
+                ofile2,
+                chunk_size,
+                buffer_size,
+                batch_size,
+                nqueue,
+            )
+        } else {
+            let mut reader1 = BytesProgressBarReader::new(&file);
+            reader1.set_label("read1");
+
+            let mut reader2 = BytesProgressBarReader::new(&file2);
+            reader2.set_label("read2");
+
+            let pb1 = progress.add(
+                ProgressBar::new(file.metadata()?.len() as u64)
+                    .with_finish(ProgressFinish::Abandon),
+            );
+            pb1.set_prefix("Parsing read1");
+            pb1.set_style(progress_style.clone());
+
+            #[cfg(not(test))]
+            reader1.attach_bar(pb1);
+
+            let pb2 = progress.add(
+                ProgressBar::new(file2.metadata()?.len() as u64)
+                    .with_finish(ProgressFinish::Abandon),
+            );
+            pb2.set_prefix("Parsing read2");
+            pb2.set_style(progress_style);
+
+            #[cfg(not(test))]
+            reader2.attach_bar(pb2);
+
+            reader_kractor_paired_read(
+                id_sets,
+                reader1,
+                ofile1,
+                reader2,
+                ofile2,
+                chunk_size,
+                buffer_size,
+                batch_size,
+                nqueue,
+            )
         }
-        (Some(fq2), None) => {
-            let ofile2 = ofile2.ok_or(anyhow!(
-                "`ofile2` must be provided when processing paired-end reads"
-            ))?;
-            if mmap {
-                mmap_kractor_paired_read(
-                    id_sets,
-                    fq1,
-                    ofile1,
-                    fq2,
-                    ofile2,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            } else {
-                reader_kractor_paired_read(
-                    id_sets,
-                    fq1,
-                    ofile1,
-                    fq2,
-                    ofile2,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            }
-        }
-        (None, Some(ubread)) => {
-            let umi_ranges = umi_ranges.ok_or(anyhow!(
-                "`umi_ranges` must be provided when processing `ubread` reads"
-            ))?;
-            let barcode_ranges = barcode_ranges.ok_or(anyhow!(
-                "`barcode_ranges` must be provided when processing `ubread` reads"
-            ))?;
-            if mmap {
-                mmap_kractor_ubread_read(
-                    id_sets,
-                    fq1,
-                    ofile1,
-                    ubread,
-                    umi_ranges,
-                    barcode_ranges,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            } else {
-                reader_kractor_ubread_read(
-                    id_sets,
-                    fq1,
-                    ofile1,
-                    ubread,
-                    umi_ranges,
-                    barcode_ranges,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            }
-        }
-        (Some(_), Some(_)) => {
-            return Err(anyhow!(
-                "Both `fq2` and `ubread` cannot be provided simultaneously. Choose one."
-            ));
+    } else {
+        if mmap {
+            let map = unsafe { Mmap::map(&file) }?;
+            #[cfg(unix)]
+            map.advise(Advice::Sequential)?;
+            let mut reader = SliceProgressBarReader::new(&map);
+            reader.set_label("reads");
+
+            let pb = ProgressBar::new(map.len() as u64).with_finish(ProgressFinish::Abandon);
+            pb.set_prefix("Parsing reads");
+            pb.set_style(progress_style);
+
+            #[cfg(not(test))]
+            reader.attach_bar(pb);
+
+            mmap_kractor_single_read(
+                id_sets,
+                reader,
+                ofile1,
+                chunk_size,
+                buffer_size,
+                batch_size,
+                nqueue,
+            )
+        } else {
+            let mut reader = BytesProgressBarReader::new(&file);
+            reader.set_label("reads");
+
+            let pb = ProgressBar::new(file.metadata()?.len() as u64)
+                .with_finish(ProgressFinish::Abandon);
+            pb.set_prefix("Parsing reads");
+            pb.set_style(progress_style);
+
+            #[cfg(not(test))]
+            reader.attach_bar(pb);
+
+            reader_kractor_single_read(
+                id_sets,
+                reader,
+                ofile1,
+                chunk_size,
+                buffer_size,
+                batch_size,
+                nqueue,
+            )
         }
     }
 }
 
-pub fn read_sequence_id_from_koutput<P>(
+fn read_sequence_id_from_koutput<P>(
     file: P,
     buffersize: usize,
 ) -> std::result::Result<Vec<Vec<u8>>, String>

@@ -97,7 +97,7 @@ sckmer <- function(kreport, koutput, reads,
     extract_umi <- extract_umi %||% "kraken_microbiome_umi.txt"
 
     cli::cli_alert_info("Parsing {.path {kreport}}")
-    kreport <- parse_kraken_report(kreport)
+    kreport <- kraken_report(kreport)
     exclude <- pl$Series(values = exclude)$cast(pl$String)
 
     # extract operated taxon -----------------------------------------

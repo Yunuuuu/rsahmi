@@ -11,10 +11,10 @@ use memmap2::Advice;
 use memmap2::Mmap;
 use rustc_hash::FxHashSet as HashSet;
 
-use super::reader::SliceChunkPairedReader;
 use crate::batchsender::BatchSender;
+use crate::koutput_reads::range::*;
+use crate::kractor::reads::mmap::reader::FastqSliceChunkPairedReader;
 use crate::kractor::reads::parser::fasta::FastaRecordWithUMIBarcode;
-use crate::kractor::reads::range::*;
 
 pub fn mmap_kractor_ubread_read(
     id_sets: HashSet<&[u8]>,
@@ -23,6 +23,7 @@ pub fn mmap_kractor_ubread_read(
     ubread: &str,
     umi_ranges: Vec<RangeKind>,
     barcode_ranges: Vec<RangeKind>,
+    strip_ranges: Vec<RangeKind>,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
@@ -78,7 +79,7 @@ pub fn mmap_kractor_ubread_read(
         pb2.set_prefix("Parsing ubread");
         pb2.set_style(progress_style);
 
-        let mut reader = SliceChunkPairedReader::with_capacity(chunk_size, &map1, &map2);
+        let mut reader = FastqSliceChunkPairedReader::with_capacity(chunk_size, &map1, &map2);
         reader.set_label1("reads");
         reader.set_label2("ubread");
         reader.attach_bars(pb1, pb2);

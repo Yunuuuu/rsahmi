@@ -20,10 +20,6 @@ rpmm_quantile(
 \item{study}{A string of the study name, used to differentiate with cell line
 data.}
 
-\item{taxon}{An atomic character specify the taxa name wanted. Should follow
-the kraken style, connected by rank codes, two underscores, and the
-scientific name of the taxon (e.g., "d__Viruses").}
-
 \item{quantile}{Probabilities with values in \verb{[0, 1]} specifying the quantile
 to calculate.}
 

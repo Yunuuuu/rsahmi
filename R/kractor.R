@@ -10,43 +10,29 @@
 #' for efficiency as they are smaller). Accepts one file for single-end or two
 #' files for paired-end. Note: if `ubread` is specified, `reads` must be the
 #' original Kraken2 input reads to ensure correct barcode/UMI pairing.
-#' @param ubread Path to the input sequence file that contains UMI and/or
-#'   barcode sequences. If `NULL`, UMI/barcode parsing is disabled. When
-#'   specified, `reads` must contain only a single FASTQ file. This is commonly
-#'   used for 10x Genomics single-cell data, where the first read file contains
-#'   only UMI and barcode sequences. In such cases, you should provide that file
-#'   via `ubread`.
-#' @param umi_ranges A range or a list of ranges specifying where UMI sequences
-#'   are located in the reads. Must be created using the `ubrange()` function.
-#'   Only used when `ubread` is not `NULL`.
-#' @param barcode_ranges A range or a list of ranges specifying where cell
-#'   barcode sequences are located in the reads. Must be created using the
-#'   `ubrange()` function.  Only used when `ubread` is not `NULL`.
 #' @param extract_koutput Path to the file where the extracted Kraken2 output
 #' matching the specified `taxon` will be saved. Defaults to
 #' `"kraken_microbiome_output.txt"`.
 #' @param extract_reads A character vector of the same length as `reads`,
 #' specifying the output FASTQ file(s) where the matching reads will be saved.
 #' Defaults to `"kraken_microbiome_reads(_1|2).txt"`.
-#' @param taxon An atomic character specify the taxa name wanted. Should follow
-#' the kraken style, connected by rank codes, two underscores, and the
-#' scientific name of the taxon (e.g., "d__Viruses").
-#' @param batch_size Integer. Number of records to accumulate before triggering
-#' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
-#' @param chunk_size Integer. Size in bytes of the intermediate chunk used to
-#'   split and distribute data to worker threads during processing. Default is
-#'   `10 * 1024 * 1024` (10MB).
-#' @param buffer_size Integer specifying the buffer size in bytes used for
-#' writing to disk. This controls the capacity of the buffered file writer.
-#' Default is `1 * 1024 * 1024` (1MB).
-#' @param nqueue Integer. Maximum number of buffers per thread, controlling the
-#'   amount of in-flight data awaiting writing. Default: `3`.
-#' @param threads Integer. Number of threads to use. Default will determined
-#' atomatically by rayon.
-#' @param odir A string of directory to save the output files. Please see
-#' `Value` section for details.
+#' @param taxonomy Character vector. The set of taxonomic groups to include
+#' (default: `c("d__Bacteria", "d__Fungi", "d__Viruses")`). This defines the
+#' global taxa to consider. If `NULL`, all taxa will be used. If `descendants =
+#' TRUE`, only the descendants within these groups will be considered. The
+#' selection of taxa can be further refined using the `ranks`, `taxa`, and
+#' `taxids` parameters. One of `taxonomy`, `ranks`, `taxa`, or `taxids` must be
+#' provided.
+#' @param ranks Character vector. The taxonomic ranks to filter by. Default:
+#' `c("G", "S")` (optional).
+#' @param taxa Character vector. Specific taxa to include (optional).
+#' @param taxids Character vector. A list of taxid values to filter by
+#' (optional).
+#' @param descendants Logical. Whether to include descendants of the selected
+#' taxa (default: `TRUE`).
+#' @inheritParams seq_refine
 #' @param mmap_koutput,mmap_reads Logical. Whether to enable memory-mapped file
-#'   access for reading input files (`mmap_reads`) and writing Kraken2 output
+#'   access for reading input FASTQ reads (`mmap_reads`) or Kraken2 output
 #'   (`mmap_koutput`). When set to `TRUE`, the function uses memory mapping to
 #'   reduce data copying and improve performance in multi-threaded environments.
 #'   This can be highly efficient on some systems, but performance gains may
@@ -54,7 +40,8 @@
 #' @seealso [`krakenx()`]
 #' @return None. This function generates the following files:
 #' - `extract_koutput`: Kraken2 output entries corresponding to the specified
-#'   `taxon`, extracted from koutput.
+#'   `taxonomy`, `ranks`, `taxa`, `taxids`, and `descendants` extracted from the
+#'   input `koutput`.
 #' - `extract_reads`: Sequence file(s) containing reads assigned to the
 #'   specified `taxon`.
 #' @examples
@@ -81,17 +68,25 @@
 #' }
 #' @export
 kractor <- function(kreport, koutput, reads,
-                    ubread = NULL, umi_ranges = NULL, barcode_ranges = NULL,
                     extract_koutput = NULL, extract_reads = NULL,
-                    taxon = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+                    taxonomy = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+                    ranks = c("G", "S"),
+                    taxa = NULL,
+                    taxids = NULL,
+                    descendants = TRUE,
                     chunk_size = NULL, buffer_size = NULL,
                     batch_size = NULL, nqueue = NULL,
                     threads = NULL, odir = NULL,
                     mmap_koutput = TRUE, mmap_reads = TRUE) {
     rust_kractor_koutput(
-        kreport, koutput,
+        kreport = kreport,
+        koutput = koutput,
         extract_koutput = extract_koutput,
-        taxon = taxon,
+        taxonomy = taxonomy,
+        ranks = ranks,
+        taxa = taxa,
+        taxids = taxids,
+        descendants = descendants,
         chunk_size = chunk_size,
         buffer_size = buffer_size,
         batch_size = batch_size,
@@ -107,9 +102,6 @@ kractor <- function(kreport, koutput, reads,
         ),
         reads = reads,
         extract_reads = extract_reads,
-        ubread = ubread,
-        umi_ranges = umi_ranges,
-        barcode_ranges = barcode_ranges,
         chunk_size = chunk_size,
         buffer_size = buffer_size,
         batch_size = batch_size,
@@ -125,33 +117,125 @@ BATCH_SIZE <- 500L
 CHUNK_SIZE <- 10L * 1024L * 1024L
 BUFFER_SIZE <- 1L * 1024L * 1024L
 
+#' Filter Kraken2 Output by Taxon
+#'
+#' This function filters Kraken2 classification output (`koutput`) by taxonomic
+#' identifiers derived from a Kraken2 report (`kreport`). It extracts lines
+#' matching the desired `taxonomy`, `ranks`, `taxa`, `taxids`, and `descendants`
+#' and writes the filtered results to an output file.
+#'
+#' @inheritParams kractor
+#' @param mmap Logical. Whether to enable memory-mapped file access for reading
+#'   input Kraken2 output. When set to `TRUE`, the function uses memory mapping
+#'   to reduce data copying and improve performance in multi-threaded
+#'   environments. This can be highly efficient on some systems, but
+#'   performance gains may vary depending on the operating system and file
+#'   system. Defaults to `TRUE`.
+#' @return None. The function generates a filtered Kraken2 output file
+#'   containing entries corresponding to the specified `taxonomy`, `ranks`,
+#'   `taxa`, `taxids`, and `descendants` extracted from the input `koutput`.
+#' @export
+kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
+                            taxonomy = c(
+                                "d__Bacteria", "d__Fungi",
+                                "d__Viruses"
+                            ),
+                            ranks = c("G", "S"),
+                            taxa = NULL,
+                            taxids = NULL,
+                            descendants = TRUE,
+                            chunk_size = NULL, buffer_size = NULL,
+                            batch_size = NULL, nqueue = NULL,
+                            mmap = TRUE, threads = NULL, odir = NULL) {
+    rust_kractor_koutput(
+        kreport = kreport,
+        koutput = koutput,
+        extract_koutput = extract_koutput,
+        taxonomy = taxonomy,
+        ranks = ranks,
+        taxa = taxa,
+        taxids = taxids,
+        descendants = descendants,
+        chunk_size = chunk_size,
+        buffer_size = buffer_size,
+        batch_size = batch_size,
+        nqueue = nqueue,
+        threads = threads,
+        odir = odir,
+        mmap = mmap
+    )
+}
+
+#' Extract Reads from Kraken2 Output Based on Classification
+#'
+#' This function extracts reads corresponding to selected classifications from a
+#' Kraken2 output file (`koutput`). Only reads classified to selected taxa will
+#' be extracted from the provided sequence file (`reads`).
+#'
+#' @inheritParams kractor
+#' @param mmap Logical. Whether to enable memory-mapped file access for reading
+#'   input sequence files. When set to `TRUE`, the function uses memory mapping
+#'   to reduce data copying and improve performance in multi-threaded
+#'   environments. This can be highly efficient on some systems, but
+#'   performance gains may vary depending on the operating system and file
+#'   system. Defaults to `TRUE`.
+#' @export
+kractor_reads <- function(koutput, reads, extract_reads = NULL,
+                          chunk_size = NULL, buffer_size = NULL,
+                          batch_size = NULL,
+                          nqueue = NULL, threads = NULL,
+                          odir = NULL, mmap = TRUE) {
+    rust_kractor_reads(
+        koutput = koutput,
+        reads = reads,
+        extract_reads = extract_reads,
+        chunk_size = chunk_size,
+        buffer_size = buffer_size,
+        batch_size = batch_size,
+        nqueue = nqueue,
+        threads = threads,
+        odir = odir,
+        mmap = mmap
+    )
+}
+
 rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
-                                 taxon = c(
+                                 taxonomy = c(
                                      "d__Bacteria", "d__Fungi",
                                      "d__Viruses"
                                  ),
+                                 ranks = c("G", "S"),
+                                 taxa = NULL,
+                                 taxids = NULL,
+                                 descendants = TRUE,
                                  chunk_size = NULL, buffer_size = NULL,
                                  batch_size = NULL, nqueue = NULL,
-                                 threads = NULL, odir = NULL,
-                                 mmap = TRUE, pprof = NULL) {
+                                 threads = NULL, odir = NULL, mmap = TRUE,
+                                 pprof = NULL) {
     assert_string(kreport, allow_empty = FALSE)
     assert_string(koutput, allow_empty = FALSE)
     assert_string(extract_koutput, allow_empty = FALSE, allow_null = TRUE)
-    taxon <- as.character(taxon)
-    if (length(taxon) == 0L) {
-        cli::cli_abort("empty {.arg taxon} provided")
+    if (!is.null(taxonomy)) {
+        taxonomy <- as.character(taxonomy)
+        taxonomy <- taxonomy[!is.na(taxonomy)]
+        if (length(taxonomy) == 0L) taxonomy <- NULL
     }
-    taxids <- parse_kraken_report(kreport)$
-        explode(pl$col("ranks", "taxon"))$
-        filter(
-        pl$concat_str(
-            pl$col("ranks")$str$to_lowercase(),
-            pl$col("taxon"),
-            separator = "__"
-        )$is_in(pl$lit(taxon))
-    )$
-        select(pl$col("taxids")$list$last())$
-        to_series()$unique()
+    if (!is.null(ranks)) {
+        ranks <- as.character(ranks)
+        ranks <- ranks[!is.na(ranks)]
+        if (length(ranks) == 0L) ranks <- NULL
+    }
+    if (!is.null(taxa)) {
+        taxa <- as.character(taxa)
+        taxa <- taxa[!is.na(taxa)]
+        if (length(taxa) == 0L) taxa <- NULL
+    }
+    if (!is.null(taxids)) {
+        taxids <- as.character(taxids)
+        taxids <- taxids[!is.na(taxids)]
+        if (length(taxids) == 0L) taxids <- NULL
+    }
+    assert_bool(descendants)
     assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
@@ -159,38 +243,35 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
         min = 0, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
-    if (is.null(odir)) odir <- getwd()
-    assert_bool(mmap)
-    assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
-    dir_create(odir)
-
-    # https://github.com/jenniferlu717/KrakenTools/blob/master/extract_kraken_reads.py#L95
-    # take care of taxid: "A"
-    if (taxids$is_in(pl$Series(values = c("81077", "A")))$any()) {
-        taxids <- taxids$append(c("81077", "A"))
-    }
-    # the third column of kraken2 output:
-    # Using (taxid ****)
-    patterns <- paste0("(taxid ", as.character(taxids), ")")
-    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
-    extract_koutput <- file.path(odir, extract_koutput)
-
-    chunk_size <- chunk_size %||% CHUNK_SIZE
-    buffer_size <- buffer_size %||% BUFFER_SIZE
-    batch_size <- batch_size %||% BATCH_SIZE
     nqueue <- check_queue(nqueue, 3L) *
         if (is.null(threads) || threads == 0L) {
             parallel::detectCores()
         } else {
             threads
         }
+    assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
+    assert_bool(mmap)
+    if (is.null(odir)) odir <- getwd()
+    assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
+    dir_create(odir)
+
+    extract_koutput <- extract_koutput %||% "kraken_microbiome_output.txt"
+    extract_koutput <- file.path(odir, extract_koutput)
+
+    chunk_size <- chunk_size %||% CHUNK_SIZE
+    buffer_size <- buffer_size %||% BUFFER_SIZE
+    batch_size <- batch_size %||% BATCH_SIZE
     threads <- threads %||% 0L # Let rayon to determine the threads
     if (is.null(pprof)) {
         rust_call(
             "kractor_koutput",
-            patterns = patterns,
+            kreport = kreport,
             koutput = koutput,
+            taxonomy = taxonomy,
+            ranks = ranks,
+            taxa = taxa,
+            taxids = taxids,
+            descendants = descendants,
             ofile = extract_koutput,
             chunk_size = chunk_size,
             buffer_size = buffer_size,
@@ -202,8 +283,13 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     } else {
         rust_call(
             "pprof_kractor_koutput",
-            patterns = patterns,
+            kreport = kreport,
             koutput = koutput,
+            taxonomy = taxonomy,
+            ranks = ranks,
+            taxa = taxa,
+            taxids = taxids,
+            descendants = descendants,
             ofile = extract_koutput,
             chunk_size = chunk_size,
             buffer_size = buffer_size,
@@ -216,10 +302,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
     }
 }
 
-rust_kractor_reads <- function(koutput, reads,
-                               ubread = NULL,
-                               umi_ranges = NULL, barcode_ranges = NULL,
-                               extract_reads = NULL,
+rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
                                chunk_size = NULL, buffer_size = NULL,
                                batch_size = NULL,
                                nqueue = NULL, threads = NULL,
@@ -246,32 +329,6 @@ rust_kractor_reads <- function(koutput, reads,
             )
         }
     }
-    assert_string(ubread, allow_empty = FALSE, allow_null = TRUE)
-    if (!is.null(umi_ranges) && !is_range(umi_ranges)) {
-        cli::cli_abort("{.arg umi_ranges} must be created with {.fn ubrange} or a combination of them using {.fn c}.")
-    }
-    if (!is.null(barcode_ranges) && !is_range(barcode_ranges)) {
-        cli::cli_abort("{.arg barcode_ranges} must be created with {.fn ubrange} or a combination of them using {.fn c}.")
-    }
-    if (!identical(is.null(ubread), is.null(umi_ranges)) ||
-        !identical(is.null(ubread), is.null(barcode_ranges))) {
-        cli::cli_abort(c(
-            "All or none of the following arguments must be provided:",
-            "*" = "{.arg ubread}",
-            "*" = "{.arg umi_ranges}",
-            "*" = "{.arg barcode_ranges}",
-            "i" = "These are required to extract {.field UMI} and {.field Cell Barcode}."
-        ))
-    }
-    if (!is.null(ubread) && length(reads) == 2L) {
-        cli::cli_abort(c(
-            "{.arg reads} must be a single FASTQ file when {.arg ubread} is specified.",
-            i = paste(
-                "UMI/barcode parsing requires {.arg reads} to contain only one input file",
-                "while the read containing UMI/barcode sequences must be passed via {.arg ubread}."
-            )
-        ))
-    }
     assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
     assert_number_whole(batch_size, min = 1, allow_null = TRUE)
@@ -279,9 +336,15 @@ rust_kractor_reads <- function(koutput, reads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
+    nqueue <- check_queue(nqueue, 3L) *
+        if (is.null(threads) || threads == 0L) {
+            parallel::detectCores()
+        } else {
+            threads
+        }
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
-    if (is.null(odir)) odir <- getwd()
     assert_bool(mmap)
+    if (is.null(odir)) odir <- getwd()
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     dir_create(odir)
 
@@ -301,12 +364,6 @@ rust_kractor_reads <- function(koutput, reads,
     chunk_size <- chunk_size %||% CHUNK_SIZE
     buffer_size <- buffer_size %||% BUFFER_SIZE
     batch_size <- batch_size %||% BATCH_SIZE
-    nqueue <- check_queue(nqueue, 3L) *
-        if (is.null(threads) || threads == 0L) {
-            parallel::detectCores()
-        } else {
-            threads
-        }
     threads <- threads %||% 0L
     if (is.null(pprof)) {
         rust_call(
@@ -314,8 +371,6 @@ rust_kractor_reads <- function(koutput, reads,
             koutput,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
-            ubread = ubread, umi_ranges = umi_ranges,
-            barcode_ranges = barcode_ranges,
             chunk_size = chunk_size,
             buffer_size = buffer_size,
             batch_size = batch_size,
@@ -329,8 +384,6 @@ rust_kractor_reads <- function(koutput, reads,
             koutput,
             fq1 = fq1, ofile1 = extract_read1,
             fq2 = fq2, ofile2 = extract_read2,
-            ubread = ubread, umi_ranges = umi_ranges,
-            barcode_ranges = barcode_ranges,
             chunk_size = chunk_size,
             buffer_size = buffer_size,
             batch_size = batch_size,

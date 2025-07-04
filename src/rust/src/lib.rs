@@ -2,7 +2,14 @@ use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
 
 mod batchsender;
+mod bench;
+mod koutput_reads;
 mod kractor;
+mod kreport;
+mod parser;
+mod reader;
+mod seq_action;
+mod seq_refine;
 
 pub(crate) fn new_channel<T>(nqueue: Option<usize>) -> (Sender<T>, Receiver<T>) {
     if let Some(queue) = nqueue {
@@ -29,5 +36,8 @@ pub(crate) fn new_channel<T>(nqueue: Option<usize>) -> (Sender<T>, Receiver<T>) 
 // For methods, we'll call it directly with R function `call_rust_method`
 extendr_module! {
     mod rsahmi;
+    use kreport;
+    use seq_refine;
     use kractor;
+    use bench;
 }

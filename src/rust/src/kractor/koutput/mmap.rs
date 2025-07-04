@@ -2,38 +2,25 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 
-use aho_corasick::{AhoCorasick, AhoCorasickKind};
+use aho_corasick::AhoCorasick;
 use anyhow::{anyhow, Result};
-use memchr::{memchr, memrchr};
-#[cfg(unix)]
-use memmap2::Advice;
-use memmap2::Mmap;
+use memchr::{memrchr, Memchr};
 
 use super::kractor_match_aho;
 use crate::batchsender::BatchSender;
+use crate::reader::slice::{SliceLineReader, SliceProgressBarReader};
 
 pub fn mmap_kractor_koutput(
-    patterns: &[&str],
-    file: &str,
+    include_aho: AhoCorasick,
+    exclude_aho: Option<AhoCorasick>,
+    reader: SliceProgressBarReader,
     ofile: &str,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
 ) -> Result<()> {
-    let file = File::open(file)?;
-    let matcher = AhoCorasick::builder()
-        .kind(Some(AhoCorasickKind::DFA))
-        .build(patterns)?;
-
     let mut writer = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
-
-    // let taxid_sets: HashSet<&[u8]> =
-    //     patterns.into_iter().map(|s| s.as_bytes()).collect();
-    // https://github.com/rayon-rs/rayon/discussions/1164
-    let map = unsafe { Mmap::map(&file) }?;
-    #[cfg(unix)]
-    map.advise(Advice::Sequential)?;
 
     std::thread::scope(|scope| {
         // Create a channel between the parser and writer threads
@@ -52,13 +39,13 @@ pub fn mmap_kractor_koutput(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
-        let reader = SliceChunkReader::with_capacity(chunk_size, &map);
+        let mut reader = KoutputSliceChunkReader::with_capacity(chunk_size, reader);
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, and `matcher`
             let has_error = AtomicBool::new(false);
             let (err_tx, err_rx) = crossbeam_channel::bounded(1);
             rayon::scope(|s| -> Result<()> {
-                for chunk in reader {
+                while let Some(chunk) = reader.chunk_reader() {
                     if has_error.load(Relaxed) {
                         return Ok(());
                     }
@@ -66,7 +53,7 @@ pub fn mmap_kractor_koutput(
                         let mut thread_tx =
                             BatchSender::with_capacity(batch_size, parser_tx.clone());
                         for line in chunk {
-                            if kractor_match_aho(&matcher, &line) {
+                            if kractor_match_aho(&include_aho, &exclude_aho, &line) {
                                 match thread_tx.send(line) {
                                     Ok(_) => continue,
                                     Err(e) => {
@@ -112,84 +99,44 @@ pub fn mmap_kractor_koutput(
     })
 }
 
-pub struct SliceChunkReader<'a> {
-    pos: usize,
-    slice: &'a [u8],
+pub struct KoutputSliceChunkReader<'a> {
     chunk_size: usize,
+    reader: SliceProgressBarReader<'a>,
 }
 
-impl<'a> Iterator for SliceChunkReader<'a> {
-    type Item = SliceKoutputChunk<'a>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.chunk_reader()
-    }
-}
-
-impl<'a> SliceChunkReader<'a> {
+impl<'a> KoutputSliceChunkReader<'a> {
     #[allow(dead_code)]
-    pub fn new(slice: &'a [u8]) -> Self {
-        Self::with_capacity(8 * 1024, slice)
+    pub fn new(reader: SliceProgressBarReader<'a>) -> Self {
+        Self::with_capacity(8 * 1024, reader)
     }
 
-    pub fn with_capacity(capacity: usize, slice: &'a [u8]) -> Self {
+    pub fn with_capacity(capacity: usize, reader: SliceProgressBarReader<'a>) -> Self {
         Self {
-            pos: 0,
-            slice,
             chunk_size: capacity,
+            reader,
         }
     }
 
-    pub fn chunk_reader(&mut self) -> Option<SliceKoutputChunk<'a>> {
+    pub fn chunk_reader(&mut self) -> Option<SliceLineReader<'a, Memchr<'a>>> {
         // If we've reached or passed the end of the input buffer, stop reading
-        if self.pos >= self.slice.len() {
-            return None;
-        }
-        let end = self.pos + self.chunk_size;
-        let mut chunk;
-        if end >= self.slice.len() {
-            chunk = &self.slice[self.pos ..];
-            self.pos = self.slice.len();
+        let buf = match self.reader.take_slice(self.chunk_size) {
+            Some(data) => data,
+            None => return None,
+        };
+        let chunk;
+        if buf.eof() {
+            chunk = buf.as_slice();
         } else {
-            chunk = &self.slice[self.pos .. end];
-            if let Some(pos) = memrchr(b'\n', chunk) {
-                chunk = &chunk[..= pos];
-                self.pos += pos + 1;
+            let bytes = buf.as_slice();
+            if let Some(pos) = memrchr(b'\n', bytes) {
+                chunk = &bytes[..= pos];
             } else {
                 self.chunk_size *= 2;
                 return self.chunk_reader();
             }
         }
-        Some(SliceKoutputChunk::new(chunk))
-    }
-}
-
-#[derive(Debug)]
-pub struct SliceKoutputChunk<'a> {
-    pos: usize,
-    chunk: &'a [u8],
-}
-
-impl<'a> SliceKoutputChunk<'a> {
-    fn new(chunk: &'a [u8]) -> Self {
-        Self { pos: 0, chunk }
-    }
-}
-
-impl<'a> Iterator for SliceKoutputChunk<'a> {
-    type Item = &'a [u8];
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.chunk.len() {
-            return None;
-        }
-        let out;
-        if let Some(pos) = memchr(b'\n', &self.chunk[self.pos ..]) {
-            out = &self.chunk[self.pos ..= self.pos + pos];
-            self.pos += pos + 1;
-        } else {
-            out = &self.chunk[self.pos ..];
-            self.pos = self.chunk.len();
-        }
-        Some(out)
+        self.reader.advance(chunk.len());
+        Some(SliceLineReader::new(chunk))
     }
 }
 
@@ -197,17 +144,22 @@ impl<'a> Iterator for SliceKoutputChunk<'a> {
 mod tests {
     use super::*;
 
-    fn to_lines(chunk: SliceKoutputChunk) -> Vec<&[u8]> {
-        chunk.collect()
+    fn to_lines<'a>(mut chunk: SliceLineReader<'a, Memchr<'a>>) -> Vec<&'a [u8]> {
+        let mut out = Vec::new();
+        while let Some(slice) = chunk.read_line_inclusive() {
+            out.push(slice);
+        }
+        out
     }
 
     #[test]
     fn test_multiple_chunks_with_newlines() {
         let data = b"line1\nline2\nline3\nline4\nline5\n";
-        let mut reader = SliceChunkReader::with_capacity(10, data);
+        let mut reader =
+            KoutputSliceChunkReader::with_capacity(10, SliceProgressBarReader::new(data));
         let mut results = Vec::new();
 
-        while let Some(chunk) = reader.next() {
+        while let Some(chunk) = reader.chunk_reader() {
             results.extend(to_lines(chunk));
         }
 
@@ -219,10 +171,11 @@ mod tests {
     #[test]
     fn test_single_chunk_without_trailing_newline() {
         let data = b"line1\nline2\nline3";
-        let mut reader = SliceChunkReader::with_capacity(10, data);
+        let mut reader =
+            KoutputSliceChunkReader::with_capacity(10, SliceProgressBarReader::new(data));
         let mut results = Vec::new();
 
-        while let Some(chunk) = reader.next() {
+        while let Some(chunk) = reader.chunk_reader() {
             results.extend(to_lines(chunk));
         }
 
@@ -236,17 +189,19 @@ mod tests {
     #[test]
     fn test_empty_input() {
         let data = b"";
-        let mut reader = SliceChunkReader::with_capacity(10, data);
-        assert!(reader.next().is_none());
+        let mut reader =
+            KoutputSliceChunkReader::with_capacity(10, SliceProgressBarReader::new(data));
+        assert!(reader.chunk_reader().is_none());
     }
 
     #[test]
     fn test_long_line_crossing_chunks() {
         let data = b"short1\naveryveryveryveryveryverylonglinewithoutnewline";
-        let mut reader = SliceChunkReader::with_capacity(10, data);
+        let mut reader =
+            KoutputSliceChunkReader::with_capacity(10, SliceProgressBarReader::new(data));
         let mut results = Vec::new();
 
-        while let Some(chunk) = reader.next() {
+        while let Some(chunk) = reader.chunk_reader() {
             results.extend(to_lines(chunk));
         }
 
@@ -259,13 +214,13 @@ mod tests {
     #[test]
     fn test_exact_chunk_size_split() {
         let data = b"abc\ndef\nghi\n";
-        let mut reader = SliceChunkReader::with_capacity(8, data);
+        let mut reader =
+            KoutputSliceChunkReader::with_capacity(8, SliceProgressBarReader::new(data));
         let mut results = Vec::new();
 
-        while let Some(chunk) = reader.next() {
+        while let Some(chunk) = reader.chunk_reader() {
             results.extend(to_lines(chunk));
         }
-
         assert_eq!(results, vec![b"abc\n", b"def\n", b"ghi\n"]);
     }
 }

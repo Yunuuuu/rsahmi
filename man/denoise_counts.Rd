@@ -41,10 +41,6 @@ typically output by \code{\link[=sckmer]{sckmer()}}, one per sample.}
 \item{samples}{A character of sample identifier for each element in \code{umis}.
 If not provided, the names of the \code{umis} vector will be used.}
 
-\item{taxon}{An atomic character specify the taxa name wanted. Should follow
-the kraken style, connected by rank codes, two underscores, and the
-scientific name of the taxon (e.g., "d__Viruses").}
-
 \item{drop_unmatched_taxa}{A boolean value, indicates whether taxa not found
 in celllines data should be dropped. Default: \code{TRUE}.}
 

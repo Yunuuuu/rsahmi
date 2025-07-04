@@ -97,8 +97,8 @@ rpmm_quantile <- function(kreports, study = "current study",
     )
 }
 
-parse_rpmm <- function(kraken_report, taxon) {
-    kreport <- parse_kraken_report(kraken_report)
+parse_rpmm <- function(kreport, taxon) {
+    kreport <- kraken_report(kreport)
     ref_reads <- kreport$
         filter(
         pl$concat_str(

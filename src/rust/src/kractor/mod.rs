@@ -1,56 +1,65 @@
+use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
-use rustc_hash::FxHashSet as HashSet;
 
-mod koutput;
-mod reads;
+pub(crate) mod koutput;
+pub(crate) mod reads;
 
-use reads::range::*;
+fn robj_to_option_str(robj: &Robj) -> Result<Option<Vec<&str>>> {
+    if robj.is_null() {
+        Ok(None)
+    } else {
+        robj.as_str_vector()
+            .map(|s| Some(s))
+            .ok_or(anyhow!("must be a character"))
+    }
+}
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
 fn kractor_koutput(
-    patterns: Robj,
+    kreport: &str,
     koutput: &str,
+    taxonomy: Robj,
+    ranks: Robj,
+    taxa: Robj,
+    taxids: Robj,
+    exclude: Robj,
+    descendants: bool,
     ofile: &str,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
-    threads: usize,
     mmap: bool,
+    threads: usize,
 ) -> std::result::Result<(), String> {
-    let pattern_vec = patterns
-        .as_str_vector()
-        .ok_or("`patterns` must be a character vector")?;
-
-    rprintln!("Extracting matching kraken2 output from: {}", koutput);
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
         .map_err(|e| format!("Failed to initialize rayon thread pool: {:?}", e))?;
+    let taxonomy = robj_to_option_str(&taxonomy).map_err(|e| format!("'taxonomy' {}", e))?;
+    let ranks = robj_to_option_str(&ranks).map_err(|e| format!("'ranks' {}", e))?;
+    let taxa = robj_to_option_str(&taxa).map_err(|e| format!("'taxa' {}", e))?;
+    let taxids = robj_to_option_str(&taxids).map_err(|e| format!("'taxids' {}", e))?;
+    let exclude = robj_to_option_str(&exclude).map_err(|e| format!("'exclude' {}", e))?;
     rayon_pool
         .install(|| {
-            if mmap {
-                koutput::mmap_kractor_koutput(
-                    &pattern_vec,
-                    koutput,
-                    ofile,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            } else {
-                koutput::reader_kractor_koutput(
-                    &pattern_vec,
-                    koutput,
-                    ofile,
-                    chunk_size,
-                    buffer_size,
-                    batch_size,
-                    nqueue,
-                )
-            }
+            koutput::kractor_koutput(
+                kreport,
+                koutput,
+                taxonomy,
+                ranks,
+                taxa,
+                taxids,
+                exclude,
+                descendants,
+                ofile,
+                chunk_size,
+                buffer_size,
+                batch_size,
+                nqueue,
+                mmap,
+            )
         })
         .map_err(|e| format!("{}", e))
 }
@@ -63,44 +72,24 @@ fn kractor_reads(
     ofile1: &str,
     fq2: Option<&str>,
     ofile2: Option<&str>,
-    ubread: Option<&str>,
-    umi_ranges: Robj,
-    barcode_ranges: Robj,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
-    threads: usize,
     mmap: bool,
+    threads: usize,
 ) -> std::result::Result<(), String> {
-    rprintln!("Extracting sequence IDs");
-    let ids = reads::read_sequence_id_from_koutput(koutput, 126 * 1024)
-        .map_err(|e| format!("Failed to read sequence IDs: {}", e))?;
-    let id_sets = ids
-        .iter()
-        .map(|id| id.as_slice())
-        .collect::<HashSet<&[u8]>>();
-    let umi_ranges = ubpatterns(umi_ranges);
-    let barcode_ranges = ubpatterns(barcode_ranges);
-    rprintln!(
-        "Extracting the matching sequence from: {} {}",
-        fq1,
-        fq2.map_or_else(|| String::from(""), |s| format!("and {}", s))
-    );
     let rayon_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
         .map_err(|e| format!("Failed to initialize rayon thread pool: {:?}", e))?;
     rayon_pool.install(|| {
         reads::kractor_reads(
-            id_sets,
+            koutput,
             fq1,
             ofile1,
             fq2,
             ofile2,
-            ubread,
-            umi_ranges,
-            barcode_ranges,
             chunk_size,
             buffer_size,
             batch_size,
@@ -114,15 +103,20 @@ fn kractor_reads(
 #[extendr]
 #[cfg(feature = "bench")]
 fn pprof_kractor_koutput(
-    patterns: Robj,
+    kreport: &str,
     koutput: &str,
+    taxonomy: Robj,
+    ranks: Robj,
+    taxa: Robj,
+    taxids: Robj,
+    descendants: bool,
     ofile: &str,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
-    threads: usize,
     mmap: bool,
+    threads: usize,
     pprof_file: &str,
 ) -> std::result::Result<(), String> {
     let guard = pprof::ProfilerGuardBuilder::default()
@@ -130,15 +124,20 @@ fn pprof_kractor_koutput(
         .build()
         .map_err(|e| format!("cannot create profile guard {:?}", e))?;
     let out = kractor_koutput(
-        patterns,
+        kreport,
         koutput,
+        taxonomy,
+        ranks,
+        taxa,
+        taxids,
+        descendants,
         ofile,
         chunk_size,
         buffer_size,
         batch_size,
         nqueue,
-        threads,
         mmap,
+        threads,
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file)
@@ -161,15 +160,12 @@ fn pprof_kractor_reads(
     ofile1: &str,
     fq2: Option<&str>,
     ofile2: Option<&str>,
-    ubread: Option<&str>,
-    umi_ranges: Robj,
-    barcode_ranges: Robj,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
-    threads: usize,
     mmap: bool,
+    threads: usize,
     pprof_file: &str,
 ) -> std::result::Result<(), String> {
     let guard = pprof::ProfilerGuardBuilder::default()
@@ -182,15 +178,12 @@ fn pprof_kractor_reads(
         ofile1,
         fq2,
         ofile2,
-        ubread,
-        umi_ranges,
-        barcode_ranges,
         chunk_size,
         buffer_size,
         batch_size,
         nqueue,
-        threads,
         mmap,
+        threads,
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file)
