@@ -1,8 +1,8 @@
 use std::fs::File;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use extendr_api::prelude::*;
-use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
+use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 #[cfg(unix)]
 use memmap2::Advice;
 use memmap2::Mmap;
@@ -11,7 +11,7 @@ mod mmap;
 
 use mmap::mmap_seq_refine_single_read;
 
-use crate::reader::bytes::BytesProgressBarReader;
+// use crate::reader::bytes::BytesProgressBarReader;
 use crate::reader::slice::SliceProgressBarReader;
 use crate::seq_action::*;
 
@@ -34,7 +34,8 @@ fn seq_refine(
         .num_threads(threads)
         .build()
         .map_err(|e| format!("Failed to initialize rayon thread pool: {:?}", e))?;
-    let actions1 = robj_to_seq_range_actions(&actions1).map_err(|e| format!("{}", e))?;
+    let actions1 =
+        robj_to_seq_range_actions(&actions1, "actions1").map_err(|e| format!("{}", e))?;
     rayon_pool
         .install(|| {
             seq_refine_single_read(
@@ -68,7 +69,11 @@ fn seq_refine_single_read(
 
     let map = unsafe { Mmap::map(&file) }?;
     #[cfg(unix)]
-    map.advise(Advice::Sequential)?;
+    if Advice::WillNeed.is_supported() {
+        map.advise(Advice::WillNeed)?;
+    } else if Advice::Sequential.is_supported() {
+        map.advise(Advice::Sequential)?;
+    }
     let mut reader = SliceProgressBarReader::new(&map);
     reader.set_label("reads");
     let pb = ProgressBar::new(map.len() as u64).with_finish(ProgressFinish::Abandon);

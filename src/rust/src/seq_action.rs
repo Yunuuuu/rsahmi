@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use extendr_api::prelude::*;
 
 use crate::parser::fastq::FastqRecord;
@@ -336,9 +336,13 @@ impl SubseqTrimAction {
                     } else if start > cursor {
                         keep.push((cursor, start)); // Keep everything before `start`
                     }
+                    cursor = len;
                     break;
                 }
             }
+        }
+        if cursor < len {
+            keep.push((cursor, len))
         }
         let trimmed_seq = keep
             .iter()
@@ -362,16 +366,108 @@ pub(crate) struct SubseqActions {
 }
 
 impl SubseqActions {
-    pub(crate) fn apply_to_fastq<T: AsRef<[u8]>>(
+    pub(crate) fn transform_fastq_slice(
         &self,
-        record: &FastqRecord<T>,
-    ) -> Result<(Vec<Bytes>, Bytes, Bytes)> {
-        let mut tags = Vec::with_capacity(self.embed.len());
-        for action in &self.embed {
-            tags.push(action.tag(record.seq.as_ref())?);
+        record: &FastqRecord<&[u8]>,
+    ) -> Result<FastqRecord<Bytes>> {
+        let description;
+        if self.embed.is_empty() {
+            description = record.desc.map(|d| Bytes::copy_from_slice(d));
+        } else {
+            let mut tags = Vec::with_capacity(self.embed.len());
+            for action in &self.embed {
+                tags.push(action.tag(record.seq)?);
+            }
+
+            // prepare the description
+            let prefix = b"RSAHMI:{";
+            let suffix = b'}';
+            let mut tag = BytesMut::with_capacity(
+                // original description length + prefix length + all tags + separator between each tag + suffix length
+                record.desc.map_or(0, |d| d.len() + 1)
+                    + prefix.len()
+                    + tags.iter().map(|t| t.len()).sum::<usize>()
+                    + tags.len()
+                    - 1
+                    + 1,
+            );
+            if let Some(desc) = record.desc {
+                tag.extend_from_slice(desc);
+                tag.put_u8(b' ');
+            }
+            tag.extend_from_slice(prefix);
+            for (i, t) in tags.iter().enumerate() {
+                if i > 0 {
+                    tag.put_u8(b':');
+                }
+                tag.extend_from_slice(t);
+            }
+            tag.put_u8(suffix);
+            description = Some(tag.freeze());
         }
-        let (seq, qual) = self.trim.trim(record.seq.as_ref(), record.qual.as_ref())?;
-        Ok((tags, seq, qual))
+
+        // prepare sequence and quality
+        let sequence;
+        let quality;
+        if self.trim.ranges.len() > 0 {
+            (sequence, quality) = self.trim.trim(record.seq, record.qual)?;
+        } else {
+            sequence = Bytes::copy_from_slice(record.seq);
+            quality = Bytes::copy_from_slice(record.qual);
+        }
+
+        // construct the output
+        Ok(FastqRecord::new(
+            Bytes::copy_from_slice(record.id),
+            description,
+            sequence,
+            Bytes::copy_from_slice(record.sep),
+            quality,
+        ))
+    }
+
+    pub(crate) fn transform_fastq_bytes(&self, record: &mut FastqRecord<Bytes>) -> Result<()> {
+        if !self.embed.is_empty() {
+            let mut tags = Vec::with_capacity(self.embed.len());
+            for action in &self.embed {
+                tags.push(action.tag(&record.seq)?);
+            }
+
+            // prepare the description
+            let prefix = b"RSAHMI:{";
+            let suffix = b'}';
+            let mut tag = BytesMut::with_capacity(
+                // original description length + prefix length + all tags + separator between each tag + suffix length
+                record.desc.as_ref().map_or(0, |d| d.len() + 1)
+                    + prefix.len()
+                    + tags.iter().map(|t| t.len()).sum::<usize>()
+                    + tags.len()
+                    - 1
+                    + 1,
+            );
+            if let Some(desc) = &record.desc {
+                tag.extend_from_slice(&desc);
+                tag.put_u8(b' ');
+            }
+            tag.extend_from_slice(prefix);
+            for (i, t) in tags.iter().enumerate() {
+                if i > 0 {
+                    tag.put_u8(b':');
+                }
+                tag.extend_from_slice(t);
+            }
+            tag.put_u8(suffix);
+            record.desc = Some(tag.freeze());
+        }
+
+        // prepare sequence and quality
+        if self.trim.ranges.len() > 0 {
+            let (sequence, quality) = self.trim.trim(&record.seq, &record.qual)?;
+            record.seq = sequence;
+            record.qual = quality;
+        }
+
+        Ok(())
     }
 }
 
@@ -432,14 +528,14 @@ enum SeqAction {
 }
 
 // Create object from R
-pub(crate) fn robj_to_seq_range_actions<'r>(ranges: &Robj) -> Result<SubseqActions> {
+pub(crate) fn robj_to_seq_range_actions<'r>(ranges: &Robj, label: &str) -> Result<SubseqActions> {
     let mut out = SubseqActionsBuilder::new();
     for ref robj in ranges
         .as_list()
         .ok_or(anyhow!("Expected a list of sequence range objects."))?
         .values()
     {
-        let (action, sorted) = robj_dissect_range_obj(robj)?;
+        let (action, sorted) = robj_dissect_range_obj(robj, label)?;
         out.add_action(action, sorted)
     }
     Ok(out.build())
@@ -466,8 +562,8 @@ fn extract_ordering(ranges: &Robj) -> Option<Vec<usize>> {
     })
 }
 
-fn robj_dissect_range_obj(ranges: &Robj) -> Result<(SeqAction, SortedSeqRanges)> {
-    let seq_ranges = robj_to_ranges(ranges)?;
+fn robj_dissect_range_obj(ranges: &Robj, label: &str) -> Result<(SeqAction, SortedSeqRanges)> {
+    let seq_ranges = robj_to_ranges(ranges, label)?;
 
     let sorted: SortedSeqRanges = seq_ranges.into();
     sorted.check_overlap()?;
@@ -489,8 +585,17 @@ fn robj_dissect_range_obj(ranges: &Robj) -> Result<(SeqAction, SortedSeqRanges)>
 /// Extract a vector of `RangeKind` from an R object.
 /// The R object must inherit from either `rsahmi_seq_range` or `rsahmi_seq_ranges`.
 /// Returns an error if the object is not structured correctly or if the ranges are malformed.
-fn robj_to_ranges(ranges: &Robj) -> Result<SeqRanges> {
-    if !ranges.inherits("rsahmi_seq_range") && !ranges.inherits("rsahmi_seq_ranges") {
+fn robj_to_ranges(ranges: &Robj, label: &str) -> Result<SeqRanges> {
+    if ranges.inherits("rsahmi_seq_range") {
+        // Only one single range
+        return robj_to_range(ranges, 0, label).map(|range| {
+            let mut ranges = SeqRanges::with_capacity(1);
+            ranges.push(range);
+            ranges
+        });
+    }
+
+    if !ranges.inherits("rsahmi_seq_ranges") {
         return Err(anyhow!(
             "The object does not inherit a valid range class (expected one of: 'rsahmi_seq_range', or 'rsahmi_seq_ranges')."
         ));
@@ -504,54 +609,60 @@ fn robj_to_ranges(ranges: &Robj) -> Result<SeqRanges> {
 
     // Iterate over list elements to build vector of RangeKind
     for (i, element) in list.values().enumerate() {
-        // Each element should itself be a list of 2 elements
-        let pair = element
-            .as_list()
-            .ok_or_else(|| anyhow!("Element {} is not a 2-element list.", i + 1))?;
+        ranges_list.push(robj_to_range(&element, i, label)?);
+    }
+    Ok(ranges_list)
+}
 
-        if pair.len() != 2 {
+fn robj_to_range(range: &Robj, i: usize, label: &str) -> Result<SeqRange> {
+    // Each element should itself be a list of 2 elements
+    let pair = range
+        .as_list()
+        .ok_or_else(|| anyhow!("{}: Element {} is not a 2-element list.", label, i + 1))?;
+
+    if pair.len() != 2 {
+        return Err(anyhow!(
+            "{}: Element {} must contain exactly 2 values (start, end).",
+            label,
+            i + 1
+        ));
+    }
+
+    // SAFETY: We already checked that the length is 2
+    let start = unsafe { pair.get_unchecked(0) };
+    let end = unsafe { pair.get_unchecked(1) };
+
+    let start_usize = if start.is_null() {
+        None
+    } else {
+        let s = start
+            .as_integer_slice()
+            .ok_or_else(|| anyhow!("{}: Element {} start must be an integer.", label, i + 1))?;
+        if s.len() != 1 || s[0] <= 0 {
             return Err(anyhow!(
-                "Element {} must contain exactly 2 values (start, end).",
+                "{}: Element {} start must be a single positive integer.",
+                label,
                 i + 1
             ));
         }
+        Some((s[0] as usize) - 1) // 0-based
+    };
 
-        // SAFETY: We already checked that the length is 2
-        let start = unsafe { pair.get_unchecked(0) };
-        let end = unsafe { pair.get_unchecked(1) };
-
-        let start_usize = if start.is_null() {
-            None
-        } else {
-            let s = start
-                .as_integer_slice()
-                .ok_or_else(|| anyhow!("Element {} start must be an integer.", i + 1))?;
-            if s.len() != 1 || s[0] <= 0 {
-                return Err(anyhow!(
-                    "Element {} start must be a single positive integer.",
-                    i + 1
-                ));
-            }
-            Some((s[0] as usize) - 1) // 0-based
-        };
-
-        let end_usize = if end.is_null() {
-            None
-        } else {
-            let e = end
-                .as_integer_slice()
-                .ok_or_else(|| anyhow!("Element {} end must be an integer.", i + 1))?;
-            if e.len() != 1 || e[0] <= 0 {
-                return Err(anyhow!(
-                    "Element {} end must be a single positive integer.",
-                    i + 1
-                ));
-            }
-            Some(e[0] as usize) // 1-based exclusive
-        };
-        let range = SeqRange::new_checked(start_usize, end_usize)
-            .map_err(|e| anyhow!("Element {}: {}", i + 1, e))?;
-        ranges_list.push(range);
-    }
-    Ok(ranges_list)
+    let end_usize = if end.is_null() {
+        None
+    } else {
+        let e = end
+            .as_integer_slice()
+            .ok_or_else(|| anyhow!("{}: Element {} end must be an integer.", label, i + 1))?;
+        if e.len() != 1 || e[0] <= 0 {
+            return Err(anyhow!(
+                "{}: Element {} end must be a single positive integer.",
+                label,
+                i + 1
+            ));
+        }
+        Some(e[0] as usize) // 1-based exclusive
+    };
+    SeqRange::new_checked(start_usize, end_usize)
+        .map_err(|e| anyhow!("{}: Element {} {}", label, i + 1, e))
 }

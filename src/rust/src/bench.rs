@@ -27,7 +27,12 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
     if mmap {
         let map = unsafe { Mmap::map(&reader) }?;
         #[cfg(unix)]
-        map.advise(Advice::Sequential)?;
+        if Advice::WillNeed.is_supported() {
+            map.advise(Advice::WillNeed)?;
+        } else if Advice::Sequential.is_supported() {
+            map.advise(Advice::Sequential)?;
+        }
+
         let mut pos = 0;
         while pos < map.len() {
             if pos + chunk_size < map.len() {

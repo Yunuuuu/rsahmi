@@ -34,6 +34,8 @@ seq_range <- function(start = NULL, end = NULL) {
     if (is.null(start) && is.null(end)) {
         cli::cli_abort("One of {.arg start} or {.arg end} must be provided")
     }
+    if (!is.null(start)) start <- as.integer(start)
+    if (!is.null(end)) end <- as.integer(end)
     new_seq_range(start, end)
 }
 

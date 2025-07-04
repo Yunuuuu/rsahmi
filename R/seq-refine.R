@@ -1,27 +1,29 @@
 #' Refine Sequences from FASTQ Files with UMI/Barcode Actions
 #'
 #' This function refines one or two FASTQ files by applying trimming and
-#' embedding operations defined via user-specified actions such as `embed()`,
-#' `trim()`, or `embed_trim()`. It supports single-end and paired-end reads,
+#' embedding operations defined via user-specified actions such as [`embed()`],
+#' [`trim()`], or [`embed_trim()`]. It supports single-end and paired-end reads,
 #' processes data in chunks, and uses multithreading for performance.
 #'
 #' @param fq1 Path to the first FASTQ file (required).
 #' @param ofile1 Path to the output FASTQ file for `fq1` (required).
-#' @param fq2 Optional path to the second (paired-end) FASTQ file.  If you want
+#' @param fq2 Optional path to the second (paired-end) FASTQ file. If you want
 #'   to operate only on the second read, you may supply that file path via `fq1`
 #'   instead.
 #' @param ofile2 Optional path to the output FASTQ file for `fq2`.
 #' @param umi_action1,umi_action2 Sequence action for extracting or trimming UMI
-#'   from `fq1`/`fq2`. `umi_action2` is only allowed if `fq2` is provided.
-#'   Specify sequence ranges using `seq_range()` or combine multiple ranges with
-#'   `c()`, this also applies to following all actions. By default, the UMI is
-#'   embedded in the header and trimmed from the sequence and quality. You can
-#'   customize the behavior with `embed()`, `trim()`, or `embed_trim()`.
+#' from `fq1`/`fq2`. `umi_action2` is only allowed if `fq2` is provided.
+#' Specify sequence ranges using [`seq_range()`] or combine multiple ranges with
+#' `c()`, this also applies to following all actions. By default, the UMI is
+#' embedded in the header and trimmed from the sequence and quality
+#' ([`embed_trim()`]). You can customize the behavior with [`embed()`], or
+#' [`trim()`].
 #' @param barcode_action1,barcode_action2 Sequence action for extracting or
-#'   trimming barcodes from `fq1`/`fq2`. `barcode_action2` is only allowed if
-#'   `fq2` is provided. By default, barcodes are embedded in the header and
-#'   trimmed from both the sequence and quality strings. Specify ranges as with
-#'   UMI actions, and customize using `embed()`, `trim()`, or `embed_trim()`.
+#' trimming barcodes from `fq1`/`fq2`. `barcode_action2` is only allowed if
+#' `fq2` is provided. By default, barcodes are embedded in the header and
+#' trimmed from both the sequence and quality strings ([`embed_trim()`]).
+#' Specify ranges as with UMI actions, and customize using [`embed()`], or
+#' [`trim()`].
 #' @param extra_actions1,extra_actions2 Additional sequence actions to apply to
 #'   `fq1`/`fq2`. `extra_actions2` is only allowed if `fq2` is provided. These
 #'   can be a single one or a list of them. By default, these actions
@@ -41,16 +43,17 @@
 #' @param odir A string of directory to save the output files. Please see
 #' `Value` section for details.
 #'
-#' @return No direct return value. Outputs processed FASTQ files as specified by
-#' `ofile1` and `ofile2`.
+#' @return None. Outputs processed FASTQ files as specified by `ofile1` and
+#' `ofile2`.
 #' @details
-#' Actions define what to do with sequence ranges specified using `seq_range()`.
+#' Actions define what to do with sequence ranges specified using
+#' [`seq_range()`].
 #'
 #' - UMI/barcode actions must be a single range (no lists) and default to
-#'   `embed_trim()` if not specified.
-#' - Extra actions can be multiple ranges (use a list) and default to `trim()`
+#'   [`embed_trim()`] if not specified.
+#' - Extra actions can be multiple ranges (use a list) and default to [`trim()`]
 #'   if not specified.
-#' - Use `embed()`, `trim()`, or `embed_trim()` to specify the behavior.
+#' - Use [`embed()`], [`trim()`], or [`embed_trim()`] to specify the behavior.
 #'
 #' @export
 seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
@@ -65,18 +68,19 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
     assert_string(ofile1, allow_empty = FALSE)
     assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
     assert_string(ofile2, allow_empty = FALSE, allow_null = TRUE)
-    umi_action1 <- check_ub_action(umi_action1)
-    barcode_action1 <- check_ub_action(barcode_action1)
+    umi_action1 <- check_ub_action(umi_action1, "UMI")
+    barcode_action1 <- check_ub_action(barcode_action1, "BARCODE")
     extra_actions1 <- check_extra_actions(extra_actions1)
 
-    umi_action2 <- check_ub_action(umi_action2)
-    barcode_action2 <- check_ub_action(barcode_action2)
+    umi_action2 <- check_ub_action(umi_action2, "UMI")
+    barcode_action2 <- check_ub_action(barcode_action2, "BARCODE")
     extra_actions2 <- check_extra_actions(extra_actions2)
     if (is.null(fq2) &&
-        (!is.null(umi_action2) || !is.null(barcode_action2) ||
-            !is.null(extra_actions2))) {
+        (!is.null(ofile2) || !is.null(umi_action2) ||
+            !is.null(barcode_action2) || !is.null(extra_actions2))) {
         cli::cli_abort(c(
             "The following arguments must not be used when {.arg fq2} is {.code NULL}:",
+            "x" = "{.arg ofile2}",
             "x" = "{.arg umi_action2}",
             "x" = "{.arg barcode_action2}",
             "x" = "{.arg extra_actions2}",
@@ -99,15 +103,30 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
         }
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     assert_bool(mmap)
-    if (is.null(odir)) odir <- getwd()
+    odir <- odir %||% getwd()
     dir_create(odir)
+    chunk_size <- chunk_size %||% CHUNK_SIZE
+    buffer_size <- buffer_size %||% BUFFER_SIZE
+    batch_size <- batch_size %||% BATCH_SIZE
+    threads <- threads %||% 0L # Let rayon to determine the threads
     actions1 <- c(list(umi_action1, barcode_action1), extra_actions1)
+    actions1 <- actions1[
+        !vapply(actions1, is.null, logical(1L), USE.NAMES = FALSE)
+    ]
+    if (length(actions1) == 0L) actions1 <- NULL
     actions2 <- c(list(umi_action2, barcode_action2), extra_actions2)
+    actions2 <- actions2[
+        !vapply(actions2, is.null, logical(1L), USE.NAMES = FALSE)
+    ]
+    if (length(actions2) == 0L) actions2 <- NULL
+    if (is.null(actions1) && is.null(actions2)) {
+        cli::cli_abort("Nothing to do, no actions specified")
+    }
     rust_call(
         "seq_refine",
         fq1 = fq1, ofile1 = ofile1,
-        fq2 = fq2, ofile2 = ofile2,
-        actions1 = actions1, actions2 = actions2,
+        `_fq2` = fq2, `_ofile2` = ofile2,
+        actions1 = actions1, `_actions2` = actions2,
         chunk_size = chunk_size,
         buffer_size = buffer_size,
         batch_size = batch_size,
@@ -115,121 +134,19 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
         mmap = mmap,
         threads = threads
     )
+
+    cli::cli_inform(c("v" = "Finished"))
 }
 
-#' Define sequence range behavior: embed, trim, or both
-#'
-#' These functions annotate a range or a list of ranges to indicate how
-#' the specified subsequences (e.g. UMI or barcode) should be handled during
-#' FASTQ processing.
-#'
-#' - `embed()` extracts the sequence and appends it to the read header without
-#'   modifying the sequence.
-#' - `trim()` removes the specified subsequence from the read but does not store
-#'   it.
-#' - `embed_trim()` both extracts the subsequence for the header and removes it
-#'   from the read.
-#'
-#' Each function wraps the input range object in a new class to indicate its
-#' behavior downstream.
-#' @param ranges A range or a list of ranges specifying the subsequence(s) to
-#' process. Must be created using the `seq_range()` function.
-#' @param tag An optional character label to use when embedding in the header
-#' (for `embed()` and `embed_trim()`).
-#'
-#' @return An annotated `rsahmi_seq_range` or `rsahmi_seq_ranges` object. object
-#' with behavior-specific class:
-#' \itemize{
-#'   \item `rsahmi_embed` — for embedding only
-#'   \item `rsahmi_trim` — for trimming only
-#'   \item `rsahmi_embed_trim` — for embedding and trimming
-#' }
-#' @name subseq_actions
-#' @export
-embed <- function(ranges, tag = NULL) {
-    assert_string(tag, allow_empty = FALSE, allow_null = TRUE)
-    UseMethod("embed")
-}
-
-#' @export
-embed.rsahmi_seq_range <- function(ranges, tag = NULL) {
-    structure(
-        ranges,
-        tag = tag,
-        class = c("rsahmi_embed", "rsahmi_seq_action", "rsahmi_seq_range")
-    )
-}
-
-#' @export
-embed.rsahmi_seq_ranges <- function(ranges, tag = NULL) {
-    structure(
-        ranges,
-        tag = tag,
-        class = c("rsahmi_embed", "rsahmi_seq_action", "rsahmi_seq_ranges")
-    )
-}
-
-#' @rdname subseq_actions
-#' @export
-trim <- function(ranges) UseMethod("trim")
-
-#' @export
-trim.rsahmi_seq_range <- function(ranges) {
-    structure(
-        ranges,
-        class = c("rsahmi_trim", "rsahmi_seq_action", "rsahmi_seq_range")
-    )
-}
-
-#' @export
-trim.rsahmi_seq_ranges <- function(ranges) {
-    structure(
-        ranges,
-        class = c("rsahmi_trim", "rsahmi_seq_action", "rsahmi_seq_ranges")
-    )
-}
-
-#' @rdname subseq_actions
-#' @export
-embed_trim <- function(ranges, tag = NULL) {
-    assert_string(tag, allow_empty = FALSE, allow_null = TRUE)
-    UseMethod("embed_and_trim")
-}
-
-#' @export
-embed_trim.rsahmi_seq_range <- function(ranges, tag = NULL) {
-    structure(
-        ranges,
-        tag = tag,
-        class = c("rsahmi_embed_trim", "rsahmi_seq_action", "rsahmi_seq_range")
-    )
-}
-
-#' @export
-embed_trim.rsahmi_seq_ranges <- function(ranges, tag = NULL) {
-    structure(
-        ranges,
-        tag = tag,
-        class = c("rsahmi_embed_trim", "rsahmi_seq_action", "rsahmi_seq_ranges")
-    )
-}
-
-#' @export
-c.rsahmi_seq_action <- function(...) {
-    cli::cli_abort(c(
-        "Combining multiple {.cls rsahmi_seq_action} objects with {.fn c} is not supported.",
-        i = "Use {.fn list} to collect multiple actions instead."
-    ))
-}
-
-is_action <- function(action) inherits(action, "rsahmi_seq_action")
-
-check_ub_action <- function(action, arg = caller_arg(action),
+check_ub_action <- function(action, tag, arg = caller_arg(action),
                             call = caller_env()) {
-    if (is.null(action) || is_action(action)) {
+    if (is.null(action)) {
+        action
+    } else if (is_action(action)) {
+        attr(action, "tag") <- attr(action, "tag", exact = TRUE) %||% tag
         action
     } else if (is_range(action)) {
-        embed_trim(action)
+        embed_trim(action, tag)
     } else {
         cli::cli_abort(c(
             "{.arg barcode_action2} must be created with {.fn seq_range} or a combination of them using {.fn c}.",

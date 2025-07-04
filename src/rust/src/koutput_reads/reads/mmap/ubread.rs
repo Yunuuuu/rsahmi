@@ -36,12 +36,21 @@ pub fn mmap_kractor_ubread_read(
     let file1 = File::open(fq)?;
     let map1 = unsafe { Mmap::map(&file1) }?;
     #[cfg(unix)]
-    map1.advise(Advice::Sequential)?;
+    if Advice::WillNeed.is_supported() {
+        map1.advise(Advice::WillNeed)?;
+    } else if Advice::Sequential.is_supported() {
+        map1.advise(Advice::Sequential)?;
+    }
 
     let file2 = File::open(ubread)?;
     let map2 = unsafe { Mmap::map(&file2) }?;
     #[cfg(unix)]
-    map2.advise(Advice::Sequential)?;
+    if Advice::WillNeed.is_supported() {
+        map2.advise(Advice::WillNeed)?;
+    } else if Advice::Sequential.is_supported() {
+        map2.advise(Advice::Sequential)?;
+    }
+
     let progress_style = ProgressStyle::with_template(
         "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
     )?;

@@ -215,7 +215,11 @@ pub(crate) fn kractor_koutput(
     if mmap {
         let map = unsafe { Mmap::map(&file) }?;
         #[cfg(unix)]
-        map.advise(Advice::Sequential)?;
+        if Advice::WillNeed.is_supported() {
+            map.advise(Advice::WillNeed)?;
+        } else if Advice::Sequential.is_supported() {
+            map.advise(Advice::Sequential)?;
+        }
         let reader = SliceProgressBarReader::new(&map);
 
         mmap_kractor_koutput(
@@ -334,7 +338,6 @@ mod tests {
         )?;
 
         let output = read_to_string(output_path)?;
-        println!("{:?}", output.clone());
         assert!(output.contains("taxid12345"));
         assert!(output.contains("taxid99999"));
         assert!(!output.contains("taxid54321"));
@@ -357,7 +360,11 @@ mod tests {
         let file = File::open(input_path).unwrap();
         let map = unsafe { Mmap::map(&file) }?;
         #[cfg(unix)]
-        map.advise(Advice::Sequential)?;
+        if Advice::WillNeed.is_supported() {
+            map.advise(Advice::WillNeed)?;
+        } else if Advice::Sequential.is_supported() {
+            map.advise(Advice::Sequential)?;
+        }
         let reader = SliceProgressBarReader::new(&map);
         mmap_kractor_koutput(
             matcher,

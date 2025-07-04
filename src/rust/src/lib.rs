@@ -3,7 +3,7 @@ use extendr_api::prelude::*;
 
 mod batchsender;
 mod bench;
-mod koutput_reads;
+// mod koutput_reads;
 mod kractor;
 mod kreport;
 mod parser;

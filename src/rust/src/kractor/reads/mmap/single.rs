@@ -6,7 +6,6 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
 use rustc_hash::FxHashSet as HashSet;
-use anyhow::Error;
 
 use crate::batchsender::BatchSender;
 use crate::parser::fasta::FastaRecord;

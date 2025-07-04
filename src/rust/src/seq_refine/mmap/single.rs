@@ -16,7 +16,7 @@ use crate::seq_action::*;
 pub fn mmap_seq_refine_single_read(
     reader: SliceProgressBarReader,
     ofile: &str,
-    ref actions: SubseqActions, // ✅ Use your unified struct
+    ref actions: SubseqActions,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
@@ -29,8 +29,8 @@ pub fn mmap_seq_refine_single_read(
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
         let (parser_tx, writer_rx): (
-            Sender<Vec<(FastqRecord<&[u8]>, (Vec<Bytes>, Bytes, Bytes))>>,
-            Receiver<Vec<(FastqRecord<&[u8]>, (Vec<Bytes>, Bytes, Bytes))>>,
+            Sender<Vec<FastqRecord<Bytes>>>,
+            Receiver<Vec<FastqRecord<Bytes>>>,
         ) = crate::new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
@@ -38,21 +38,7 @@ pub fn mmap_seq_refine_single_read(
         let writer_handle = scope.spawn(move || -> Result<()> {
             // Iterate over each received batch of records
             for chunk in writer_rx {
-                for (mut record, (tags, seq, qual)) in chunk {
-                    let desc = record.desc.map_or_else(
-                        || tags.iter().flatten().copied().collect::<Bytes>(),
-                        |d| {
-                            d.as_ref()
-                                .into_iter()
-                                .chain(std::iter::once(&b' '))
-                                .chain(tags.iter().flatten())
-                                .copied()
-                                .collect::<Bytes>()
-                        },
-                    );
-                    record.desc = Some(&desc);
-                    record.seq = &seq;
-                    record.qual = &qual;
+                for record in chunk {
                     record.write(&mut writer)?;
                 }
             }
@@ -87,10 +73,10 @@ pub fn mmap_seq_refine_single_read(
                             match chunk.read_record() {
                                 Ok(opt_record) => match opt_record {
                                     Some(record) => {
-                                        match actions.apply_to_fastq(&record) {
-                                            Ok((tags, seq, qual)) => {
+                                        match actions.transform_fastq_slice(&record) {
+                                            Ok(record) => {
                                                 // Attempt to send the matching record to the writer thread.
-                                                match thread_tx.send((record, (tags, seq, qual))) {
+                                                match thread_tx.send(record) {
                                                     Ok(_) => continue,
                                                     Err(_) => {
                                                         // If this fails, it means the writer thread has already exited due to an error.

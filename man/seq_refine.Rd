@@ -29,7 +29,7 @@ seq_refine(
 
 \item{ofile1}{Path to the output FASTQ file for \code{fq1} (required).}
 
-\item{fq2}{Optional path to the second (paired-end) FASTQ file.  If you want
+\item{fq2}{Optional path to the second (paired-end) FASTQ file. If you want
 to operate only on the second read, you may supply that file path via \code{fq1}
 instead.}
 
@@ -37,16 +37,18 @@ instead.}
 
 \item{umi_action1, umi_action2}{Sequence action for extracting or trimming UMI
 from \code{fq1}/\code{fq2}. \code{umi_action2} is only allowed if \code{fq2} is provided.
-Specify sequence ranges using \code{seq_range()} or combine multiple ranges with
+Specify sequence ranges using \code{\link[=seq_range]{seq_range()}} or combine multiple ranges with
 \code{c()}, this also applies to following all actions. By default, the UMI is
-embedded in the header and trimmed from the sequence and quality. You can
-customize the behavior with \code{embed()}, \code{trim()}, or \code{embed_trim()}.}
+embedded in the header and trimmed from the sequence and quality
+(\code{\link[=embed_trim]{embed_trim()}}). You can customize the behavior with \code{\link[=embed]{embed()}}, or
+\code{\link[=trim]{trim()}}.}
 
 \item{barcode_action1, barcode_action2}{Sequence action for extracting or
 trimming barcodes from \code{fq1}/\code{fq2}. \code{barcode_action2} is only allowed if
 \code{fq2} is provided. By default, barcodes are embedded in the header and
-trimmed from both the sequence and quality strings. Specify ranges as with
-UMI actions, and customize using \code{embed()}, \code{trim()}, or \code{embed_trim()}.}
+trimmed from both the sequence and quality strings (\code{\link[=embed_trim]{embed_trim()}}).
+Specify ranges as with UMI actions, and customize using \code{\link[=embed]{embed()}}, or
+\code{\link[=trim]{trim()}}.}
 
 \item{extra_actions1, extra_actions2}{Additional sequence actions to apply to
 \code{fq1}/\code{fq2}. \code{extra_actions2} is only allowed if \code{fq2} is provided. These
@@ -74,22 +76,23 @@ atomatically by rayon.}
 \code{Value} section for details.}
 }
 \value{
-No direct return value. Outputs processed FASTQ files as specified by
-\code{ofile1} and \code{ofile2}.
+None. Outputs processed FASTQ files as specified by \code{ofile1} and
+\code{ofile2}.
 }
 \description{
 This function refines one or two FASTQ files by applying trimming and
-embedding operations defined via user-specified actions such as \code{embed()},
-\code{trim()}, or \code{embed_trim()}. It supports single-end and paired-end reads,
+embedding operations defined via user-specified actions such as \code{\link[=embed]{embed()}},
+\code{\link[=trim]{trim()}}, or \code{\link[=embed_trim]{embed_trim()}}. It supports single-end and paired-end reads,
 processes data in chunks, and uses multithreading for performance.
 }
 \details{
-Actions define what to do with sequence ranges specified using \code{seq_range()}.
+Actions define what to do with sequence ranges specified using
+\code{\link[=seq_range]{seq_range()}}.
 \itemize{
 \item UMI/barcode actions must be a single range (no lists) and default to
-\code{embed_trim()} if not specified.
-\item Extra actions can be multiple ranges (use a list) and default to \code{trim()}
+\code{\link[=embed_trim]{embed_trim()}} if not specified.
+\item Extra actions can be multiple ranges (use a list) and default to \code{\link[=trim]{trim()}}
 if not specified.
-\item Use \code{embed()}, \code{trim()}, or \code{embed_trim()} to specify the behavior.
+\item Use \code{\link[=embed]{embed()}}, \code{\link[=trim]{trim()}}, or \code{\link[=embed_trim]{embed_trim()}} to specify the behavior.
 }
 }
