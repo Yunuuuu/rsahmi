@@ -3,8 +3,6 @@ use std::fs::File;
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
 use memchr::{memchr, memchr2, memmem};
-#[cfg(unix)]
-use memmap2::Advice;
 use memmap2::Mmap;
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
@@ -78,51 +76,6 @@ pub(crate) fn kractor_koutput(
             .collect();
     }
 
-    let taxid_to_descendants;
-    if descendants {
-        // Build a map: taxid → set of its ancestor taxids
-        let taxid_to_ancestors = kreports
-            .iter()
-            .map(|report| {
-                // Each report's `taxids` field holds the lineage (ancestors) of this taxon
-                let ancestors = report
-                    .taxids
-                    .iter()
-                    .map(|x| x.as_slice())
-                    .collect::<HashSet<&[u8]>>();
-                // Map: current taxid → set of its ancestors
-                (report.taxid.as_slice(), ancestors)
-            })
-            .collect::<HashMap<&[u8], HashSet<&[u8]>>>();
-
-        // For each taxid, find all other taxids that consider it an ancestor
-        // i.e., build a reverse lookup: taxid → set of descendant taxids
-        taxid_to_descendants = Some(
-            kreports
-                .iter()
-                .map(|report| {
-                    let taxid = report.taxid.as_slice();
-                    // Iterate over all taxids and check whose ancestor set includes the current taxid
-                    let descendants = taxid_to_ancestors
-                        .iter()
-                        .filter_map(|(child, parents)| {
-                            if parents.contains(taxid) {
-                                Some(*child)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<HashSet<&[u8]>>();
-
-                    // Map: current taxid → set of its descendant taxids
-                    (report.taxid.as_slice(), descendants)
-                })
-                .collect::<HashMap<&[u8], HashSet<&[u8]>>>(),
-        );
-    } else {
-        taxid_to_descendants = None
-    }
-
     let mut targeted_taxids: Vec<&[u8]>;
     if ranks.is_some() || taxa.is_some() || taxids.is_some() {
         // Parse set of desired taxonomic ranks
@@ -162,10 +115,47 @@ pub(crate) fn kractor_koutput(
         targeted_taxids = kreports.iter().map(|kr| kr.taxid.as_slice()).collect();
     }
 
-    if let Some(map) = taxid_to_descendants {
+    if descendants {
+        // Build a map: taxid → set of its ancestor taxids
+        let taxid_to_ancestors = kreports
+            .iter()
+            .map(|report| {
+                // Each report's `taxids` field holds the lineage (ancestors) of this taxon
+                let ancestors = report
+                    .taxids
+                    .iter()
+                    .map(|x| x.as_slice())
+                    .collect::<HashSet<&[u8]>>();
+                // Map: current taxid → set of its ancestors
+                (report.taxid.as_slice(), ancestors)
+            })
+            .collect::<HashMap<&[u8], HashSet<&[u8]>>>();
+
+        // For each taxid, find all other taxids that consider it an ancestor
+        // i.e., build a reverse lookup: taxid → set of descendant taxids
+        let taxid_to_descendants = kreports
+            .iter()
+            .map(|report| {
+                let taxid = report.taxid.as_slice();
+                // Iterate over all taxids and check whose ancestor set includes the current taxid
+                let descendants = taxid_to_ancestors
+                    .iter()
+                    .filter_map(|(child, parents)| {
+                        if parents.contains(taxid) {
+                            Some(*child)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<HashSet<&[u8]>>();
+
+                // Map: current taxid → set of its descendant taxids
+                (report.taxid.as_slice(), descendants)
+            })
+            .collect::<HashMap<&[u8], HashSet<&[u8]>>>();
         targeted_taxids = targeted_taxids
             .into_iter()
-            .filter_map(|taxid| map.get(taxid))
+            .filter_map(|taxid| taxid_to_descendants.get(taxid))
             .flatten()
             .copied()
             .collect()
