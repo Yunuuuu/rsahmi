@@ -10,13 +10,13 @@ use memchr::memrchr;
 
 use super::kractor_match_aho;
 use crate::batchsender::BatchSender;
-use crate::reader::bytes::{BytesLineReader, BytesProgressBarReader};
+use crate::reader::bytes::{BytesLineReader, BytesReader};
 
 #[allow(clippy::too_many_arguments)]
 pub fn reader_kractor_koutput<R: Read + Send>(
     include_aho: AhoCorasick,
     exclude_aho: Option<AhoCorasick>,
-    reader: BytesProgressBarReader<R>,
+    reader: R,
     ofile: &str,
     chunk_size: usize,
     buffer_size: usize,
@@ -43,6 +43,8 @@ pub fn reader_kractor_koutput<R: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let mut reader = BytesReader::new(reader);
+        reader.set_label("reads");
         let mut reader = KoutputBytesChunkReader::with_capacity(chunk_size, reader);
         let parser_handle = scope.spawn(move || {
             // will move `reader`, `parser_tx`, `include_aho` and `exclude_aho`
@@ -109,16 +111,16 @@ where
     R: Read,
 {
     chunk_size: usize,
-    reader: BytesProgressBarReader<R>,
+    reader: BytesReader<R>,
 }
 
 impl<R: Read> KoutputBytesChunkReader<R> {
     #[allow(dead_code)]
-    pub fn new(reader: BytesProgressBarReader<R>) -> Self {
+    pub fn new(reader: BytesReader<R>) -> Self {
         Self::with_capacity(8 * 1024, reader)
     }
 
-    pub fn with_capacity(capacity: usize, reader: BytesProgressBarReader<R>) -> Self {
+    pub fn with_capacity(capacity: usize, reader: BytesReader<R>) -> Self {
         Self {
             chunk_size: capacity,
             reader,
@@ -163,8 +165,7 @@ mod tests {
     fn test_bytes_chunk_reader_basic() -> Result<()> {
         let data = b"line1\nline2\nline3\nline4\nline5\n";
         let cursor = Cursor::new(data.as_ref());
-        let mut reader =
-            KoutputBytesChunkReader::with_capacity(10, BytesProgressBarReader::new(cursor));
+        let mut reader = KoutputBytesChunkReader::with_capacity(10, BytesReader::new(cursor));
 
         let mut all_lines = Vec::new();
 
@@ -187,8 +188,7 @@ mod tests {
     fn test_bytes_chunk_reader_no_final_newline() -> Result<()> {
         let data = b"line1\nline2\nlast_line_without_newline";
         let cursor = Cursor::new(data.as_ref());
-        let mut reader =
-            KoutputBytesChunkReader::with_capacity(10, BytesProgressBarReader::new(cursor));
+        let mut reader = KoutputBytesChunkReader::with_capacity(10, BytesReader::new(cursor));
 
         let mut all_lines = Vec::new();
 
@@ -213,7 +213,7 @@ mod tests {
     fn test_bytes_chunk_reader_empty() -> Result<()> {
         let data = b"";
         let cursor = Cursor::new(data.as_ref());
-        let mut reader = KoutputBytesChunkReader::new(BytesProgressBarReader::new(cursor));
+        let mut reader = KoutputBytesChunkReader::new(BytesReader::new(cursor));
 
         match reader.chunk_reader()? {
             None => Ok(()), // expected None means iterator exhausted

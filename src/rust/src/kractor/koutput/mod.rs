@@ -2,6 +2,7 @@ use std::fs::File;
 
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
+use indicatif::{ProgressBar, ProgressFinish};
 use memchr::{memchr, memchr2, memmem};
 use memmap2::Mmap;
 use rustc_hash::FxHashMap as HashMap;
@@ -12,7 +13,7 @@ pub(crate) mod mmap;
 use io::reader_kractor_koutput;
 use mmap::mmap_kractor_koutput;
 
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader::bytes::ProgressBarReader;
 use crate::reader::slice::SliceProgressBarReader;
 
 #[allow(clippy::too_many_arguments)]
@@ -218,11 +219,15 @@ pub(crate) fn kractor_koutput(
             nqueue,
         )
     } else {
-        let reader = BytesProgressBarReader::new(&file);
+        let style = crate::progress_style()?;
+        let pb =
+            ProgressBar::new(file.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon);
+        pb.set_prefix("Parsing koutput");
+        pb.set_style(style);
         reader_kractor_koutput(
             include_aho,
             exclude_aho,
-            reader,
+            ProgressBarReader::new(&file, pb),
             ofile,
             chunk_size,
             buffer_size,
@@ -310,11 +315,10 @@ mod tests {
             .kind(Some(AhoCorasickKind::DFA))
             .build(patterns)?;
         let file = File::open(input_path).unwrap();
-        let reader = BytesProgressBarReader::new(file);
         reader_kractor_koutput(
             matcher,
             None,
-            reader,
+            file,
             output_path.to_str().unwrap(),
             2,
             64,

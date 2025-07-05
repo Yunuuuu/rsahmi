@@ -12,13 +12,13 @@ use crate::batchsender::BatchSender;
 use crate::parser::fasta::FastaRecord;
 use crate::parser::fastq::FastqBytesChunkReader;
 use crate::parser::fastq::FastqContainer;
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader::bytes::BytesReader;
 
 /// Reads a single-end FASTQ file in chunks, filters records by ID set, and writes matching records to output.
 /// This function uses thread + rayon + channel architecture for parallelism.
 pub fn reader_kractor_single_read<R: Read + Send>(
     id_sets: HashSet<&[u8]>,
-    reader: BytesProgressBarReader<R>,
+    reader: R,
     ofile: &str,
     chunk_size: usize,
     buffer_size: usize,
@@ -52,7 +52,7 @@ pub fn reader_kractor_single_read<R: Read + Send>(
         // Reads and splits the input FASTQ into chunks.
         // Each chunk is parsed in parallel using Rayon.
         // Matching records (based on `id_sets`) are sent to the writer via the channel.
-        let mut reader = FastqBytesChunkReader::with_capacity(chunk_size, reader);
+        let mut reader = FastqBytesChunkReader::with_capacity(chunk_size, BytesReader::new(reader));
 
         let parser_handle = scope.spawn(move || -> Result<()> {
             // will move `reader`, `parser_tx`, and `id_sets`

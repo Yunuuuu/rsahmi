@@ -11,11 +11,11 @@ use crate::batchsender::BatchSender;
 use crate::parser::fastq::FastqBytesChunkReader;
 use crate::parser::fastq::FastqContainer;
 use crate::parser::fastq::FastqRecord;
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader::bytes::BytesReader;
 use crate::seq_action::*;
 
-pub(super) fn reader_seq_refine_single_read<R: Read + Send>(
-    reader: BytesProgressBarReader<R>,
+pub(crate) fn reader_seq_refine_single_read<R: Read + Send>(
+    reader: R,
     ofile: &str,
     ref actions: SubseqActions,
     chunk_size: usize,
@@ -48,6 +48,8 @@ pub(super) fn reader_seq_refine_single_read<R: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let mut reader = BytesReader::new(reader);
+        reader.set_label("fq1");
         let mut reader = FastqBytesChunkReader::with_capacity(chunk_size, reader);
 
         let parser_handle = scope.spawn(move || -> Result<()> {
@@ -147,7 +149,7 @@ mod tests {
     #[test]
     fn test_reader_seq_refine_single_read_embed_trim() -> Result<()> {
         let fastq_data = b"@SEQ_ID\nACGTGATCGT\n+\nFFFFFFFFFF\n";
-        let reader = BytesProgressBarReader::new(Cursor::new(&fastq_data[..]));
+        let reader = Cursor::new(&fastq_data[..]);
 
         let tmpfile = tempfile::NamedTempFile::new()?;
         let out_path = tmpfile.path().to_str().unwrap();

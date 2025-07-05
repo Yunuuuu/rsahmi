@@ -9,13 +9,13 @@ use crossbeam_channel::{Receiver, Sender};
 
 use crate::batchsender::BatchSender;
 use crate::parser::fastq::{FastqBytesChunkPairedReader, FastqContainer, FastqRecord};
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader::bytes::BytesReader;
 use crate::seq_action::*;
 
-pub(super) fn reader_seq_refine_paired_read<R: Read + Send>(
-    reader1: BytesProgressBarReader<R>,
+pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
+    reader1: R1,
     ofile1: Option<&str>,
-    reader2: BytesProgressBarReader<R>,
+    reader2: R2,
     ofile2: Option<&str>,
     ref actions: SubseqPairedActions,
     chunk_size: usize,
@@ -64,6 +64,10 @@ pub(super) fn reader_seq_refine_paired_read<R: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let mut reader1 = BytesReader::new(reader1);
+        reader1.set_label("fq1");
+        let mut reader2 = BytesReader::new(reader2);
+        reader2.set_label("fq2");
         let mut reader = FastqBytesChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
 
         let parser_handle = scope.spawn(move || {

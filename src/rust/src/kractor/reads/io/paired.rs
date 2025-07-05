@@ -11,13 +11,13 @@ use rustc_hash::FxHashSet as HashSet;
 use crate::batchsender::BatchSender;
 use crate::parser::fasta::FastaRecord;
 use crate::parser::fastq::{FastqBytesChunkPairedReader, FastqContainer};
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader::bytes::BytesReader;
 
 pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
     id_sets: HashSet<&[u8]>,
-    reader1: BytesProgressBarReader<R1>,
+    reader1: R1,
     ofile1: &str,
-    reader2: BytesProgressBarReader<R2>,
+    reader2: R2,
     ofile2: &str,
     chunk_size: usize,
     buffer_size: usize,
@@ -51,6 +51,10 @@ pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams FASTQ data, filters by ID set, sends batches to writer
+        let mut reader1 = BytesReader::new(reader1);
+        reader1.set_label("fq1");
+        let mut reader2 = BytesReader::new(reader2);
+        reader2.set_label("fq2");
         let mut reader = FastqBytesChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
 
         let parser_handle = scope.spawn(move || {
@@ -179,9 +183,9 @@ mod tests {
         // Run the paired reader
         reader_kractor_paired_read(
             id_set,
-            BytesProgressBarReader::new(File::open(fq1_path.to_str().unwrap()).unwrap()),
+            File::open(fq1_path.to_str().unwrap()).unwrap(),
             ofile1_path.to_str().unwrap(),
-            BytesProgressBarReader::new(File::open(fq2_path.to_str().unwrap()).unwrap()),
+            File::open(fq2_path.to_str().unwrap()).unwrap(),
             ofile2_path.to_str().unwrap(),
             2,
             4096,

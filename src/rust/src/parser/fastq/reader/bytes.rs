@@ -5,21 +5,21 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
 use crate::parser::fastq::{FastqContainer, FastqParseError, FastqRecord};
-use crate::reader::bytes::{BytesBreaksReader, BytesProgressBarReader};
+use crate::reader::bytes::{BytesBreaksReader, BytesReader};
 
 pub(crate) struct FastqBytesChunkReader<R: Read> {
     line_offset: usize,
     chunk_size: usize,
-    reader: BytesProgressBarReader<R>,
+    reader: BytesReader<R>,
 }
 
 impl<R: Read> FastqBytesChunkReader<R> {
     #[allow(dead_code)]
-    pub(crate) fn new(reader: BytesProgressBarReader<R>) -> Self {
+    pub(crate) fn new(reader: BytesReader<R>) -> Self {
         Self::with_capacity(8 * 1024, reader)
     }
 
-    pub(crate) fn with_capacity(capacity: usize, reader: BytesProgressBarReader<R>) -> Self {
+    pub(crate) fn with_capacity(capacity: usize, reader: BytesReader<R>) -> Self {
         Self {
             line_offset: 0,
             chunk_size: capacity,
@@ -79,23 +79,20 @@ pub(crate) struct FastqBytesChunkPairedReader<R1: Read, R2: Read> {
     line_offset1: usize,
     line_offset2: usize,
     chunk_size: usize,
-    reader1: BytesProgressBarReader<R1>,
-    reader2: BytesProgressBarReader<R2>,
+    reader1: BytesReader<R1>,
+    reader2: BytesReader<R2>,
 }
 
 impl<R1: Read, R2: Read> FastqBytesChunkPairedReader<R1, R2> {
     #[allow(dead_code)]
-    pub(crate) fn new(
-        reader1: BytesProgressBarReader<R1>,
-        reader2: BytesProgressBarReader<R2>,
-    ) -> Self {
+    pub(crate) fn new(reader1: BytesReader<R1>, reader2: BytesReader<R2>) -> Self {
         Self::with_capacity(8 * 1024, reader1, reader2)
     }
 
     pub(crate) fn with_capacity(
         capacity: usize,
-        reader1: BytesProgressBarReader<R1>,
-        reader2: BytesProgressBarReader<R2>,
+        reader1: BytesReader<R1>,
+        reader2: BytesReader<R2>,
     ) -> Self {
         Self {
             line_offset1: 0,
@@ -520,8 +517,7 @@ mod tests {
             "@SEQ_ID1\nGATTA\n+\n!!!!!\n@SEQ_ID2\nACGTA\n+\n#####\n"
         )?;
 
-        let mut chunk_reader =
-            FastqBytesChunkReader::new(BytesProgressBarReader::new(File::open(&path)?));
+        let mut chunk_reader = FastqBytesChunkReader::new(BytesReader::new(File::open(&path)?));
         let reader = chunk_reader.chunk_reader()?.unwrap();
         let mut container = FastqContainer::new();
         let record1 = reader.read_record(&mut container).unwrap().unwrap();
@@ -554,8 +550,8 @@ mod tests {
         writeln!(f2, "@SEQ_ID1\nTTTAA\n+\n%%%%%\n@SEQ_ID2\nGGCCC\n+\n&&&&&")?;
 
         let mut paired_reader = FastqBytesChunkPairedReader::new(
-            BytesProgressBarReader::new(File::open(&path1)?),
-            BytesProgressBarReader::new(File::open(&path2)?),
+            BytesReader::new(File::open(&path1)?),
+            BytesReader::new(File::open(&path2)?),
         );
 
         let chunk = paired_reader.chunk_reader()?.unwrap();

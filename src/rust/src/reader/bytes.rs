@@ -7,6 +7,25 @@ use bytes::{Bytes, BytesMut};
 use indicatif::ProgressBar;
 use memchr::{memchr, memchr_iter};
 
+pub(crate) struct ProgressBarReader<R: Read> {
+    bar: ProgressBar,
+    reader: R,
+}
+
+impl<R: Read> ProgressBarReader<R> {
+    pub(crate) fn new(reader: R, bar: ProgressBar) -> Self {
+        Self { bar, reader }
+    }
+}
+
+impl<R: Read> Read for ProgressBarReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let nbytes = self.reader.read(buf)?;
+        self.bar.inc(nbytes as u64);
+        Ok(nbytes)
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct BytesReader<R: Read> {
@@ -64,63 +83,6 @@ impl<R: Read> BytesReader<R> {
 
     pub(crate) fn take_leftover(&mut self, leftover: BytesMut) {
         self.leftover = leftover;
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct BytesProgressBarReader<R: Read> {
-    bar: Option<ProgressBar>,
-    reader: BytesReader<R>,
-}
-
-impl<R: Read> BytesProgressBarReader<R> {
-    pub(crate) fn new(reader: R) -> Self {
-        Self {
-            bar: None,
-            reader: BytesReader::new(reader),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn attach_bar(&mut self, bar: ProgressBar) {
-        self.bar = Some(bar);
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn detach_bar(&mut self) {
-        self.bar = None
-    }
-
-    pub(crate) fn label(&self) -> Option<&'static str> {
-        self.reader.label()
-    }
-
-    pub(crate) fn set_label(&mut self, label: &'static str) {
-        self.reader.set_label(label)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn unset_label(&mut self) {
-        self.reader.unset_label()
-    }
-    pub(crate) fn borrow_reader(&mut self) -> &mut R {
-        self.reader.borrow_reader()
-    }
-
-    pub(crate) fn read_bytes(&mut self, size: usize) -> std::io::Result<Option<BytesContent>> {
-        let out = self.reader.read_bytes(size);
-        if let Some(bar) = &self.bar {
-            if let Ok(opt) = &out {
-                if let Some(bytes) = opt {
-                    bar.inc(bytes.len() as u64);
-                }
-            }
-        }
-        out
-    }
-
-    pub(crate) fn take_leftover(&mut self, leftover: BytesMut) {
-        self.reader.take_leftover(leftover)
     }
 }
 

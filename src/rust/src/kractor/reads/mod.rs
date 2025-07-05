@@ -14,7 +14,7 @@ use io::{reader_kractor_paired_read, reader_kractor_single_read};
 use memmap2::Mmap;
 use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read};
 
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader::bytes::ProgressBarReader;
 use crate::reader::slice::SliceProgressBarReader;
 
 pub(crate) fn kractor_reads(
@@ -90,21 +90,13 @@ pub(crate) fn kractor_reads(
                 nqueue,
             )
         } else {
-            let mut reader1 = BytesProgressBarReader::new(&file);
-            reader1.set_label("read1");
-
-            let mut reader2 = BytesProgressBarReader::new(&file2);
-            reader2.set_label("read2");
-
             let pb1 = progress.add(
                 ProgressBar::new(file.metadata()?.len() as u64)
                     .with_finish(ProgressFinish::Abandon),
             );
             pb1.set_prefix("Parsing read1");
             pb1.set_style(style.clone());
-
-            #[cfg(not(test))]
-            reader1.attach_bar(pb1);
+            let reader1 = ProgressBarReader::new(&file, pb1);
 
             let pb2 = progress.add(
                 ProgressBar::new(file2.metadata()?.len() as u64)
@@ -112,9 +104,7 @@ pub(crate) fn kractor_reads(
             );
             pb2.set_prefix("Parsing read2");
             pb2.set_style(style);
-
-            #[cfg(not(test))]
-            reader2.attach_bar(pb2);
+            let reader2 = ProgressBarReader::new(&file2, pb2);
 
             reader_kractor_paired_read(
                 id_sets,
@@ -152,16 +142,12 @@ pub(crate) fn kractor_reads(
                 nqueue,
             )
         } else {
-            let mut reader = BytesProgressBarReader::new(&file);
-            reader.set_label("reads");
-
             let pb = ProgressBar::new(file.metadata()?.len() as u64)
                 .with_finish(ProgressFinish::Abandon);
             pb.set_prefix("Parsing reads");
             pb.set_style(style);
 
-            #[cfg(not(test))]
-            reader.attach_bar(pb);
+            let reader = ProgressBarReader::new(&file, pb);
 
             reader_kractor_single_read(
                 id_sets,
