@@ -51,6 +51,7 @@ impl<R: Read> BytesReader<R> {
         self.label = Some(label);
     }
 
+    #[allow(dead_code)]
     pub(crate) fn unset_label(&mut self) {
         self.label = None;
     }
