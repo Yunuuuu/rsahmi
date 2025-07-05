@@ -13,7 +13,7 @@ use crate::parser::fastq::FastqSliceChunkPairedReader;
 use crate::reader::slice::SliceProgressBarReader;
 use crate::seq_action::*;
 
-pub(crate) fn mmap_seq_refine_paired_read(
+pub(super) fn mmap_seq_refine_paired_read(
     reader1: SliceProgressBarReader,
     ofile1: Option<&str>,
     reader2: SliceProgressBarReader,
