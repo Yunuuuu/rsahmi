@@ -6,6 +6,8 @@ use std::sync::Arc;
 use anyhow::{anyhow, Error, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 
 use crate::batchsender::BatchSender;
 use crate::parser::fastq::{FastqBytesChunkPairedReader, FastqContainer, FastqRecord};
@@ -26,13 +28,17 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     // Create output file and wrap in buffered writer
     let mut writer1;
     if let Some(file) = ofile1 {
-        writer1 = Some(BufWriter::with_capacity(buffer_size, File::create(file)?));
+        let file = File::create(&file)?;
+        let bw = BufWriter::with_capacity(buffer_size, file);
+        writer1 = Some(GzEncoder::new(bw, Compression::best()));
     } else {
         writer1 = None
     }
     let mut writer2;
     if let Some(file) = ofile2 {
-        writer2 = Some(BufWriter::with_capacity(buffer_size, File::create(file)?));
+        let file = File::create(&file)?;
+        let bw = BufWriter::with_capacity(buffer_size, file);
+        writer2 = Some(GzEncoder::new(bw, Compression::best()));
     } else {
         writer2 = None
     }

@@ -1,8 +1,9 @@
 use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
-use flate2::read::MultiGzDecoder;
+use flate2::bufread::MultiGzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 
 pub(crate) mod paired;
@@ -71,7 +72,7 @@ fn reader_seq_refine_single_read(
 
     if crate::gz_compressed(path) {
         single::reader_seq_refine_single_read(
-            MultiGzDecoder::new(reader),
+            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader)),
             ofile1,
             actions,
             chunk_size,
@@ -134,9 +135,9 @@ fn reader_seq_refine_paired_read(
     let actions = SubseqPairedActions::new(actions1, actions2);
     match (crate::gz_compressed(path1), crate::gz_compressed(path2)) {
         (true, true) => paired::reader_seq_refine_paired_read(
-            MultiGzDecoder::new(reader1),
+            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader1)),
             ofile1,
-            MultiGzDecoder::new(reader2),
+            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader2)),
             ofile2,
             actions,
             chunk_size,
@@ -145,7 +146,7 @@ fn reader_seq_refine_paired_read(
             nqueue,
         ),
         (true, false) => paired::reader_seq_refine_paired_read(
-            MultiGzDecoder::new(reader1),
+            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader1)),
             ofile1,
             reader2,
             ofile2,
@@ -158,7 +159,7 @@ fn reader_seq_refine_paired_read(
         (false, true) => paired::reader_seq_refine_paired_read(
             reader1,
             ofile1,
-            MultiGzDecoder::new(reader2),
+            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader2)),
             ofile2,
             actions,
             chunk_size,

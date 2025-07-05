@@ -6,6 +6,8 @@ use std::sync::Arc;
 use anyhow::{anyhow, Error, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 
 use crate::batchsender::BatchSender;
 use crate::parser::fastq::FastqBytesChunkReader;
@@ -24,7 +26,8 @@ pub(crate) fn reader_seq_refine_single_read<R: Read + Send>(
     nqueue: Option<usize>,
 ) -> Result<()> {
     // Open output file and wrap in buffered writer
-    let mut writer = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
+    let bw = BufWriter::with_capacity(buffer_size, File::create(ofile)?);
+    let mut writer = GzEncoder::new(bw, Compression::best());
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
