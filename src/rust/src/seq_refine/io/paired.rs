@@ -30,7 +30,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     if let Some(file) = ofile1 {
         let file = File::create(&file)?;
         let bw = BufWriter::with_capacity(buffer_size, file);
-        writer1 = Some(GzEncoder::new(bw, Compression::best()));
+        writer1 = Some(GzEncoder::new(bw, Compression::new(4)));
     } else {
         writer1 = None
     }
@@ -38,7 +38,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     if let Some(file) = ofile2 {
         let file = File::create(&file)?;
         let bw = BufWriter::with_capacity(buffer_size, file);
-        writer2 = Some(GzEncoder::new(bw, Compression::best()));
+        writer2 = Some(GzEncoder::new(bw, Compression::new(4)));
     } else {
         writer2 = None
     }
