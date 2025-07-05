@@ -53,7 +53,7 @@ pub fn mmap_kractor_koutput(
                         let mut thread_tx =
                             BatchSender::with_capacity(batch_size, parser_tx.clone());
                         for line in chunk {
-                            if kractor_match_aho(&include_aho, &exclude_aho, &line) {
+                            if kractor_match_aho(&include_aho, &exclude_aho, line) {
                                 match thread_tx.send(line) {
                                     Ok(_) => continue,
                                     Err(e) => {

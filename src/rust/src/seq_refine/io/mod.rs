@@ -2,15 +2,14 @@ use std::fs::File;
 
 use anyhow::{anyhow, Result};
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
-use memmap2::Mmap;
 
 mod paired;
 mod single;
 
-use crate::reader::slice::SliceProgressBarReader;
+use crate::reader::bytes::BytesProgressBarReader;
 use crate::seq_action::*;
 
-pub(crate) fn mmap_seq_refine(
+pub(crate) fn reader_seq_refine(
     fq1: &str,
     ofile1: Option<&str>,
     fq2: Option<&str>,
@@ -23,7 +22,7 @@ pub(crate) fn mmap_seq_refine(
     nqueue: Option<usize>,
 ) -> Result<()> {
     if let Some(fq2) = fq2 {
-        mmap_seq_refine_paired_read(
+        reader_seq_refine_paired_read(
             fq1,
             ofile1,
             fq2,
@@ -36,7 +35,7 @@ pub(crate) fn mmap_seq_refine(
             nqueue,
         )
     } else {
-        mmap_seq_refine_single_read(
+        reader_seq_refine_single_read(
             fq1,
             ofile1,
             actions1,
@@ -48,7 +47,7 @@ pub(crate) fn mmap_seq_refine(
     }
 }
 
-fn mmap_seq_refine_single_read(
+fn reader_seq_refine_single_read(
     fq1: &str,
     ofile1: Option<&str>,
     actions: Option<SubseqActions>,
@@ -60,20 +59,18 @@ fn mmap_seq_refine_single_read(
     let ofile1 = ofile1.ok_or_else(|| anyhow!("No output file specified."))?;
     let actions = actions.ok_or_else(|| anyhow!("No sequence actions were specified."))?;
     let file = File::open(fq1)?;
-    let map = unsafe { Mmap::map(&file) }?;
-    crate::mmap_advice(&map)?;
 
-    let mut reader = SliceProgressBarReader::new(&map);
+    let mut reader = BytesProgressBarReader::new(&file);
     reader.set_label("fq1");
     let style = crate::progress_style()?;
-    let pb = ProgressBar::new(map.len() as u64).with_finish(ProgressFinish::Abandon);
+    let pb = ProgressBar::new(file.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon);
     pb.set_prefix("Parsing fq1");
     pb.set_style(style);
 
     #[cfg(not(test))]
     reader.attach_bar(pb);
 
-    single::mmap_seq_refine_single_read(
+    single::reader_seq_refine_single_read(
         reader,
         ofile1,
         actions,
@@ -84,7 +81,7 @@ fn mmap_seq_refine_single_read(
     )
 }
 
-fn mmap_seq_refine_paired_read(
+fn reader_seq_refine_paired_read(
     fq1: &str,
     ofile1: Option<&str>,
     fq2: &str,
@@ -105,31 +102,26 @@ fn mmap_seq_refine_paired_read(
         ));
     }
     let file1 = File::open(fq1)?;
-    let map1 = unsafe { Mmap::map(&file1) }?;
-    crate::mmap_advice(&map1)?;
-
     let file2 = File::open(fq2)?;
-    let map2 = unsafe { Mmap::map(&file2) }?;
-    crate::mmap_advice(&map2)?;
 
-    let mut reader1 = SliceProgressBarReader::new(&map1);
+    let mut reader1 = BytesProgressBarReader::new(&file1);
     reader1.set_label("fq1");
 
-    let mut reader2 = SliceProgressBarReader::new(&map2);
+    let mut reader2 = BytesProgressBarReader::new(&file2);
     reader2.set_label("fq2");
 
     let style = crate::progress_style()?;
     let progress = MultiProgress::new();
-    let pb1 =
-        progress.add(ProgressBar::new(map1.len() as u64).with_finish(ProgressFinish::Abandon));
+    let pb1 = progress
+        .add(ProgressBar::new(file1.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon));
     pb1.set_prefix("Parsing fq1");
     pb1.set_style(style.clone());
 
     #[cfg(not(test))]
     reader1.attach_bar(pb1);
 
-    let pb2 =
-        progress.add(ProgressBar::new(map2.len() as u64).with_finish(ProgressFinish::Abandon));
+    let pb2 = progress
+        .add(ProgressBar::new(file2.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon));
     pb2.set_prefix("Parsing fq2");
     pb2.set_style(style);
 
@@ -137,7 +129,7 @@ fn mmap_seq_refine_paired_read(
     reader2.attach_bar(pb2);
 
     let actions = SubseqPairedActions::new(actions1, actions2);
-    paired::mmap_seq_refine_paired_read(
+    paired::reader_seq_refine_paired_read(
         reader1,
         ofile1,
         reader2,

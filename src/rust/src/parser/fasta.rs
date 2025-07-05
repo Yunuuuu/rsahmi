@@ -20,6 +20,7 @@ impl<T> From<FastqRecord<T>> for FastaRecord<T> {
 }
 
 impl<T> FastaRecord<T> {
+    #[allow(dead_code)]
     pub(crate) fn new(id: T, desc: Option<T>, seq: T) -> Self {
         Self { id, desc, seq }
     }
@@ -51,6 +52,7 @@ impl<T: AsRef<[u8]>> FastaRecord<T> {
         writer.write_all(&buffer)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn as_ref(&self) -> FastaRecord<&[u8]> {
         FastaRecord {
             id: self.id.as_ref(),

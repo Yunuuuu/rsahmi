@@ -1,5 +1,6 @@
 use extendr_api::prelude::*;
 
+mod io;
 mod mmap;
 
 // use crate::reader::bytes::BytesProgressBarReader;
@@ -17,7 +18,7 @@ fn seq_refine(
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
-    _mmap: bool,
+    mmap: bool,
     threads: usize,
 ) -> std::result::Result<(), String> {
     let rayon_pool = rayon::ThreadPoolBuilder::new()
@@ -29,18 +30,33 @@ fn seq_refine(
 
     rayon_pool
         .install(|| {
-            mmap::mmap_seq_refine(
-                fq1,
-                ofile1,
-                fq2,
-                ofile2,
-                actions1,
-                actions2,
-                chunk_size,
-                buffer_size,
-                batch_size,
-                nqueue,
-            )
+            if mmap {
+                mmap::mmap_seq_refine(
+                    fq1,
+                    ofile1,
+                    fq2,
+                    ofile2,
+                    actions1,
+                    actions2,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            } else {
+                io::reader_seq_refine(
+                    fq1,
+                    ofile1,
+                    fq2,
+                    ofile2,
+                    actions1,
+                    actions2,
+                    chunk_size,
+                    buffer_size,
+                    batch_size,
+                    nqueue,
+                )
+            }
         })
         .map_err(|e| format!("{}", e))
 }

@@ -9,10 +9,8 @@ use rustc_hash::FxHashSet as HashSet;
 pub(crate) mod io;
 pub(crate) mod mmap;
 
-use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 use io::{reader_kractor_paired_read, reader_kractor_single_read};
-#[cfg(unix)]
-use memmap2::Advice;
 use memmap2::Mmap;
 use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read};
 
@@ -44,9 +42,7 @@ pub(crate) fn kractor_reads(
         fq2.map_or_else(|| String::from(""), |s| format!("and {}", s))
     );
     let file = File::open(fq1)?;
-    let progress_style = ProgressStyle::with_template(
-        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
-    )?;
+    let style = crate::progress_style()?;
 
     if let Some(fq2) = fq2 {
         let ofile2 = ofile2.ok_or(anyhow!(
@@ -69,7 +65,7 @@ pub(crate) fn kractor_reads(
             let pb1 = progress
                 .add(ProgressBar::new(map1.len() as u64).with_finish(ProgressFinish::Abandon));
             pb1.set_prefix("Parsing read1");
-            pb1.set_style(progress_style.clone());
+            pb1.set_style(style.clone());
 
             #[cfg(not(test))]
             reader1.attach_bar(pb1);
@@ -77,7 +73,7 @@ pub(crate) fn kractor_reads(
             let pb2 = progress
                 .add(ProgressBar::new(map2.len() as u64).with_finish(ProgressFinish::Abandon));
             pb2.set_prefix("Parsing read2");
-            pb2.set_style(progress_style);
+            pb2.set_style(style);
 
             #[cfg(not(test))]
             reader2.attach_bar(pb2);
@@ -105,7 +101,7 @@ pub(crate) fn kractor_reads(
                     .with_finish(ProgressFinish::Abandon),
             );
             pb1.set_prefix("Parsing read1");
-            pb1.set_style(progress_style.clone());
+            pb1.set_style(style.clone());
 
             #[cfg(not(test))]
             reader1.attach_bar(pb1);
@@ -115,7 +111,7 @@ pub(crate) fn kractor_reads(
                     .with_finish(ProgressFinish::Abandon),
             );
             pb2.set_prefix("Parsing read2");
-            pb2.set_style(progress_style);
+            pb2.set_style(style);
 
             #[cfg(not(test))]
             reader2.attach_bar(pb2);
@@ -141,7 +137,7 @@ pub(crate) fn kractor_reads(
 
             let pb = ProgressBar::new(map.len() as u64).with_finish(ProgressFinish::Abandon);
             pb.set_prefix("Parsing reads");
-            pb.set_style(progress_style);
+            pb.set_style(style);
 
             #[cfg(not(test))]
             reader.attach_bar(pb);
@@ -162,7 +158,7 @@ pub(crate) fn kractor_reads(
             let pb = ProgressBar::new(file.metadata()?.len() as u64)
                 .with_finish(ProgressFinish::Abandon);
             pb.set_prefix("Parsing reads");
-            pb.set_style(progress_style);
+            pb.set_style(style);
 
             #[cfg(not(test))]
             reader.attach_bar(pb);

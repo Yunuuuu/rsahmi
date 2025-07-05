@@ -1,5 +1,7 @@
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
+use indicatif::style::TemplateError;
+use indicatif::ProgressStyle;
 #[cfg(unix)]
 use memmap2::Advice;
 use memmap2::Mmap;
@@ -30,6 +32,12 @@ pub(crate) fn mmap_advice(map: &Mmap) -> anyhow::Result<()> {
         map.advise(Advice::Sequential)?;
     }
     Ok(())
+}
+
+pub(crate) fn progress_style() -> std::result::Result<ProgressStyle, TemplateError> {
+    ProgressStyle::with_template(
+        "{prefix:.bold.cyan/blue} {decimal_bytes}/{decimal_total_bytes} {spinner:.green} [{elapsed_precise}] {decimal_bytes_per_sec} (ETA {eta})",
+    )
 }
 
 // https://extendr.github.io/extendr/extendr_api/#returning-resultt-e-to-r

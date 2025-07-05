@@ -17,13 +17,14 @@ use crate::parser::fastq::FastqRecord;
 /// - `RangeTo(end)`: includes all elements up to but not including `end`.
 /// - `Range(start, end)`: includes elements from `start` (inclusive) to `end` (exclusive).
 #[derive(Debug, Clone)]
-enum SeqRange {
+pub(crate) enum SeqRange {
     From(usize),
     To(usize),
     Span(usize, usize),
 }
 
 impl SeqRange {
+    #[allow(dead_code)]
     fn new_checked(start: Option<usize>, end: Option<usize>) -> std::result::Result<Self, String> {
         match (start, end) {
             (Some(s), Some(e)) => {
@@ -41,10 +42,12 @@ impl SeqRange {
         }
     }
 
+    #[allow(dead_code)]
     fn new(start: Option<usize>, end: Option<usize>) -> Self {
         Self::new_checked(start, end).unwrap_or_else(|e| panic!("Failed to create range: {}", e))
     }
 
+    #[allow(dead_code)]
     fn try_extract<'s>(&self, slice: &'s [u8]) -> Result<&'s [u8]> {
         let len = slice.len();
         match *self {
@@ -78,6 +81,7 @@ impl SeqRange {
         }
     }
 
+    #[allow(dead_code)]
     fn extract<'s>(&self, slice: &'s [u8]) -> &'s [u8] {
         match *self {
             SeqRange::From(start) => &slice[start ..],
@@ -86,6 +90,7 @@ impl SeqRange {
         }
     }
 
+    #[allow(dead_code)]
     unsafe fn extract_unchecked<'s>(&self, slice: &'s [u8]) -> &'s [u8] {
         unsafe {
             match *self {
@@ -98,21 +103,25 @@ impl SeqRange {
 }
 
 #[derive(Debug, Clone)]
-struct SeqRanges(Vec<SeqRange>);
+pub(crate) struct SeqRanges(Vec<SeqRange>);
 
 impl SeqRanges {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self::with_capacity(0)
     }
 
+    #[allow(dead_code)]
     fn with_capacity(capacity: usize) -> Self {
         Self(Vec::with_capacity(capacity))
     }
 
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[allow(dead_code)]
     fn sort(&mut self) {
         self.0.sort_by(|x, y| match (x, y) {
             (SeqRange::To(end0), SeqRange::To(end1)) => end0.cmp(end1),
@@ -125,20 +134,19 @@ impl SeqRanges {
         });
     }
 
+    #[allow(dead_code)]
     fn extend<I: IntoIterator<Item = SeqRange>>(&mut self, iter: I) {
         self.0.extend(iter);
     }
 
+    #[allow(dead_code)]
     fn push(&mut self, value: SeqRange) {
         self.0.push(value);
     }
 
+    #[allow(dead_code)]
     fn as_slice(&self) -> &[SeqRange] {
         &self.0
-    }
-
-    fn into_inner(self) -> Vec<SeqRange> {
-        self.0
     }
 }
 
@@ -174,31 +182,20 @@ impl<'a> IntoIterator for &'a SeqRanges {
 
 // DOn't allow add new sequence range
 #[derive(Debug, Clone)]
-struct SortedSeqRanges(Vec<SeqRange>);
-
-impl From<SeqRanges> for SortedSeqRanges {
-    fn from(mut value: SeqRanges) -> Self {
-        value.sort();
-        SortedSeqRanges(value.0)
-    }
-}
-
-impl FromIterator<SeqRange> for SortedSeqRanges {
-    fn from_iter<T: IntoIterator<Item = SeqRange>>(iter: T) -> Self {
-        let ranges: SeqRanges = iter.into_iter().collect::<Vec<SeqRange>>().into();
-        ranges.into()
-    }
-}
+pub(crate) struct SortedSeqRanges(Vec<SeqRange>);
 
 impl SortedSeqRanges {
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[allow(dead_code)]
     fn as_slice(&self) -> &[SeqRange] {
         &self.0
     }
 
+    #[allow(dead_code)]
     fn check_overlap(&self) -> Result<()> {
         // Check for overlapping
         for pair in self.0.windows(2) {
@@ -241,6 +238,20 @@ impl SortedSeqRanges {
             }
         }
         Ok(())
+    }
+}
+
+impl From<SeqRanges> for SortedSeqRanges {
+    fn from(mut value: SeqRanges) -> Self {
+        value.sort();
+        SortedSeqRanges(value.0)
+    }
+}
+
+impl FromIterator<SeqRange> for SortedSeqRanges {
+    fn from_iter<T: IntoIterator<Item = SeqRange>>(iter: T) -> Self {
+        let ranges: SeqRanges = iter.into_iter().collect::<Vec<SeqRange>>().into();
+        ranges.into()
     }
 }
 
@@ -371,6 +382,14 @@ fn tag_sequence(tag: &str, sequence: Vec<&[u8]>) -> Bytes {
 }
 
 impl SubseqActions {
+    #[allow(dead_code)]
+    pub(crate) fn builder() -> SubseqActionsBuilder {
+        SubseqActionsBuilder {
+            embed_list: Vec::new(),
+            trim_list: Vec::new(),
+        }
+    }
+
     fn embedded_tags(&self, seq: &[u8]) -> Result<Vec<Bytes>> {
         let out = self
             .tag_sequence(seq)?
@@ -659,7 +678,7 @@ fn tag_description(tags: &Vec<Bytes>, desc: &Option<&[u8]>) -> Result<Bytes> {
     Ok(tag.freeze())
 }
 
-struct SubseqActionsBuilder {
+pub(crate) struct SubseqActionsBuilder {
     embed_list: Vec<(String, SortedSeqRanges)>,
     trim_list: Vec<SortedSeqRanges>,
 }
@@ -680,7 +699,7 @@ impl SubseqActionsBuilder {
         self.trim_list.push(ranges);
     }
 
-    fn add_action(&mut self, action: SeqAction, ranges: SortedSeqRanges) {
+    pub(crate) fn add_action(&mut self, action: SeqAction, ranges: SortedSeqRanges) {
         match action {
             SeqAction::Embed(tag) => {
                 self.add_embed(tag, ranges);
@@ -695,7 +714,7 @@ impl SubseqActionsBuilder {
         }
     }
 
-    fn build(self) -> SubseqActions {
+    pub(crate) fn build(self) -> SubseqActions {
         let embed_actions = self
             .embed_list
             .into_iter()
@@ -709,7 +728,7 @@ impl SubseqActionsBuilder {
     }
 }
 
-enum SeqAction {
+pub(crate) enum SeqAction {
     Embed(String),
     Trim,
     EmbedTrim(String),
@@ -739,6 +758,7 @@ fn extract_tag(ranges: &Robj) -> &str {
         .unwrap_or_else(|| "rsahmi")
 }
 
+#[allow(dead_code)]
 fn extract_ordering(ranges: &Robj) -> Option<Vec<usize>> {
     ranges.get_attrib("ordering").and_then(|o| {
         if let Some(ordering) = o.as_integer_slice() {

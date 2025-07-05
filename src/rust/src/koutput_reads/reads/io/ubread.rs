@@ -6,14 +6,14 @@ use std::sync::Arc;
 use anyhow::{anyhow, Error, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
-use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 use rustc_hash::FxHashSet as HashSet;
 
 use crate::batchsender::BatchSender;
+use crate::koutput_reads::range::*;
 use crate::kractor::reads::io::reader::BytesChunkPairedReader;
 use crate::kractor::reads::parser::fasta::FastaRecordWithUMIBarcode;
 use crate::kractor::reads::parser::fastq::FastqContainer;
-use crate::koutput_reads::range::*;
 
 pub fn reader_kractor_ubread_read(
     id_sets: HashSet<&[u8]>,
@@ -35,9 +35,7 @@ pub fn reader_kractor_ubread_read(
     let reader2 = File::open(ubread)?;
     let size1 = reader1.metadata()?.len();
     let size2 = reader2.metadata()?.len();
-    let progress_style = ProgressStyle::with_template(
-        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})"
-    )?;
+    let style = crate::progress_style()?;
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
@@ -64,13 +62,15 @@ pub fn reader_kractor_ubread_read(
         let m = MultiProgress::new();
         let pb1 = m.add(ProgressBar::new(size1).with_finish(ProgressFinish::Abandon));
         pb1.set_prefix("Parsing reads");
-        pb1.set_style(progress_style.clone());
+        pb1.set_style(style.clone());
         let pb2 = m.add(ProgressBar::new(size2).with_finish(ProgressFinish::Abandon));
         pb2.set_prefix("Parsing ubread");
-        pb2.set_style(progress_style);
+        pb2.set_style(style);
         let mut reader = BytesChunkPairedReader::with_capacity(chunk_size, reader1, reader2);
         reader.set_label1("reads");
         reader.set_label2("ubread");
+
+        #[cfg(not(test))]
         reader.attach_bars(pb1, pb2);
 
         let parser_handle = scope.spawn(move || {

@@ -4,7 +4,7 @@ use std::io::Read;
 use anyhow::Result;
 use bytes::BytesMut;
 use extendr_api::prelude::*;
-use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
+use indicatif::{ProgressBar, ProgressFinish};
 use memchr::memrchr;
 use memmap2::Mmap;
 
@@ -16,12 +16,10 @@ fn bench_read(file: &str, chunk_size: usize, mmap: bool) -> std::result::Result<
 fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
     let mut reader = File::open(file)?;
     let size = reader.metadata()?.len();
-    let progress_style = ProgressStyle::with_template(
-        "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
-    )?;
+    let style = crate::progress_style()?;
     let pb = ProgressBar::new(size).with_finish(ProgressFinish::Abandon);
     pb.set_prefix(format!("Reading {}", file));
-    pb.set_style(progress_style);
+    pb.set_style(style);
     if mmap {
         let map = unsafe { Mmap::map(&reader) }?;
         crate::mmap_advice(&map)?;

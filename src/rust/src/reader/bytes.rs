@@ -108,7 +108,15 @@ impl<R: Read> BytesProgressBarReader<R> {
     }
 
     pub(crate) fn read_bytes(&mut self, size: usize) -> std::io::Result<Option<BytesContent>> {
-        self.reader.read_bytes(size)
+        let out = self.reader.read_bytes(size);
+        if let Some(bar) = &self.bar {
+            if let Ok(opt) = &out {
+                if let Some(bytes) = opt {
+                    bar.inc(bytes.len() as u64);
+                }
+            }
+        }
+        out
     }
 
     pub(crate) fn take_leftover(&mut self, leftover: BytesMut) {
@@ -232,6 +240,7 @@ impl<I: Iterator<Item = usize>> BytesBreaksReader<I> {
         &self.bytes
     }
 
+    #[allow(dead_code)]
     pub(crate) fn as_slice(&self) -> &[u8] {
         &self.borrow_bytes()
     }
@@ -288,10 +297,12 @@ impl BytesLineReader {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn label(&self) -> Option<&'static str> {
         self.label
     }
 
+    #[allow(dead_code)]
     pub(crate) fn set_label(&mut self, label: &'static str) {
         self.label = Some(label);
     }

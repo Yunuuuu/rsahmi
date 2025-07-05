@@ -57,6 +57,7 @@ impl<T: AsRef<[u8]>> FastqRecord<T> {
         writer.write_all(&buffer)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn as_ref(&self) -> FastqRecord<&[u8]> {
         FastqRecord {
             id: self.id.as_ref(),

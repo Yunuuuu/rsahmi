@@ -22,6 +22,7 @@ impl<'a> SliceProgressBarReader<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn attach_bar(&mut self, bar: ProgressBar) {
         self.bar = Some(bar);
     }
@@ -344,7 +345,6 @@ mod test_reader {
 
         let pb = ProgressBar::new(3);
         let mut reader_with_bar = SliceProgressBarReader::new(data);
-        reader_with_bar.attach_bar(pb.clone());
 
         // Simulate chunk reading with progress bar updates
         while let Some(chunk) = reader_with_bar.take_slice(10) {
