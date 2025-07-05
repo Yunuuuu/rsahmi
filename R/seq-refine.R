@@ -102,12 +102,7 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    nqueue <- check_queue(nqueue, 3L) *
-        if (is.null(threads) || threads == 0L) {
-            parallel::detectCores()
-        } else {
-            threads
-        }
+    nqueue <- check_queue(nqueue, 3L, threads)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     assert_bool(mmap)
     odir <- odir %||% getwd()

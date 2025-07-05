@@ -243,12 +243,7 @@ rust_kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
         min = 0, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    nqueue <- check_queue(nqueue, 3L) *
-        if (is.null(threads) || threads == 0L) {
-            parallel::detectCores()
-        } else {
-            threads
-        }
+    nqueue <- check_queue(nqueue, 3L, threads)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     assert_bool(mmap)
     if (is.null(odir)) odir <- getwd()
@@ -336,12 +331,7 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
     )
-    nqueue <- check_queue(nqueue, 3L) *
-        if (is.null(threads) || threads == 0L) {
-            parallel::detectCores()
-        } else {
-            threads
-        }
+    nqueue <- check_queue(nqueue, 3L, threads)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     assert_bool(mmap)
     if (is.null(odir)) odir <- getwd()
@@ -395,7 +385,7 @@ rust_kractor_reads <- function(koutput, reads, extract_reads = NULL,
     }
 }
 
-check_queue <- function(queue, default, arg = caller_arg(queue),
+check_queue <- function(queue, default, threads, arg = caller_arg(queue),
                         call = rlang::caller_call()) {
     # styler: off
     if (.rlang_check_number(queue, min = 0,
@@ -407,9 +397,19 @@ check_queue <- function(queue, default, arg = caller_arg(queue),
     }
     # styler: on
     if (is.null(queue)) {
-        default
+        default *
+            if (is.null(threads) || threads == 0L) {
+                parallel::detectCores()
+            } else {
+                threads
+            }
     } else if (is.finite(queue)) {
-        queue
+        queue *
+            if (is.null(threads) || threads == 0L) {
+                parallel::detectCores()
+            } else {
+                threads
+            }
     } else {
         NULL
     }
