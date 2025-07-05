@@ -13,7 +13,7 @@ name = 'rsahmi'
 extendr-api = { version = "0.8.0", features = [ "result_list" ] }
 anyhow = '*'
 memmap2 = '*'
-flate2 = '*'
+flate2 = { version = "*", features = ["zlib-rs"]}
 indicatif = '*'
 bytes = '*'
 rayon = '*'

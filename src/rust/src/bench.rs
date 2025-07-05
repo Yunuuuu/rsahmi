@@ -1,12 +1,15 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::Cursor;
+use std::path::Path;
 
 use anyhow::Result;
-use bytes::BytesMut;
 use extendr_api::prelude::*;
+use flate2::read::MultiGzDecoder;
 use indicatif::{ProgressBar, ProgressFinish};
 use memchr::memrchr;
 use memmap2::Mmap;
+
+use crate::reader::bytes::{BytesReader, ProgressBarReader};
 
 #[extendr]
 fn bench_read(file: &str, chunk_size: usize, mmap: bool) -> std::result::Result<(), String> {
@@ -14,7 +17,8 @@ fn bench_read(file: &str, chunk_size: usize, mmap: bool) -> std::result::Result<
 }
 
 fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
-    let mut reader = File::open(file)?;
+    let path: &Path = file.as_ref();
+    let reader = File::open(file)?;
     let size = reader.metadata()?.len();
     let style = crate::progress_style()?;
     let pb = ProgressBar::new(size).with_finish(ProgressFinish::Abandon);
@@ -24,55 +28,43 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
         let map = unsafe { Mmap::map(&reader) }?;
         crate::mmap_advice(&map)?;
 
-        let mut pos = 0;
-        while pos < map.len() {
-            if pos + chunk_size < map.len() {
-                let chunk = &map[pos .. pos + chunk_size];
-                if let Some(offset) = memrchr(b'\n', chunk) {
-                    let _ = &chunk[..= offset];
-                    pb.inc(offset as u64);
-                    pos += offset + 1;
+        if crate::gz_compressed(path) {
+            let reader = BytesReader::new(MultiGzDecoder::new(ProgressBarReader::new(
+                Cursor::new(map),
+                pb,
+            )));
+            let mut reader = crate::kractor::koutput::io::KoutputBytesChunkReader::new(reader);
+            while let Some(_) = reader.chunk_reader()? {}
+        } else {
+            let mut pos = 0;
+            while pos < map.len() {
+                if pos + chunk_size < map.len() {
+                    let chunk = &map[pos .. pos + chunk_size];
+                    if let Some(offset) = memrchr(b'\n', chunk) {
+                        let _ = &chunk[..= offset];
+                        pb.inc(offset as u64);
+                        pos += offset + 1;
+                    } else {
+                        chunk_size *= 2;
+                        continue;
+                    }
                 } else {
-                    chunk_size *= 2;
-                    continue;
+                    let chunk = &map[pos ..];
+                    pb.inc(chunk.len() as u64);
+                    pos = map.len();
                 }
-            } else {
-                let chunk = &map[pos ..];
-                pb.inc(chunk.len() as u64);
-                pos = map.len();
             }
         }
     } else {
-        let mut leftover = BytesMut::new();
-        loop {
-            let leftover_len = leftover.len();
-            let mut buf = BytesMut::with_capacity(chunk_size + leftover.len());
-            buf.extend_from_slice(&leftover);
-            unsafe { buf.set_len(leftover_len + chunk_size) };
-            let nbytes = reader.read(&mut buf[leftover_len ..])?;
-            unsafe { buf.set_len(leftover_len + nbytes) };
-            if nbytes == 0 {
-                if buf.is_empty() {
-                    return Ok(());
-                } else {
-                    pb.inc(buf.len() as u64);
-                    leftover = BytesMut::new();
-                    continue;
-                }
-            }
-            if let Some(pos) = memrchr(b'\n', &buf) {
-                // split at newline
-                let _ = buf.split_to(pos + 1);
-                pb.inc(pos as u64);
-                leftover = buf; // remainder for next round
-                continue;
-            } else {
-                // no newline found — either final chunk or partial
-                // leave all in leftover and try again with larger chunk
-                chunk_size *= 2;
-                leftover = buf;
-                continue;
-            }
+        let reader = ProgressBarReader::new(reader, pb);
+        if crate::gz_compressed(path) {
+            let reader = BytesReader::new(MultiGzDecoder::new(reader));
+            let mut reader = crate::kractor::koutput::io::KoutputBytesChunkReader::new(reader);
+            while let Some(_) = reader.chunk_reader()? {}
+        } else {
+            let reader = BytesReader::new(reader);
+            let mut reader = crate::kractor::koutput::io::KoutputBytesChunkReader::new(reader);
+            while let Some(_) = reader.chunk_reader()? {}
         }
     }
     Ok(())
