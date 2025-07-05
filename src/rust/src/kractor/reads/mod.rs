@@ -57,22 +57,12 @@ pub(crate) fn kractor_reads(
         let progress = MultiProgress::new();
         if mmap {
             let map1 = unsafe { Mmap::map(&file) }?;
-            #[cfg(unix)]
-            if Advice::WillNeed.is_supported() {
-                map1.advise(Advice::WillNeed)?;
-            } else if Advice::Sequential.is_supported() {
-                map1.advise(Advice::Sequential)?;
-            }
+            crate::mmap_advice(&map1)?;
             let mut reader1 = SliceProgressBarReader::new(&map1);
             reader1.set_label("read1");
 
             let map2 = unsafe { Mmap::map(&file2) }?;
-            #[cfg(unix)]
-            if Advice::WillNeed.is_supported() {
-                map2.advise(Advice::WillNeed)?;
-            } else if Advice::Sequential.is_supported() {
-                map2.advise(Advice::Sequential)?;
-            }
+            crate::mmap_advice(&map2)?;
             let mut reader2 = SliceProgressBarReader::new(&map2);
             reader2.set_label("read2");
 
@@ -145,12 +135,7 @@ pub(crate) fn kractor_reads(
     } else {
         if mmap {
             let map = unsafe { Mmap::map(&file) }?;
-            #[cfg(unix)]
-            if Advice::WillNeed.is_supported() {
-                map.advise(Advice::WillNeed)?;
-            } else if Advice::Sequential.is_supported() {
-                map.advise(Advice::Sequential)?;
-            }
+            crate::mmap_advice(&map)?;
             let mut reader = SliceProgressBarReader::new(&map);
             reader.set_label("reads");
 

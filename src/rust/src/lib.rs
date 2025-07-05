@@ -1,5 +1,8 @@
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
+#[cfg(unix)]
+use memmap2::Advice;
+use memmap2::Mmap;
 
 mod batchsender;
 mod bench;
@@ -17,6 +20,16 @@ pub(crate) fn new_channel<T>(nqueue: Option<usize>) -> (Sender<T>, Receiver<T>) 
     } else {
         unbounded()
     }
+}
+
+pub(crate) fn mmap_advice(map: &Mmap) -> anyhow::Result<()> {
+    #[cfg(unix)]
+    if Advice::WillNeed.is_supported() {
+        map.advise(Advice::WillNeed)?;
+    } else if Advice::Sequential.is_supported() {
+        map.advise(Advice::Sequential)?;
+    }
+    Ok(())
 }
 
 // https://extendr.github.io/extendr/extendr_api/#returning-resultt-e-to-r

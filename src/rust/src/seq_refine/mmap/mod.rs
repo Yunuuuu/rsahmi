@@ -2,8 +2,6 @@ use std::fs::File;
 
 use anyhow::{anyhow, Result};
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
-#[cfg(unix)]
-use memmap2::Advice;
 use memmap2::Mmap;
 
 mod paired;
@@ -63,12 +61,8 @@ fn mmap_seq_refine_single_read(
     let actions = actions.ok_or_else(|| anyhow!("No sequence actions were specified."))?;
     let file = File::open(fq1)?;
     let map = unsafe { Mmap::map(&file) }?;
-    #[cfg(unix)]
-    if Advice::WillNeed.is_supported() {
-        map.advise(Advice::WillNeed)?;
-    } else if Advice::Sequential.is_supported() {
-        map.advise(Advice::Sequential)?;
-    }
+    crate::mmap_advice(&map)?;
+
     let mut reader = SliceProgressBarReader::new(&map);
     reader.set_label("fq1");
     let progress_style = ProgressStyle::with_template(
@@ -114,21 +108,11 @@ fn mmap_seq_refine_paired_read(
     }
     let file1 = File::open(fq1)?;
     let map1 = unsafe { Mmap::map(&file1) }?;
-    #[cfg(unix)]
-    if Advice::WillNeed.is_supported() {
-        map1.advise(Advice::WillNeed)?;
-    } else if Advice::Sequential.is_supported() {
-        map1.advise(Advice::Sequential)?;
-    }
+    crate::mmap_advice(&map1)?;
 
     let file2 = File::open(fq2)?;
     let map2 = unsafe { Mmap::map(&file2) }?;
-    #[cfg(unix)]
-    if Advice::WillNeed.is_supported() {
-        map2.advise(Advice::WillNeed)?;
-    } else if Advice::Sequential.is_supported() {
-        map2.advise(Advice::Sequential)?;
-    }
+    crate::mmap_advice(&map2)?;
 
     let mut reader1 = SliceProgressBarReader::new(&map1);
     reader1.set_label("fq1");

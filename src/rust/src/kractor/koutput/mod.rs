@@ -214,12 +214,7 @@ pub(crate) fn kractor_koutput(
     let file = File::open(koutput)?;
     if mmap {
         let map = unsafe { Mmap::map(&file) }?;
-        #[cfg(unix)]
-        if Advice::WillNeed.is_supported() {
-            map.advise(Advice::WillNeed)?;
-        } else if Advice::Sequential.is_supported() {
-            map.advise(Advice::Sequential)?;
-        }
+        crate::mmap_advice(&map)?;
         let reader = SliceProgressBarReader::new(&map);
 
         mmap_kractor_koutput(
@@ -359,12 +354,7 @@ mod tests {
             .build(patterns)?;
         let file = File::open(input_path).unwrap();
         let map = unsafe { Mmap::map(&file) }?;
-        #[cfg(unix)]
-        if Advice::WillNeed.is_supported() {
-            map.advise(Advice::WillNeed)?;
-        } else if Advice::Sequential.is_supported() {
-            map.advise(Advice::Sequential)?;
-        }
+        crate::mmap_advice(&map)?;
         let reader = SliceProgressBarReader::new(&map);
         mmap_kractor_koutput(
             matcher,

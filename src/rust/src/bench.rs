@@ -6,8 +6,6 @@ use bytes::BytesMut;
 use extendr_api::prelude::*;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use memchr::memrchr;
-#[cfg(unix)]
-use memmap2::Advice;
 use memmap2::Mmap;
 
 #[extendr]
@@ -26,12 +24,7 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
     pb.set_style(progress_style);
     if mmap {
         let map = unsafe { Mmap::map(&reader) }?;
-        #[cfg(unix)]
-        if Advice::WillNeed.is_supported() {
-            map.advise(Advice::WillNeed)?;
-        } else if Advice::Sequential.is_supported() {
-            map.advise(Advice::Sequential)?;
-        }
+        crate::mmap_advice(&map)?;
 
         let mut pos = 0;
         while pos < map.len() {

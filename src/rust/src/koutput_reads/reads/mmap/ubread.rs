@@ -35,21 +35,11 @@ pub fn mmap_kractor_ubread_read(
     // Open and memory-map the input FASTQ file
     let file1 = File::open(fq)?;
     let map1 = unsafe { Mmap::map(&file1) }?;
-    #[cfg(unix)]
-    if Advice::WillNeed.is_supported() {
-        map1.advise(Advice::WillNeed)?;
-    } else if Advice::Sequential.is_supported() {
-        map1.advise(Advice::Sequential)?;
-    }
+    crate::mmap_advice(&map1)?;
 
     let file2 = File::open(ubread)?;
     let map2 = unsafe { Mmap::map(&file2) }?;
-    #[cfg(unix)]
-    if Advice::WillNeed.is_supported() {
-        map2.advise(Advice::WillNeed)?;
-    } else if Advice::Sequential.is_supported() {
-        map2.advise(Advice::Sequential)?;
-    }
+    crate::mmap_advice(&map2)?;
 
     let progress_style = ProgressStyle::with_template(
         "{prefix:.bold.green} {wide_bar:.cyan/blue} {decimal_bytes}/{decimal_total_bytes} [{elapsed_precise}] {decimal_bytes_per_sec} ({eta})",
