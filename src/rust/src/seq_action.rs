@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use bytes::{BufMut, Bytes, BytesMut};
 use extendr_api::prelude::*;
+use rustc_hash::FxHashMap as HashMap;
 
 use crate::parser::fastq::FastqRecord;
 
@@ -271,20 +272,15 @@ impl SubseqEmbedAction {
         Self { tag, ranges }
     }
 
-    fn tag(&self, seq: &[u8]) -> Result<Bytes> {
+    fn tag<'action, 'seq>(
+        &'action self,
+        seq: &'seq [u8],
+    ) -> Result<(&'action str, Vec<&'seq [u8]>)> {
         let mut sequences = Vec::with_capacity(self.ranges.len());
         for range in &self.ranges {
             sequences.push(range.try_extract(seq)?);
         }
-        Ok(self
-            .tag
-            .as_bytes()
-            .iter()
-            // add ":" between tag and extracted sequence
-            .chain(std::iter::once(&b':'))
-            .chain(sequences.into_iter().flatten())
-            .copied()
-            .collect())
+        Ok((&self.tag, sequences))
     }
 }
 
@@ -365,52 +361,65 @@ pub(crate) struct SubseqActions {
     trim: SubseqTrimAction,
 }
 
+fn tag_sequence(tag: &str, sequence: Vec<&[u8]>) -> Bytes {
+    tag.as_bytes()
+        .iter()
+        .chain(std::iter::once(&b':'))
+        .chain(sequence.into_iter().flatten())
+        .copied()
+        .collect::<Bytes>()
+}
+
 impl SubseqActions {
+    fn embedded_tags(&self, seq: &[u8]) -> Result<Vec<Bytes>> {
+        let out = self
+            .tag_sequence(seq)?
+            .into_iter()
+            .map(|(tag, sequence)| tag_sequence(tag, sequence))
+            .collect();
+        Ok(out)
+    }
+
+    fn tag_sequence<'actions, 'seq>(
+        &'actions self,
+        seq: &'seq [u8],
+    ) -> Result<Vec<(&'actions str, Vec<&'seq [u8]>)>> {
+        let mut tags: Vec<(&str, Vec<&[u8]>)> = Vec::with_capacity(self.embed.len());
+        for action in &self.embed {
+            tags.push(action.tag(seq)?);
+        }
+        Ok(tags)
+    }
+
+    fn trim(&self, seq: &[u8], qual: &[u8]) -> Result<(Bytes, Bytes)> {
+        self.trim.trim(seq, qual)
+    }
+
+    fn has_embed(&self) -> bool {
+        !self.embed.is_empty()
+    }
+
+    fn has_trim(&self) -> bool {
+        self.trim.ranges.len() > 0
+    }
+
     pub(crate) fn transform_fastq_slice(
         &self,
         record: &FastqRecord<&[u8]>,
     ) -> Result<FastqRecord<Bytes>> {
         let description;
-        if self.embed.is_empty() {
-            description = record.desc.map(|d| Bytes::copy_from_slice(d));
+        if self.has_embed() {
+            let tags = self.embedded_tags(&record.seq)?;
+            description = Some(tag_description(&tags, &record.desc)?);
         } else {
-            let mut tags = Vec::with_capacity(self.embed.len());
-            for action in &self.embed {
-                tags.push(action.tag(record.seq)?);
-            }
-
-            // prepare the description
-            let prefix = b"RSAHMI{";
-            let suffix = b'}';
-            let mut tag = BytesMut::with_capacity(
-                // original description length + prefix length + all tags + separator between each tag + suffix length
-                record.desc.map_or(0, |d| d.len() + 1)
-                    + prefix.len()
-                    + tags.iter().map(|t| t.len()).sum::<usize>()
-                    + tags.len()
-                    - 1
-                    + 1,
-            );
-            if let Some(desc) = record.desc {
-                tag.extend_from_slice(desc);
-                tag.put_u8(b' ');
-            }
-            tag.extend_from_slice(prefix);
-            for (i, t) in tags.iter().enumerate() {
-                if i > 0 {
-                    tag.put_u8(b':');
-                }
-                tag.extend_from_slice(t);
-            }
-            tag.put_u8(suffix);
-            description = Some(tag.freeze());
+            description = record.desc.map(|d| Bytes::copy_from_slice(d));
         }
 
         // prepare sequence and quality
         let sequence;
         let quality;
-        if self.trim.ranges.len() > 0 {
-            (sequence, quality) = self.trim.trim(record.seq, record.qual)?;
+        if self.has_trim() {
+            (sequence, quality) = self.trim(record.seq, record.qual)?;
         } else {
             sequence = Bytes::copy_from_slice(record.seq);
             quality = Bytes::copy_from_slice(record.qual);
@@ -427,48 +436,227 @@ impl SubseqActions {
     }
 
     pub(crate) fn transform_fastq_bytes(&self, record: &mut FastqRecord<Bytes>) -> Result<()> {
-        if !self.embed.is_empty() {
-            let mut tags = Vec::with_capacity(self.embed.len());
-            for action in &self.embed {
-                tags.push(action.tag(&record.seq)?);
-            }
-
-            // prepare the description
-            let prefix = b"RSAHMI{";
-            let suffix = b'}';
-            let mut tag = BytesMut::with_capacity(
-                // original description length + prefix length + all tags + separator between each tag + suffix length
-                record.desc.as_ref().map_or(0, |d| d.len() + 1)
-                    + prefix.len()
-                    + tags.iter().map(|t| t.len()).sum::<usize>()
-                    + tags.len()
-                    - 1
-                    + 1,
-            );
-            if let Some(desc) = &record.desc {
-                tag.extend_from_slice(&desc);
-                tag.put_u8(b' ');
-            }
-            tag.extend_from_slice(prefix);
-            for (i, t) in tags.iter().enumerate() {
-                if i > 0 {
-                    tag.put_u8(b':');
-                }
-                tag.extend_from_slice(t);
-            }
-            tag.put_u8(suffix);
-            record.desc = Some(tag.freeze());
+        if self.has_embed() {
+            let tags = self.embedded_tags(&record.seq)?;
+            record.desc = Some(tag_description(
+                &tags,
+                &record.desc.as_ref().map(|d| d.as_ref()),
+            )?);
         }
 
         // prepare sequence and quality
-        if self.trim.ranges.len() > 0 {
-            let (sequence, quality) = self.trim.trim(&record.seq, &record.qual)?;
+        if self.has_trim() {
+            let (sequence, quality) = self.trim(&record.seq, &record.qual)?;
             record.seq = sequence;
             record.qual = quality;
         }
 
         Ok(())
     }
+}
+
+pub(crate) struct SubseqPairedActions {
+    actions1: Option<SubseqActions>,
+    actions2: Option<SubseqActions>,
+}
+
+impl SubseqPairedActions {
+    pub(crate) fn new(actions1: Option<SubseqActions>, actions2: Option<SubseqActions>) -> Self {
+        Self { actions1, actions2 }
+    }
+
+    fn embedded_tags(&self, seq1: &[u8], seq2: &[u8]) -> Result<Option<Vec<Bytes>>> {
+        let tag_sequence_pair1;
+        if let Some(actions) = &self.actions1 {
+            if actions.has_embed() {
+                tag_sequence_pair1 = Some(actions.tag_sequence(seq1)?);
+            } else {
+                tag_sequence_pair1 = None
+            }
+        } else {
+            tag_sequence_pair1 = None
+        }
+        let tag_sequence_pair2;
+        if let Some(actions) = &self.actions2 {
+            if actions.has_embed() {
+                tag_sequence_pair2 = Some(actions.tag_sequence(seq2)?);
+            } else {
+                tag_sequence_pair2 = None
+            }
+        } else {
+            tag_sequence_pair2 = None
+        }
+        let out = match (tag_sequence_pair1, tag_sequence_pair2) {
+            (None, Some(tag_sequence_pair)) => Some(
+                tag_sequence_pair
+                    .into_iter()
+                    .map(|(tag, sequence)| tag_sequence(tag, sequence))
+                    .collect::<Vec<Bytes>>(),
+            ),
+            (Some(tag_sequence_pair), None) => Some(
+                tag_sequence_pair
+                    .into_iter()
+                    .map(|(tag, sequence)| tag_sequence(tag, sequence))
+                    .collect::<Vec<Bytes>>(),
+            ),
+            (Some(mut tag_sequence_pair1), Some(tag_sequence_pair2)) => {
+                // Build index for tag -> index in tag_sequence_pair1
+                let mut index_map = HashMap::with_capacity_and_hasher(
+                    tag_sequence_pair1.len(),
+                    rustc_hash::FxBuildHasher,
+                );
+                for (i, (tag, _)) in tag_sequence_pair1.iter().enumerate() {
+                    index_map.insert(*tag, i);
+                }
+
+                // Merge sequences from tags2 into tags1 where tag matches
+                for (tag2, seq2) in tag_sequence_pair2 {
+                    if let Some(&i) = index_map.get(tag2) {
+                        tag_sequence_pair1[i].1.extend(seq2);
+                    } else {
+                        tag_sequence_pair1.push((tag2, seq2)); // New tag, append at end
+                    }
+                }
+                Some(
+                    tag_sequence_pair1
+                        .into_iter()
+                        .map(|(tag, seq)| tag_sequence(tag, seq))
+                        .collect(),
+                )
+            }
+            (None, None) => None,
+        };
+        Ok(out)
+    }
+
+    pub(crate) fn transform_fastq_slice(
+        &self,
+        record1: &FastqRecord<&[u8]>,
+        record2: &FastqRecord<&[u8]>,
+    ) -> Result<(FastqRecord<Bytes>, FastqRecord<Bytes>)> {
+        let tags = self.embedded_tags(record1.seq, record2.seq)?;
+        let description1;
+        let description2;
+        if let Some(ref tags) = tags {
+            description1 = Some(tag_description(&tags, &record1.desc)?);
+            description2 = Some(tag_description(&tags, &record2.desc)?);
+        } else {
+            description1 = record1.desc.map(|d| Bytes::copy_from_slice(d));
+            description2 = record1.desc.map(|d| Bytes::copy_from_slice(d));
+        }
+
+        // prepare sequence and quality
+        let sequence1;
+        let quality1;
+        if let Some(actions) = &self.actions1 {
+            if actions.has_trim() {
+                (sequence1, quality1) = actions.trim(record1.seq, record1.qual)?;
+            } else {
+                sequence1 = Bytes::copy_from_slice(record1.seq);
+                quality1 = Bytes::copy_from_slice(record1.qual);
+            }
+        } else {
+            sequence1 = Bytes::copy_from_slice(record1.seq);
+            quality1 = Bytes::copy_from_slice(record1.qual);
+        }
+        let sequence2;
+        let quality2;
+        if let Some(actions) = &self.actions2 {
+            if actions.has_trim() {
+                (sequence2, quality2) = actions.trim(record2.seq, record2.qual)?;
+            } else {
+                sequence2 = Bytes::copy_from_slice(record2.seq);
+                quality2 = Bytes::copy_from_slice(record2.qual);
+            }
+        } else {
+            sequence2 = Bytes::copy_from_slice(record2.seq);
+            quality2 = Bytes::copy_from_slice(record2.qual);
+        }
+
+        // construct the output
+        let record1 = FastqRecord::new(
+            Bytes::copy_from_slice(record1.id),
+            description1,
+            sequence1,
+            Bytes::copy_from_slice(record1.sep),
+            quality1,
+        );
+        let record2 = FastqRecord::new(
+            Bytes::copy_from_slice(record2.id),
+            description2,
+            sequence2,
+            Bytes::copy_from_slice(record2.sep),
+            quality2,
+        );
+        Ok((record1, record2))
+    }
+
+    pub(crate) fn transform_fastq_bytes(
+        &self,
+        record1: &mut FastqRecord<Bytes>,
+        record2: &mut FastqRecord<Bytes>,
+    ) -> Result<()> {
+        let tags = self.embedded_tags(&record1.seq, &record2.seq)?;
+        if let Some(tags) = tags {
+            record1.desc = Some(tag_description(
+                &tags,
+                &record1.desc.as_ref().map(|d| d.as_ref()),
+            )?);
+            record2.desc = Some(tag_description(
+                &tags,
+                &record2.desc.as_ref().map(|d| d.as_ref()),
+            )?);
+        }
+
+        // prepare sequence and quality
+        if let Some(actions) = &self.actions1 {
+            if actions.has_trim() {
+                let (sequence, quality) = actions.trim(&record1.seq, &record1.qual)?;
+                record1.seq = sequence;
+                record1.qual = quality;
+            }
+        }
+        if let Some(actions) = &self.actions2 {
+            if actions.has_trim() {
+                let (sequence, quality) = actions.trim(&record2.seq, &record2.qual)?;
+                record2.seq = sequence;
+                record2.qual = quality;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn tag_description(tags: &Vec<Bytes>, desc: &Option<&[u8]>) -> Result<Bytes> {
+    // add prefix, tag and seprator
+    let prefix = b"RSAHMI{";
+    let suffix = b'}';
+    let mut tag = BytesMut::with_capacity(
+        // original description length
+        desc.map_or(0, |d| d.len() + 1)
+        // prefix
+            + prefix.len()
+            // all tag
+            + tags.iter().map(|t| t.len()).sum::<usize>()
+            // all seprator
+            + tags.len()
+            - 1
+            // suffix
+            + 1,
+    );
+    if let Some(desc) = desc {
+        tag.extend_from_slice(&desc);
+        tag.put_u8(b' ');
+    }
+    tag.extend_from_slice(prefix);
+    for (i, t) in tags.iter().enumerate() {
+        if i > 0 {
+            tag.put_u8(b':');
+        }
+        tag.extend_from_slice(t);
+    }
+    tag.put_u8(suffix);
+    Ok(tag.freeze())
 }
 
 struct SubseqActionsBuilder {
@@ -528,17 +716,20 @@ enum SeqAction {
 }
 
 // Create object from R
-pub(crate) fn robj_to_seq_range_actions<'r>(ranges: &Robj, label: &str) -> Result<SubseqActions> {
+pub(crate) fn robj_to_seq_actions<'r>(ranges: &Robj, label: &str) -> Result<Option<SubseqActions>> {
+    if ranges.is_null() {
+        return Ok(None);
+    }
     let mut out = SubseqActionsBuilder::new();
     for ref robj in ranges
         .as_list()
         .ok_or(anyhow!("Expected a list of sequence range objects."))?
         .values()
     {
-        let (action, sorted) = robj_dissect_range_obj(robj, label)?;
+        let (action, sorted) = robj_dissect_action(robj, label)?;
         out.add_action(action, sorted)
     }
-    Ok(out.build())
+    Ok(Some(out.build()))
 }
 
 fn extract_tag(ranges: &Robj) -> &str {
@@ -562,7 +753,7 @@ fn extract_ordering(ranges: &Robj) -> Option<Vec<usize>> {
     })
 }
 
-fn robj_dissect_range_obj(ranges: &Robj, label: &str) -> Result<(SeqAction, SortedSeqRanges)> {
+fn robj_dissect_action(ranges: &Robj, label: &str) -> Result<(SeqAction, SortedSeqRanges)> {
     let seq_ranges = robj_to_ranges(ranges, label)?;
 
     let sorted: SortedSeqRanges = seq_ranges.into();

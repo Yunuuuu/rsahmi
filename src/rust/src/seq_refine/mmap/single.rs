@@ -13,7 +13,7 @@ use crate::parser::fastq::FastqSliceChunkReader;
 use crate::reader::slice::SliceProgressBarReader;
 use crate::seq_action::*;
 
-pub fn mmap_seq_refine_single_read(
+pub(crate) fn mmap_seq_refine_single_read(
     reader: SliceProgressBarReader,
     ofile: &str,
     ref actions: SubseqActions,
@@ -55,7 +55,6 @@ pub fn mmap_seq_refine_single_read(
             let has_error = Arc::new(AtomicBool::new(false));
             // A bounded channel to capture the first error that occurs (capacity = 1)
             let (err_tx, err_rx) = crossbeam_channel::bounded(1);
-            // Reuse the shared ID set for matching records
             // Rayon scope for spawning parsing threads
             rayon::scope(|s| {
                 while let Some(mut chunk) = reader.chunk_reader() {

@@ -3,36 +3,47 @@ use std::io::BufWriter;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
+use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
-use rustc_hash::FxHashSet as HashSet;
 
-use super::reader::FastqSliceChunkPairedReader;
 use crate::batchsender::BatchSender;
-use crate::kractor::reads::parser::fasta::FastaRecord;
+use crate::parser::fastq::FastqRecord;
+use crate::parser::fastq::FastqSliceChunkPairedReader;
 use crate::reader::slice::SliceProgressBarReader;
+use crate::seq_action::*;
 
-pub fn mmap_kractor_paired_read(
-    id_sets: HashSet<&[u8]>,
+pub(crate) fn mmap_seq_refine_paired_read(
     reader1: SliceProgressBarReader,
-    ofile1: &str,
+    ofile1: Option<&str>,
     reader2: SliceProgressBarReader,
-    ofile2: &str,
+    ofile2: Option<&str>,
+    ref actions: SubseqPairedActions,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
 ) -> Result<()> {
     // Create output file and wrap in buffered writer
-    let mut writer1 = BufWriter::with_capacity(buffer_size, File::create(ofile1)?);
-    let mut writer2 = BufWriter::with_capacity(buffer_size, File::create(ofile2)?);
+    let mut writer1;
+    if let Some(file) = ofile1 {
+        writer1 = Some(BufWriter::with_capacity(buffer_size, File::create(file)?));
+    } else {
+        writer1 = None
+    }
+    let mut writer2;
+    if let Some(file) = ofile2 {
+        writer2 = Some(BufWriter::with_capacity(buffer_size, File::create(file)?));
+    } else {
+        writer2 = None
+    }
 
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
         let (parser_tx, writer_rx): (
-            Sender<Vec<(FastaRecord<&[u8]>, FastaRecord<&[u8]>)>>,
-            Receiver<Vec<(FastaRecord<&[u8]>, FastaRecord<&[u8]>)>>,
+            Sender<Vec<(FastqRecord<Bytes>, FastqRecord<Bytes>)>>,
+            Receiver<Vec<(FastqRecord<Bytes>, FastqRecord<Bytes>)>>,
         ) = crate::new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
@@ -41,8 +52,12 @@ pub fn mmap_kractor_paired_read(
             // Iterate over each received batch of records
             for chunk in writer_rx {
                 for (record1, record2) in chunk {
-                    record1.write(&mut writer1)?;
-                    record2.write(&mut writer2)?;
+                    if let Some(ref mut writer) = &mut writer1 {
+                        record1.write(writer)?;
+                    }
+                    if let Some(ref mut writer) = &mut writer2 {
+                        record2.write(writer)?;
+                    }
                 }
             }
             Ok(())
@@ -58,8 +73,6 @@ pub fn mmap_kractor_paired_read(
             let has_error = Arc::new(AtomicBool::new(false));
             // A bounded channel to capture the first error that occurs (capacity = 1)
             let (err_tx, err_rx) = crossbeam_channel::bounded(1);
-            // Reuse the shared ID set for matching records
-            let id_sets = &id_sets;
             // Rayon scope for spawning parsing threads
             rayon::scope(|s| -> Result<()> {
                 while let Some(mut chunk) = reader.chunk_reader()? {
@@ -71,24 +84,33 @@ pub fn mmap_kractor_paired_read(
                     let mut thread_tx = BatchSender::with_capacity(batch_size, parser_tx.clone());
                     // Clone the shared error state for this thread
                     let thread_has_error = has_error.clone();
-                    let thread_err_tx = err_tx.clone();
+                    let thread_err_tx: Sender<Error> = err_tx.clone();
                     s.spawn(move |_| {
                         loop {
                             match chunk.read_record() {
                                 Ok(value) => match value {
                                     Some((record1, record2)) => {
-                                        if id_sets.contains(record1.id) {
-                                            // Attempt to send the matching record to the writer thread.
-                                            match thread_tx.send((record1, record2)) {
-                                                Ok(_) => continue,
-                                                Err(_) => {
-                                                    // If this fails, it means the writer thread has already exited due to an error.
-                                                    // Since that error will be reported separately, we can safely ignore this send failure.
-                                                    // Mark that an error has occurred
-                                                    thread_has_error.store(true, Relaxed);
-                                                    return ();
-                                                }
-                                            };
+                                        match actions.transform_fastq_slice(&record1, &record2) {
+                                            Ok(record) => {
+                                                // Attempt to send the matching record to the writer thread.
+                                                match thread_tx.send(record) {
+                                                    Ok(_) => continue,
+                                                    Err(_) => {
+                                                        // If this fails, it means the writer thread has already exited due to an error.
+                                                        // Since that error will be reported separately, we can safely ignore this send failure.
+                                                        // Mark that an error has occurred
+                                                        thread_has_error.store(true, Relaxed);
+                                                        return ();
+                                                    }
+                                                };
+                                            }
+                                            Err(e) => {
+                                                // Mark that an error has occurred
+                                                thread_has_error.store(true, Relaxed);
+                                                // Only the first error is reported
+                                                let _ = thread_err_tx.try_send(e.into());
+                                                return ();
+                                            }
                                         }
                                     }
                                     None => break,
@@ -97,7 +119,7 @@ pub fn mmap_kractor_paired_read(
                                     // Mark that an error has occurred
                                     thread_has_error.store(true, Relaxed);
                                     // Only the first error is reported
-                                    let _ = thread_err_tx.try_send(e);
+                                    let _ = thread_err_tx.try_send(e.into());
                                     return ();
                                 }
                             }
