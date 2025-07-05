@@ -380,7 +380,7 @@ impl SubseqActions {
             }
 
             // prepare the description
-            let prefix = b"RSAHMI:{";
+            let prefix = b"RSAHMI{";
             let suffix = b'}';
             let mut tag = BytesMut::with_capacity(
                 // original description length + prefix length + all tags + separator between each tag + suffix length
@@ -434,7 +434,7 @@ impl SubseqActions {
             }
 
             // prepare the description
-            let prefix = b"RSAHMI:{";
+            let prefix = b"RSAHMI{";
             let suffix = b'}';
             let mut tag = BytesMut::with_capacity(
                 // original description length + prefix length + all tags + separator between each tag + suffix length

@@ -17,8 +17,17 @@ embed_trim(ranges, tag = NULL)
 \item{ranges}{A range or a list of ranges specifying the subsequence(s) to
 process. Must be created using the \code{\link[=seq_range]{seq_range()}} function.}
 
-\item{tag}{An optional character label to use when embedding in the header
-(for \code{embed()} and \code{embed_trim()}).}
+\item{tag}{An optional character label used when embedding sequence content
+into the FASTQ header (used with \code{embed()} and \code{embed_trim()}).
+
+For UMI and barcode actions, the tag will be assigned automatically as
+\code{"UMI"} and \code{"BARCODE"} respectively, and should be left as the default
+to ensure compatibility with downstream processing in the \code{rsahmi}
+workflow.
+
+For other types of actions, it is recommended to explicitly specify a \code{tag}
+to ensure clarity in the embedded header. Without a clear tag, it may be
+difficult to distinguish different embedded regions later in the analysis.}
 }
 \value{
 An annotated \code{rsahmi_seq_range} or \code{rsahmi_seq_ranges} object. object

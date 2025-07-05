@@ -65,7 +65,7 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
                        threads = NULL, odir = NULL,
                        mmap = TRUE) {
     assert_string(fq1, allow_empty = FALSE)
-    assert_string(ofile1, allow_empty = FALSE)
+    assert_string(ofile1, allow_empty = FALSE, allow_null = TRUE)
     assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
     assert_string(ofile2, allow_empty = FALSE, allow_null = TRUE)
     umi_action1 <- check_ub_action(umi_action1, "UMI")
@@ -85,6 +85,13 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
             "x" = "{.arg barcode_action2}",
             "x" = "{.arg extra_actions2}",
             i = "These arguments are only applicable when paired-end reads are provided via {.arg fq2}."
+        ))
+    }
+
+    if (is.null(ofile1) && is.null(ofile2)) {
+        cli::cli_abort(c(
+            "No output specified.",
+            i = "Please provide at least one of {.arg ofile1} or {.arg ofile2} to write the results."
         ))
     }
 
@@ -120,8 +127,12 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
     ]
     if (length(actions2) == 0L) actions2 <- NULL
     if (is.null(actions1) && is.null(actions2)) {
-        cli::cli_abort("Nothing to do, no actions specified")
+        cli::cli_abort(c(
+            "No sequence actions were specified.",
+            i = "Please provide at least one action to proceed"
+        ))
     }
+
     rust_call(
         "seq_refine",
         fq1 = fq1, ofile1 = ofile1,

@@ -13,10 +13,20 @@
 #'
 #' Each function wraps the input range object in a new class to indicate its
 #' behavior downstream.
+#'
 #' @param ranges A range or a list of ranges specifying the subsequence(s) to
 #' process. Must be created using the [`seq_range()`] function.
-#' @param tag An optional character label to use when embedding in the header
-#' (for `embed()` and `embed_trim()`).
+#' @param tag An optional character label used when embedding sequence content
+#'   into the FASTQ header (used with `embed()` and `embed_trim()`).
+#'
+#'   For UMI and barcode actions, the tag will be assigned automatically as
+#'   `"UMI"` and `"BARCODE"` respectively, and should be left as the default
+#'   to ensure compatibility with downstream processing in the `rsahmi`
+#'   workflow.
+#'
+#'   For other types of actions, it is recommended to explicitly specify a `tag`
+#'   to ensure clarity in the embedded header. Without a clear tag, it may be
+#'   difficult to distinguish different embedded regions later in the analysis.
 #'
 #' @return An annotated `rsahmi_seq_range` or `rsahmi_seq_ranges` object. object
 #' with behavior-specific class:
