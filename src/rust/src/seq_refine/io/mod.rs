@@ -135,9 +135,9 @@ fn reader_seq_refine_paired_read(
     let actions = SubseqPairedActions::new(actions1, actions2);
     match (crate::gz_compressed(path1), crate::gz_compressed(path2)) {
         (true, true) => paired::reader_seq_refine_paired_read(
-            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader1)),
+            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader1)),
             ofile1,
-            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader2)),
+            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader2)),
             ofile2,
             actions,
             chunk_size,
@@ -146,7 +146,7 @@ fn reader_seq_refine_paired_read(
             nqueue,
         ),
         (true, false) => paired::reader_seq_refine_paired_read(
-            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader1)),
+            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader1)),
             ofile1,
             reader2,
             ofile2,
@@ -159,7 +159,7 @@ fn reader_seq_refine_paired_read(
         (false, true) => paired::reader_seq_refine_paired_read(
             reader1,
             ofile1,
-            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader2)),
+            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader2)),
             ofile2,
             actions,
             chunk_size,

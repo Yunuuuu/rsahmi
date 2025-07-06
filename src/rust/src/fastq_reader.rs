@@ -37,7 +37,7 @@ impl<R: Read> FastqReader<R> {
                 if end == 0 {
                     return BytesMut::new();
                 } else {
-                    b.split_off(end + 1);
+                    let _ = b.split_off(end);
                 }
             }
             b

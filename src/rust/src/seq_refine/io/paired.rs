@@ -102,17 +102,15 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file
         let writer_handle = scope.spawn(move || -> Result<()> {
-            let mut writer1_tx = BatchSender::with_capacity(batch_size, writer1_tx);
-            let mut writer2_tx = BatchSender::with_capacity(batch_size, writer2_tx);
             // Iterate over each received batch of records
             for chunk in writer_rx {
-                for (record1, record2) in chunk {
-                    if has_writer1 {
-                        writer1_tx.send(record1)?;
-                    }
-                    if has_writer2 {
-                        writer2_tx.send(record2)?;
-                    }
+                let (records1, records2): (Vec<FastqRecord<Bytes>>, Vec<FastqRecord<Bytes>>) =
+                    chunk.into_iter().unzip();
+                if has_writer1 {
+                    writer1_tx.send(records1)?;
+                }
+                if has_writer2 {
+                    writer2_tx.send(records2)?;
                 }
             }
             Ok(())
@@ -120,7 +118,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         let parser_handle = scope.spawn(move || {
-            // will move `reader`, `parser_tx`, and `id_sets`
+            // will move `parser_tx`, `reader1_rx`, reader2_rx
             // Shared atomic flag to signal if any thread encountered an error
             let has_error = Arc::new(AtomicBool::new(false));
             // A bounded channel to capture the first error that occurs (capacity = 1)
@@ -144,13 +142,8 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                             return Ok(());
                         }
                     };
-
                     if records1.len() != records2.len() {
-                        return Err(anyhow!(
-                            "FASTQ pairing error: mismatched record counts (read1: {}, read2: {})",
-                            records1.len(),
-                            records2.len()
-                        ));
+                        return Err(anyhow!("FASTQ pairing error: mismatched record counts"));
                     }
 
                     // If an error already occurred, stop spawning new threads
@@ -166,6 +159,17 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                     let thread_err_tx: Sender<Error> = err_tx.clone();
                     s.spawn(move |_| {
                         for (mut record1, mut record2) in zip(records1, records2) {
+                            if record1.id != record2.id {
+                                // Mark that an error has occurred
+                                thread_has_error.store(true, Relaxed);
+                                // Only the first error is reported
+                                let _ = thread_err_tx.try_send(anyhow!(
+                                    "FASTQ pairing error: mismatched record id (read1: {}, read2: {})",
+                                    String::from_utf8_lossy(&record1.id),
+                                    String::from_utf8_lossy(&record2.id)
+                                ));
+                                return ();
+                            }
                             match actions.transform_fastq_bytes(&mut record1, &mut record2) {
                                 Ok(_) => {
                                     // Attempt to send the matching record to the writer thread.
@@ -194,13 +198,13 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 }
             })?;
             // Clean up: close the error channel and drop parser sender
-            drop(err_tx);
-            drop(parser_tx);
+            drop(err_tx);// To close err_rx
+            drop(parser_tx); // To close writer_rx
 
             // Report the first error if any thread encountered one
             if has_error.load(Relaxed) {
                 let err = err_rx.recv()?; // Safe unwrap because has_error is true
-                Err(anyhow!(err))
+                Err(err)
             } else {
                 Ok(())
             }
@@ -246,10 +250,72 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             .map_err(|e| anyhow!("Parser thread panicked: {:?}", e))??;
         reader1_handle
             .join()
-            .map_err(|e| anyhow!("Writer2 thread panicked: {:?}", e))??;
+            .map_err(|e| anyhow!("Reader1 thread panicked: {:?}", e))??;
         reader2_handle
             .join()
-            .map_err(|e| anyhow!("Writer2 thread panicked: {:?}", e))??;
+            .map_err(|e| anyhow!("Reader2 thread panicked: {:?}", e))??;
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+    use std::io::Read;
+
+    use flate2::read::GzDecoder;
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn test_reader_seq_refine_paired_read_passthrough() -> Result<()> {
+        // Sample paired-end FASTQ records (matching IDs)
+        let read1 = b"@SEQ_ID1\nACGT\n+\n!!!!\n@SEQ_ID2\nTGCA\n+\n####\n";
+        let read2 = b"@SEQ_ID1\nTTAA\n+\n$$$$\n@SEQ_ID2\nAATT\n+\n%%%%\n";
+
+        // Create temp directory and files
+        let tmp = tempdir()?;
+        let out1_path = tmp.path().join("out1.fq.gz");
+        let out2_path = tmp.path().join("out2.fq.gz");
+
+        // No-op transformation
+        let ranges: SortedSeqRanges = vec![SeqRange::From(3), SeqRange::To(2)]
+            .into_iter()
+            .collect();
+        let mut actions = SubseqActions::builder();
+        actions.add_action(SeqAction::Embed("UMI".to_string()), ranges);
+        let actions = actions.build();
+        let actions = SubseqPairedActions::new(Some(actions), None);
+        // Run paired reader pipeline
+        reader_seq_refine_paired_read(
+            &read1[..],
+            Some(out1_path.to_str().unwrap()),
+            &read2[..],
+            Some(out2_path.to_str().unwrap()),
+            actions,
+            1,       // chunk_size
+            4096,    // buffer_size
+            1,       // batch_size
+            Some(4), // queue size
+        )?;
+
+        // Decompress and read output
+        let mut buf1 = String::new();
+        GzDecoder::new(File::open(out1_path)?).read_to_string(&mut buf1)?;
+
+        let mut buf2 = String::new();
+        GzDecoder::new(File::open(out2_path)?).read_to_string(&mut buf2)?;
+
+        // Assert equality with original input
+        assert_eq!(
+            buf1.as_bytes(),
+            b"@SEQ_ID1 RSAHMI{UMI:ACT}\nACGT\n+\n!!!!\n@SEQ_ID2 RSAHMI{UMI:TGA}\nTGCA\n+\n####\n"
+        );
+        assert_eq!(
+            buf2.as_bytes(),
+            b"@SEQ_ID1 RSAHMI{UMI:TTA}\nTTAA\n+\n$$$$\n@SEQ_ID2 RSAHMI{UMI:AAT}\nAATT\n+\n%%%%\n"
+        );
+        Ok(())
+    }
 }

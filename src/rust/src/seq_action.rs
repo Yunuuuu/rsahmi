@@ -429,7 +429,7 @@ impl SubseqActions {
         let description;
         if self.has_embed() {
             let tags = self.embedded_tags(&record.seq)?;
-            description = Some(tag_description(&tags, &record.desc)?);
+            description = Some(tag_description(&tags, &record.desc));
         } else {
             description = record.desc.map(|d| Bytes::copy_from_slice(d));
         }
@@ -460,7 +460,7 @@ impl SubseqActions {
             record.desc = Some(tag_description(
                 &tags,
                 &record.desc.as_ref().map(|d| d.as_ref()),
-            )?);
+            ));
         }
 
         // prepare sequence and quality
@@ -557,8 +557,8 @@ impl SubseqPairedActions {
         let description1;
         let description2;
         if let Some(ref tags) = tags {
-            description1 = Some(tag_description(&tags, &record1.desc)?);
-            description2 = Some(tag_description(&tags, &record2.desc)?);
+            description1 = Some(tag_description(&tags, &record1.desc));
+            description2 = Some(tag_description(&tags, &record2.desc));
         } else {
             description1 = record1.desc.map(|d| Bytes::copy_from_slice(d));
             description2 = record1.desc.map(|d| Bytes::copy_from_slice(d));
@@ -620,11 +620,11 @@ impl SubseqPairedActions {
             record1.desc = Some(tag_description(
                 &tags,
                 &record1.desc.as_ref().map(|d| d.as_ref()),
-            )?);
+            ));
             record2.desc = Some(tag_description(
                 &tags,
                 &record2.desc.as_ref().map(|d| d.as_ref()),
-            )?);
+            ));
         }
 
         // prepare sequence and quality
@@ -646,7 +646,7 @@ impl SubseqPairedActions {
     }
 }
 
-fn tag_description(tags: &Vec<Bytes>, desc: &Option<&[u8]>) -> Result<Bytes> {
+fn tag_description(tags: &Vec<Bytes>, desc: &Option<&[u8]>) -> Bytes {
     // add prefix, tag and seprator
     let prefix = b"RSAHMI{";
     let suffix = b'}';
@@ -675,7 +675,7 @@ fn tag_description(tags: &Vec<Bytes>, desc: &Option<&[u8]>) -> Result<Bytes> {
         tag.extend_from_slice(t);
     }
     tag.put_u8(suffix);
-    Ok(tag.freeze())
+    tag.freeze()
 }
 
 pub(crate) struct SubseqActionsBuilder {
