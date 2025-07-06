@@ -1,10 +1,8 @@
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::iter::zip;
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-use std::sync::Arc;
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use flate2::write::GzEncoder;
@@ -121,100 +119,53 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         });
 
         // ─── Parser Thread ─────────────────────────────────────
-        let parser_handle = scope.spawn(move || {
-            // will move `parser_tx`, `reader1_rx`, `reader2_rx`
-            // Shared atomic flag to signal if any thread encountered an error
-            let has_error = Arc::new(AtomicBool::new(false));
-            // A bounded channel to capture the first error that occurs (capacity = 1)
-            let (err_tx, err_rx) = crossbeam_channel::bounded(1);
-            // Rayon scope for spawning parsing threads
-            rayon::scope(|s| -> Result<()> {
-                loop {
-                    let (records1, records2) = match (reader1_rx.recv(), reader2_rx.recv()) {
-                        (Ok(rec1), Ok(rec2)) => (rec1, rec2),
-                        (Err(_), Ok(_)) => {
-                            return Err(anyhow!(
-                                "FASTQ pairing error: read1 channel closed unexpectedly before read2"
-                            ));
+        let mut parser_handles = Vec::with_capacity(10);
+        for _ in 0 .. 10 {
+            let rx1 = reader1_rx.clone();
+            let rx2 = reader2_rx.clone();
+            let tx = parser_tx.clone();
+            let handle =
+                scope.spawn(move || -> Result<()> {
+                    let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
+                    loop {
+                        let (records1, records2) = match (rx1.recv(), rx2.recv()) {
+                            (Ok(rec1), Ok(rec2)) => (rec1, rec2),
+                            (Err(_), Ok(_)) => {
+                                return Err(anyhow!(
+                                    "FASTQ pairing error: read1 channel closed unexpectedly before read2"
+                                ));
+                            }
+                            (Ok(_), Err(_)) => {
+                                return Err(anyhow!(
+                                    "FASTQ pairing error: read2 channel closed unexpectedly before read1"
+                                ));
+                            }
+                            (Err(_), Err(_)) => {
+                                return Ok(());
+                            }
+                        };
+                        if records1.len() != records2.len() {
+                            return Err(anyhow!("FASTQ pairing error: mismatched record counts"));
                         }
-                        (Ok(_), Err(_)) => {
-                            return Err(anyhow!(
-                                "FASTQ pairing error: read2 channel closed unexpectedly before read1"
-                            ));
-                        }
-                        (Err(_), Err(_)) => {
-                            return Ok(());
-                        }
-                    };
-                    if records1.len() != records2.len() {
-                        return Err(anyhow!("FASTQ pairing error: mismatched record counts"));
-                    }
-
-                    // If an error already occurred, stop spawning new threads
-                    if has_error.load(Relaxed) {
-                        return Ok(());
-                    }
-
-                    // Initialize a thread-local batch sender for matching records
-                    let mut thread_tx = BatchSender::with_capacity(batch_size, parser_tx.clone());
-
-                    // Clone the shared error state for this thread
-                    let thread_has_error = has_error.clone();
-                    let thread_err_tx: Sender<Error> = err_tx.clone();
-                    s.spawn(move |_| {
+                        // Initialize a thread-local batch sender for matching records
                         for (mut record1, mut record2) in zip(records1, records2) {
                             if record1.id != record2.id {
-                                // Mark that an error has occurred
-                                thread_has_error.store(true, Relaxed);
-                                // Only the first error is reported
-                                let _ = thread_err_tx.try_send(anyhow!(
+                                return Err(anyhow!(
                                     "FASTQ pairing error: mismatched record id (read1: {}, read2: {})",
                                     String::from_utf8_lossy(&record1.id),
                                     String::from_utf8_lossy(&record2.id)
                                 ));
-                                return ();
                             }
-                            match actions.transform_fastq_bytes(&mut record1, &mut record2) {
-                                Ok(_) => {
-                                    // Attempt to send the matching record to the writer thread.
-                                    match thread_tx.send((record1, record2)) {
-                                        Ok(_) => continue,
-                                        Err(_) => {
-                                            // If this fails, it means the writer thread has already exited due to an error.
-                                            // Since that error will be reported separately, we can safely ignore this send failure.
-                                            // Mark that an error has occurred
-                                            thread_has_error.store(true, Relaxed);
-                                            return ();
-                                        }
-                                    };
-                                }
-                                Err(e) => {
-                                    // Mark that an error has occurred
-                                    thread_has_error.store(true, Relaxed);
-                                    // Only the first error is reported
-                                    let _ = thread_err_tx.try_send(e.into());
-                                    return ();
-                                }
-                            }
+                            actions.transform_fastq_bytes(&mut record1, &mut record2)?;
+                            thread_tx.send((record1, record2))?;
                         }
-                        let _ = thread_tx.flush();
-                    });
-                }
-            })?;
-            drop(reader1_rx);
-            drop(reader2_rx);
-
-            // Clean up: close the error channel and drop parser sender
-            drop(err_tx);// To close err_rx
-            drop(parser_tx); // To close writer_rx
-            // Report the first error if any thread encountered one
-            if has_error.load(Relaxed) {
-                let err = err_rx.recv()?; // Safe unwrap because has_error is true
-                Err(err)
-            } else {
-                Ok(())
-            }
-        });
+                    }
+                });
+            parser_handles.push(handle);
+        }
+        drop(reader1_rx);
+        drop(reader2_rx);
+        drop(parser_tx);
 
         // ─── reader Thread ─────────────────────────────────────
         let reader1_handle = scope.spawn(move || -> Result<()> {
@@ -251,9 +202,13 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         writer_handle
             .join()
             .map_err(|e| anyhow!("Writer thread panicked: {:?}", e))??;
-        parser_handle
-            .join()
-            .map_err(|e| anyhow!("Parser thread panicked: {:?}", e))??;
+
+        // we ensure no data to send
+        for handler in parser_handles {
+            handler
+                .join()
+                .map_err(|e| anyhow!("Parser thread panicked: {:?}", e))??;
+        }
         reader1_handle
             .join()
             .map_err(|e| anyhow!("Reader1 thread panicked: {:?}", e))??;
