@@ -25,6 +25,10 @@ impl<T> FastqRecord<T> {
 impl<T: AsRef<[u8]>> FastqRecord<T> {
     #[allow(dead_code)]
     pub(crate) fn write<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.as_vec())
+    }
+
+    pub(crate) fn as_vec(&self) -> Vec<u8> {
         let id = self.id.as_ref();
         let desc = self.desc.as_ref().map(|d| d.as_ref());
         let seq = self.seq.as_ref();
@@ -53,8 +57,7 @@ impl<T: AsRef<[u8]>> FastqRecord<T> {
         buffer.push(b'\n');
         buffer.extend_from_slice(qual);
         buffer.push(b'\n');
-
-        writer.write_all(&buffer)
+        buffer
     }
 
     #[allow(dead_code)]

@@ -9,10 +9,12 @@ use memmap2::Mmap;
 mod batchsender;
 mod bench;
 // mod koutput_reads;
+mod fastq_reader;
 mod kractor;
 mod kreport;
 mod parser;
 mod reader;
+mod reader0;
 mod seq_action;
 mod seq_refine;
 

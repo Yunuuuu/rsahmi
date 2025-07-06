@@ -1,0 +1,271 @@
+use std::io::Read;
+
+use anyhow::Result;
+use bytes::{Bytes, BytesMut};
+use memchr::memchr2;
+
+use crate::parser::fastq::FastqParseError;
+use crate::parser::fastq::FastqRecord;
+use crate::reader0::BytesReader;
+
+pub(crate) struct FastqReader<R> {
+    reader: BytesReader<R>,
+    offset: usize,
+    label: Option<&'static str>,
+}
+
+impl<R: Read> FastqReader<R> {
+    pub(crate) fn new(reader: R) -> Self {
+        Self {
+            reader: BytesReader::new(reader),
+            offset: 0,
+            label: None,
+        }
+    }
+
+    fn read_line(&mut self) -> Result<Option<BytesMut>> {
+        let line = self.reader.read_line()?.map(|mut b| {
+            if !b.is_empty() {
+                let mut end = b.len();
+                while end > 0 {
+                    if b[end - 1] == b'\n' || b[end - 1] == b'r' {
+                        end -= 1; // Remove the newline character
+                    } else {
+                        break;
+                    }
+                }
+                if end == 0 {
+                    return BytesMut::new();
+                } else {
+                    b.split_off(end + 1);
+                }
+            }
+            b
+        });
+        self.offset += 1;
+        Ok(line)
+    }
+
+    pub(crate) fn read_record(&mut self) -> Result<Option<FastqRecord<Bytes>>> {
+        let mut header;
+        loop {
+            if let Some(line) = self.read_line()? {
+                if line.iter().all(|b| b.is_ascii_whitespace()) {
+                    continue;
+                } else {
+                    header = line;
+                    break;
+                }
+            } else {
+                return Ok(None);
+            }
+        }
+
+        // SAFETY: we must ensure line is not empty, this is ensured by the caller function
+        if header.is_empty() || unsafe { *header.get_unchecked(0) } != b'@' {
+            Err(FastqParseError::InvalidHead {
+                label: self.label,
+                record: format!("{}", String::from_utf8_lossy(&header)),
+                pos: self.offset,
+            })?;
+        }
+        let _ = header.split_to(1); // remove the '@' from the start of the sequence ID
+        let id;
+        let desc;
+        if let Some(line_pos) = memchr2(b' ', b'\t', &header) {
+            id = header.split_to(line_pos);
+            let _ = header.split_to(1); // remove the blankspace
+                                        // check if description exits
+            if header.is_empty() {
+                desc = None
+            } else {
+                desc = Some(header);
+            }
+        } else {
+            id = header;
+            desc = None;
+        }
+
+        // 2nd line (sequence) must exist. Otherwise, incomplete record.
+        let seq = if let Some(line) = self.read_line()? {
+            Ok(line)
+        } else {
+            Err(FastqParseError::IncompleteRecord {
+                label: self.label,
+                record: format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&id),
+                    String::from_utf8_lossy(
+                        desc.as_ref()
+                            .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
+                    )
+                ),
+                pos: self.offset,
+            })
+        }?;
+
+        // 3rd line (separator). Must exist.
+        let sep = if let Some(line) = self.read_line()? {
+            // Separator: begins with a '+' character and is optionally followed by the same sequence identifier
+            if line.is_empty() || unsafe { *line.get_unchecked(0) } != b'+' {
+                Err(FastqParseError::InvalidSep {
+                    label: self.label,
+                    record: format!(
+                        "{}\n{}\n{}",
+                        String::from_utf8_lossy(
+                            desc.as_ref()
+                                .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
+                        ),
+                        String::from_utf8_lossy(&seq),
+                        String::from_utf8_lossy(&line)
+                    ),
+                    pos: self.offset,
+                })
+            } else {
+                Ok(line)
+            }
+        } else {
+            Err(FastqParseError::IncompleteRecord {
+                label: self.label,
+                record: format!(
+                    "{}\n{}",
+                    String::from_utf8_lossy(
+                        desc.as_ref()
+                            .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
+                    ),
+                    String::from_utf8_lossy(&seq)
+                ),
+                pos: self.offset,
+            })
+        }?;
+
+        // 4th line (quality). Must exist.
+        let qual = if let Some(line) = self.read_line()? {
+            if seq.len() != line.len() {
+                Err(FastqParseError::UnequalLength {
+                    label: self.label,
+                    seq: seq.len(),
+                    qual: line.len(),
+                    record: format!(
+                        "{}\n{}\n{}\n{}",
+                        String::from_utf8_lossy(
+                            desc.as_ref()
+                                .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
+                        ),
+                        String::from_utf8_lossy(&seq),
+                        String::from_utf8_lossy(&sep),
+                        String::from_utf8_lossy(&line)
+                    ),
+                    pos: self.offset,
+                })
+            } else {
+                Ok(line)
+            }
+        } else {
+            Err(FastqParseError::IncompleteRecord {
+                label: self.label,
+                record: format!(
+                    "{}\n{}\n{}",
+                    String::from_utf8_lossy(
+                        desc.as_ref()
+                            .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
+                    ),
+                    String::from_utf8_lossy(&seq),
+                    String::from_utf8_lossy(&sep),
+                ),
+                pos: self.offset,
+            })
+        }?;
+        Ok(Some(FastqRecord::new(
+            id.freeze(),
+            desc.map(|d| d.freeze()),
+            seq.freeze(),
+            sep.freeze(),
+            qual.freeze(),
+        )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    fn create_reader(data: &str) -> FastqReader<Cursor<&[u8]>> {
+        let reader = Cursor::new(data.as_bytes());
+        let bytes_reader = BytesReader::new(reader);
+        FastqReader {
+            reader: bytes_reader,
+            offset: 0,
+            label: None,
+        }
+    }
+
+    #[test]
+    fn test_read_valid_record() -> Result<()> {
+        let fastq_data = "@seq1 description\nATGC\n+\n!!!!\n@seq2\nGCGT\n+\n$$$$\n";
+
+        let mut reader = create_reader(fastq_data);
+
+        let record = reader.read_record()?.expect("Should have a record");
+
+        // Check that the FASTQ fields match the expected values
+        assert_eq!(record.id.as_ref(), b"seq1");
+        assert_eq!(record.desc.unwrap().as_ref(), b"description");
+        assert_eq!(record.seq.as_ref(), b"ATGC");
+        assert_eq!(record.sep.as_ref(), b"+");
+        assert_eq!(record.qual.as_ref(), b"!!!!");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_header() -> Result<()> {
+        let fastq_data = "seq1 description\nATGC\n+\n!!!!\n";
+
+        let mut reader = create_reader(fastq_data);
+
+        let result = reader.read_record();
+
+        assert!(result.is_err()); // Expect error: Invalid header
+        Ok(())
+    }
+
+    #[test]
+    fn test_incomplete_record() -> Result<()> {
+        let fastq_data = "@seq1 description\nATGC\n+\n";
+
+        let mut reader = create_reader(fastq_data);
+
+        let result = reader.read_record();
+
+        assert!(result.is_err()); // Expect error: Incomplete record (missing quality)
+        Ok(())
+    }
+
+    #[test]
+    fn test_unmatched_seq_qual_length() -> Result<()> {
+        let fastq_data = "@seq1 description\nATGC\n+\n!!\n";
+
+        let mut reader = create_reader(fastq_data);
+
+        let result = reader.read_record();
+
+        assert!(result.is_err()); // Expect error: Unequal sequence and quality lengths
+        Ok(())
+    }
+
+    #[test]
+    fn test_edge_case_empty_data() -> Result<()> {
+        let fastq_data = "";
+
+        let mut reader = create_reader(fastq_data);
+
+        let result = reader.read_record();
+
+        assert!(result.is_ok()); // Expect error: EOF
+        assert!(result.unwrap().is_none());
+        Ok(())
+    }
+}

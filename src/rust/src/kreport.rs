@@ -158,7 +158,7 @@ fn parse_usize(bytes: &[u8]) -> Result<usize> {
         .map_err(|e| anyhow!("Failed to parse integer '{}': {}", s.trim(), e))
 }
 
-fn list_rstr(vv: Vec<Vec<u8>>) -> Vec<Rstr> {
+fn u8_to_list_rstr(vv: Vec<Vec<u8>>) -> Vec<Rstr> {
     vv.into_iter().map(|v| u8_to_rstr(v)).collect()
 }
 
@@ -195,9 +195,9 @@ fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
         taxid.push(u8_to_rstr(report.taxid));
         taxa.push(u8_to_rstr(report.taxon));
 
-        ranks.push(Robj::from(list_rstr(report.ranks)));
-        taxids.push(Robj::from(list_rstr(report.taxids)));
-        taxon.push(Robj::from(list_rstr(report.taxa)));
+        ranks.push(Robj::from(u8_to_list_rstr(report.ranks)));
+        taxids.push(Robj::from(u8_to_list_rstr(report.taxids)));
+        taxon.push(Robj::from(u8_to_list_rstr(report.taxa)));
 
         match (report.minimizer_len, report.minimizer_n_unique) {
             (Some(a), Some(b)) => {
