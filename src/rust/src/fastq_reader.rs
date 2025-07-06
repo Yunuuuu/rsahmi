@@ -1,49 +1,61 @@
+use std::io::BufRead;
+use std::io::BufReader;
 use std::io::Read;
 
 use anyhow::Result;
 use bytes::{Bytes, BytesMut};
+use memchr::memchr;
 use memchr::memchr2;
 
 use crate::parser::fastq::FastqParseError;
 use crate::parser::fastq::FastqRecord;
-use crate::reader0::BytesReader;
 
 pub(crate) struct FastqReader<R> {
-    reader: BytesReader<R>,
+    reader: R,
     offset: usize,
     label: Option<&'static str>,
 }
 
-impl<R: Read> FastqReader<R> {
-    pub(crate) fn new(reader: R) -> Self {
+impl<R: Read> FastqReader<BufReader<R>> {
+    pub(crate) fn new(reader: BufReader<R>) -> Self {
         Self {
-            reader: BytesReader::new(reader),
+            reader,
             offset: 0,
             label: None,
         }
     }
 
     fn read_line(&mut self) -> Result<Option<BytesMut>> {
-        let line = self.reader.read_line()?.map(|mut b| {
-            if !b.is_empty() {
-                let mut end = b.len();
-                while end > 0 {
-                    if b[end - 1] == b'\n' || b[end - 1] == b'r' {
-                        end -= 1; // Remove the newline character
+        // No enough data; take what's left
+        let mut line = BytesMut::new();
+        // Refill until we get the `byte` or EOF
+        loop {
+            let available = self.reader.fill_buf()?;
+            let (done, used) = match memchr(b'\n', available) {
+                Some(i) => {
+                    if i > 0 && available[i - 1] == b'\r' {
+                        line.extend_from_slice(&available[.. i - 1]);
                     } else {
-                        break;
+                        line.extend_from_slice(&available[.. i]);
                     }
+                    (true, i + 1)
                 }
-                if end == 0 {
-                    return BytesMut::new();
-                } else {
-                    let _ = b.split_off(end);
+                None => {
+                    line.extend_from_slice(available);
+                    (false, available.len())
                 }
+            };
+            self.reader.consume(used);
+            if done || used == 0 {
+                break;
             }
-            b
-        });
-        self.offset += 1;
-        Ok(line)
+        }
+        if line.is_empty() {
+            return Ok(None);
+        } else {
+            self.offset += 1;
+            return Ok(Some(line));
+        }
     }
 
     pub(crate) fn read_record(&mut self) -> Result<Option<FastqRecord<Bytes>>> {
@@ -73,22 +85,22 @@ impl<R: Read> FastqReader<R> {
         let id;
         let desc;
         if let Some(line_pos) = memchr2(b' ', b'\t', &header) {
-            id = header.split_to(line_pos);
+            id = header.split_to(line_pos).freeze();
             let _ = header.split_to(1); // remove the blankspace
                                         // check if description exits
             if header.is_empty() {
                 desc = None
             } else {
-                desc = Some(header);
+                desc = Some(header.freeze());
             }
         } else {
-            id = header;
+            id = header.freeze();
             desc = None;
         }
 
         // 2nd line (sequence) must exist. Otherwise, incomplete record.
         let seq = if let Some(line) = self.read_line()? {
-            Ok(line)
+            Ok(line.freeze())
         } else {
             Err(FastqParseError::IncompleteRecord {
                 label: self.label,
@@ -111,7 +123,8 @@ impl<R: Read> FastqReader<R> {
                 Err(FastqParseError::InvalidSep {
                     label: self.label,
                     record: format!(
-                        "{}\n{}\n{}",
+                        "{}{}\n{}\n{}",
+                        String::from_utf8_lossy(&id),
                         String::from_utf8_lossy(
                             desc.as_ref()
                                 .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
@@ -122,13 +135,14 @@ impl<R: Read> FastqReader<R> {
                     pos: self.offset,
                 })
             } else {
-                Ok(line)
+                Ok(line.freeze())
             }
         } else {
             Err(FastqParseError::IncompleteRecord {
                 label: self.label,
                 record: format!(
-                    "{}\n{}",
+                    "{}{}\n{}",
+                    String::from_utf8_lossy(&id),
                     String::from_utf8_lossy(
                         desc.as_ref()
                             .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
@@ -147,7 +161,8 @@ impl<R: Read> FastqReader<R> {
                     seq: seq.len(),
                     qual: line.len(),
                     record: format!(
-                        "{}\n{}\n{}\n{}",
+                        "{}{}\n{}\n{}\n{}",
+                        String::from_utf8_lossy(&id),
                         String::from_utf8_lossy(
                             desc.as_ref()
                                 .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
@@ -159,7 +174,7 @@ impl<R: Read> FastqReader<R> {
                     pos: self.offset,
                 })
             } else {
-                Ok(line)
+                Ok(line.freeze())
             }
         } else {
             Err(FastqParseError::IncompleteRecord {
@@ -176,13 +191,7 @@ impl<R: Read> FastqReader<R> {
                 pos: self.offset,
             })
         }?;
-        Ok(Some(FastqRecord::new(
-            id.freeze(),
-            desc.map(|d| d.freeze()),
-            seq.freeze(),
-            sep.freeze(),
-            qual.freeze(),
-        )))
+        Ok(Some(FastqRecord::new(id, desc, seq, sep, qual)))
     }
 }
 
@@ -192,9 +201,9 @@ mod tests {
 
     use super::*;
 
-    fn create_reader(data: &str) -> FastqReader<Cursor<&[u8]>> {
+    fn create_reader(data: &str) -> FastqReader<BufReader<Cursor<&[u8]>>> {
         let reader = Cursor::new(data.as_bytes());
-        let bytes_reader = BytesReader::new(reader);
+        let bytes_reader = BufReader::new(reader);
         FastqReader {
             reader: bytes_reader,
             offset: 0,

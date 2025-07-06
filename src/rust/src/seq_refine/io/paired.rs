@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufWriter, Read};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::iter::zip;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
@@ -31,6 +31,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         let file = File::create(&file)?;
         let bw = BufWriter::with_capacity(buffer_size, file);
         writer1 = Some(GzEncoder::new(bw, Compression::new(4)));
+        // writer1 = Some(bw);
     } else {
         writer1 = None
     }
@@ -39,6 +40,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         let file = File::create(&file)?;
         let bw = BufWriter::with_capacity(buffer_size, file);
         writer2 = Some(GzEncoder::new(bw, Compression::new(4)));
+        // writer2 = Some(bw);
     } else {
         writer2 = None
     }
@@ -79,6 +81,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                         record.write(&mut writer)?;
                     }
                 }
+                writer.flush()?;
                 Ok(())
             }))
         } else {
@@ -93,6 +96,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                         record.write(&mut writer)?;
                     }
                 }
+                writer.flush()?;
                 Ok(())
             }))
         } else {
@@ -118,7 +122,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         let parser_handle = scope.spawn(move || {
-            // will move `parser_tx`, `reader1_rx`, reader2_rx
+            // will move `parser_tx`, `reader1_rx`, `reader2_rx`
             // Shared atomic flag to signal if any thread encountered an error
             let has_error = Arc::new(AtomicBool::new(false));
             // A bounded channel to capture the first error that occurs (capacity = 1)
@@ -197,10 +201,12 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                     });
                 }
             })?;
+            drop(reader1_rx);
+            drop(reader2_rx);
+
             // Clean up: close the error channel and drop parser sender
             drop(err_tx);// To close err_rx
             drop(parser_tx); // To close writer_rx
-
             // Report the first error if any thread encountered one
             if has_error.load(Relaxed) {
                 let err = err_rx.recv()?; // Safe unwrap because has_error is true
@@ -212,7 +218,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
 
         // ─── reader Thread ─────────────────────────────────────
         let reader1_handle = scope.spawn(move || -> Result<()> {
-            let mut reader1 = fastq_reader::FastqReader::new(reader1);
+            let mut reader1 = fastq_reader::FastqReader::new(BufReader::new(reader1));
             let mut reader1_tx = BatchSender::with_capacity(chunk_size, reader1_tx);
             while let Some(record) = reader1.read_record()? {
                 reader1_tx.send(record)?;
@@ -222,7 +228,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         });
 
         let reader2_handle = scope.spawn(move || -> Result<()> {
-            let mut reader2 = fastq_reader::FastqReader::new(reader2);
+            let mut reader2 = fastq_reader::FastqReader::new(BufReader::new(reader2));
             let mut reader2_tx = BatchSender::with_capacity(chunk_size, reader2_tx);
             while let Some(record) = reader2.read_record()? {
                 reader2_tx.send(record)?;
