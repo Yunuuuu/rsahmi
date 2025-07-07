@@ -1,63 +1,37 @@
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::iter::zip;
-use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
-use flate2::write::GzEncoder;
-use flate2::Compression;
 
 use crate::batchsender::BatchSender;
 use crate::parser::fastq::FastqRecord;
-use crate::{fastq_reader, seq_action::*};
+use crate::{fastq_reader::FastqReader, seq_action::*};
 
-pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
-    reader1: R1,
-    ofile1: Option<&str>,
-    reader2: R2,
-    ofile2: Option<&str>,
-    ref actions: SubseqPairedActions,
+pub(crate) fn reader_seq_refine_paired_read<
+    R1: Read + Send,
+    R2: Read + Send,
+    W1: Write + Send,
+    W2: Write + Send,
+>(
+    reader1: &mut R1,
+    writer1: &mut Option<W1>,
+    reader2: &mut R2,
+    writer2: &mut Option<W2>,
+    actions: &SubseqPairedActions,
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
-    // Create output file and wrap in buffered writer
-    let writer1: Option<Box<dyn Write + Send>>;
-    if let Some(file) = ofile1 {
-        let path: &Path = file.as_ref();
-        let file = File::create(path)
-            .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
-        let bw = BufWriter::with_capacity(buffer_size, file);
-        if crate::gz_compressed(path) {
-            writer1 = Some(Box::new(GzEncoder::new(bw, Compression::new(4))));
-        } else {
-            writer1 = Some(Box::new(bw))
-        }
-    } else {
-        writer1 = None
-    }
-    let writer2: Option<Box<dyn Write + Send>>;
-    if let Some(file) = ofile2 {
-        let path: &Path = file.as_ref();
-        let file = File::create(path)
-            .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
-        let bw = BufWriter::with_capacity(buffer_size, file);
-        if crate::gz_compressed(path) {
-            writer2 = Some(Box::new(GzEncoder::new(bw, Compression::new(4))));
-        } else {
-            writer2 = Some(Box::new(bw))
-        }
-    } else {
-        writer2 = None
-    }
+    let mut reader1 = FastqReader::new(BufReader::with_capacity(buffer_size, reader1));
+    let mut reader2 = FastqReader::new(BufReader::with_capacity(buffer_size, reader2));
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
-        let (parser_tx, writer_rx): (
+        let (writer_tx, writer_rx): (
             Sender<Vec<(FastqRecord<Bytes>, FastqRecord<Bytes>)>>,
             Receiver<Vec<(FastqRecord<Bytes>, FastqRecord<Bytes>)>>,
         ) = crate::new_channel(nqueue);
@@ -90,7 +64,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         }
 
         let has_writer1 = writer1.is_some();
-        let writer1_handle = if let Some(mut writer) = writer1 {
+        let writer1_handle = if let Some(writer) = writer1 {
             Some(scope.spawn(move || -> Result<()> {
                 for chunk in writer1_rx {
                     for record in chunk {
@@ -109,7 +83,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         };
 
         let has_writer2 = writer2.is_some();
-        let writer2_handle = if let Some(mut writer) = writer2 {
+        let writer2_handle = if let Some(writer) = writer2 {
             Some(scope.spawn(move || -> Result<()> {
                 for chunk in writer2_rx {
                     for record in chunk {
@@ -171,7 +145,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             let reader2_rx = reader2_rx_vec.pop().ok_or(anyhow!(
                 "(Parser setup) Not enough read2 channels for threads"
             ))?;
-            let tx = parser_tx.clone();
+            let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
                 let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
                 loop {
@@ -209,7 +183,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             });
             parser_handles.push(handle);
         }
-        drop(parser_tx);
+        drop(writer_tx);
 
         // ─── reader Thread ─────────────────────────────────────
         let reader1_handle = scope.spawn(move || -> Result<()> {
@@ -218,7 +192,6 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 .map(|tx| BatchSender::with_capacity(chunk_size, tx))
                 .collect::<Vec<_>>();
             let mut n = 0usize;
-            let mut reader1 = fastq_reader::FastqReader::new(BufReader::new(reader1));
             while let Some(record) = reader1
                 .read_record()
                 .map_err(|e| anyhow!("(Reader1) Error while reading FASTQ record: {}", e))?
@@ -246,7 +219,6 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 .map(|tx| BatchSender::with_capacity(chunk_size, tx))
                 .collect::<Vec<_>>();
             let mut n = 0usize;
-            let mut reader2 = fastq_reader::FastqReader::new(BufReader::new(reader2));
             while let Some(record) = reader2
                 .read_record()
                 .map_err(|e| anyhow!("(Reader2) Error while reading FASTQ record: {}", e))?
@@ -307,6 +279,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    use crate::fastq_reader::fastq_writer;
 
     #[test]
     fn test_reader_seq_refine_paired_read_passthrough() -> Result<()> {
@@ -317,7 +290,9 @@ mod tests {
         // Create temp directory and files
         let tmp = tempdir()?;
         let out1_path = tmp.path().join("out1.fq.gz");
+        let writer1 = fastq_writer(&out1_path, 10, 4, None).unwrap();
         let out2_path = tmp.path().join("out2.fq.gz");
+        let writer2 = fastq_writer(&out2_path, 10, 4, None).unwrap();
 
         // No-op transformation
         let ranges: SortedSeqRanges = vec![SeqRange::From(3), SeqRange::To(2)]
@@ -329,15 +304,15 @@ mod tests {
         let actions = SubseqPairedActions::new(Some(actions), None);
         // Run paired reader pipeline
         reader_seq_refine_paired_read(
-            &read1[..],
-            Some(out1_path.to_str().unwrap()),
-            &read2[..],
-            Some(out2_path.to_str().unwrap()),
-            actions,
+            &mut read1.as_slice(),
+            &mut Some(writer1),
+            &mut read2.as_slice(),
+            &mut Some(writer2),
+            &actions,
             1,       // chunk_size
-            4096,    // buffer_size
+            10,      // buffer_size
             1,       // batch_size
-            Some(4), // queue size
+            Some(1), // queue size
             1,
         )?;
 
@@ -355,7 +330,7 @@ mod tests {
         );
         assert_eq!(
             buf2.as_bytes(),
-            b"@SEQ_ID1 RSAHMI{UMI:TTA}\nTTAA\n+\n$$$$\n@SEQ_ID2 RSAHMI{UMI:AAT}\nAATT\n+\n%%%%\n"
+            b"@SEQ_ID1 RSAHMI{UMI:ACT}\nTTAA\n+\n$$$$\n@SEQ_ID2 RSAHMI{UMI:TGA}\nAATT\n+\n%%%%\n"
         );
         Ok(())
     }

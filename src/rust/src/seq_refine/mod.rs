@@ -1,16 +1,11 @@
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
-
 use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
-use flate2::bufread::MultiGzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 
 pub(crate) mod paired;
 pub(crate) mod single;
 
-use crate::reader::bytes::ProgressBarReader;
+use crate::fastq_reader::*;
 use crate::seq_action::*;
 
 #[extendr]
@@ -24,6 +19,7 @@ pub(crate) fn seq_refine(
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
+    compression_level: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> std::result::Result<(), String> {
@@ -41,6 +37,7 @@ pub(crate) fn seq_refine(
             chunk_size,
             buffer_size,
             batch_size,
+            compression_level,
             nqueue,
             threads,
         )
@@ -53,7 +50,9 @@ pub(crate) fn seq_refine(
             chunk_size,
             buffer_size,
             batch_size,
+            compression_level,
             nqueue,
+            threads,
         )
         .map_err(|e| format!("{}", e))
     }
@@ -66,40 +65,35 @@ fn reader_seq_refine_single_read(
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
+    compression_level: usize,
     nqueue: Option<usize>,
+    threads: usize,
 ) -> Result<()> {
     let ofile1 = ofile1.ok_or_else(|| anyhow!("No output file specified."))?;
     let actions = actions.ok_or_else(|| anyhow!("No sequence actions were specified."))?;
-    let path: &Path = fq1.as_ref();
-    let file: File = File::open(path)?;
-
     let style = crate::progress_style()?;
-    let pb = ProgressBar::new(file.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon);
-    pb.set_prefix("Parsing fq1");
-    pb.set_style(style);
-    let reader = ProgressBarReader::new(&file, pb);
+    let progress = MultiProgress::new();
+    let pb1 = progress.add(
+        ProgressBar::new(std::fs::metadata(fq1)?.len() as u64).with_finish(ProgressFinish::Abandon),
+    );
+    pb1.set_prefix("Reading fastq");
+    pb1.set_style(style.clone());
 
-    if crate::gz_compressed(path) {
-        single::reader_seq_refine_single_read(
-            MultiGzDecoder::new(BufReader::with_capacity(chunk_size, reader)),
-            ofile1,
-            actions,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-        )
-    } else {
-        single::reader_seq_refine_single_read(
-            reader,
-            ofile1,
-            actions,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-        )
-    }
+    let pb2 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
+    pb2.set_prefix("Writing fastq");
+    pb2.set_style(style);
+    let mut reader = fastq_reader(&fq1, buffer_size, Some(pb1))?;
+    let mut writer = fastq_writer(&ofile1, buffer_size, compression_level as u32, Some(pb2))?;
+    single::reader_seq_refine_single_read(
+        &mut reader,
+        &mut writer,
+        &actions,
+        chunk_size,
+        buffer_size,
+        batch_size,
+        nqueue,
+        threads,
+    )
 }
 
 fn reader_seq_refine_paired_read(
@@ -112,6 +106,7 @@ fn reader_seq_refine_paired_read(
     chunk_size: usize,
     buffer_size: usize,
     batch_size: usize,
+    compression_level: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -123,78 +118,62 @@ fn reader_seq_refine_paired_read(
             "No sequence actions were specified. Please provide at least one action to proceed"
         ));
     }
-    let path1: &Path = fq1.as_ref();
-    let file1 =
-        File::open(path1).map_err(|e| anyhow!("Failed to open file {}: {}", path1.display(), e))?;
-    let path2: &Path = fq2.as_ref();
-    let file2 =
-        File::open(path2).map_err(|e| anyhow!("Failed to open file {}: {}", path2.display(), e))?;
 
     let style = crate::progress_style()?;
     let progress = MultiProgress::new();
-    let pb1 = progress
-        .add(ProgressBar::new(file1.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon));
-    pb1.set_prefix("Parsing fq1");
+    let pb1 = progress.add(
+        ProgressBar::new(std::fs::metadata(fq1)?.len() as u64).with_finish(ProgressFinish::Abandon),
+    );
+    pb1.set_prefix("Reading fq1");
     pb1.set_style(style.clone());
-    let reader1 = ProgressBarReader::new(file1, pb1);
+    let mut reader1 = fastq_reader(&fq1, buffer_size, Some(pb1))?;
+    let mut writer1 = if let Some(file) = ofile1 {
+        let pb2 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
+        pb2.set_prefix("Writing fq1");
+        pb2.set_style(style.clone());
+        Some(fastq_writer(
+            &file,
+            buffer_size,
+            compression_level as u32,
+            Some(pb2),
+        )?)
+    } else {
+        None
+    };
 
-    let pb2 = progress
-        .add(ProgressBar::new(file2.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon));
-    pb2.set_prefix("Parsing fq2");
-    pb2.set_style(style);
-    let reader2 = ProgressBarReader::new(file2, pb2);
+    let pb3 = progress.add(
+        ProgressBar::new(std::fs::metadata(fq2)?.len() as u64).with_finish(ProgressFinish::Abandon),
+    );
+    pb3.set_prefix("Reading fq2");
+    pb3.set_style(style.clone());
+    let mut reader2 = fastq_reader(&fq2, buffer_size, Some(pb3))?;
 
+    let mut writer2 = if let Some(file) = ofile2 {
+        let pb4 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
+        pb4.set_prefix("Writing fq2");
+        pb4.set_style(style.clone());
+        Some(fastq_writer(
+            &file,
+            buffer_size,
+            compression_level as u32,
+            Some(pb4),
+        )?)
+    } else {
+        None
+    };
     let actions = SubseqPairedActions::new(actions1, actions2);
-    match (crate::gz_compressed(path1), crate::gz_compressed(path2)) {
-        (true, true) => paired::reader_seq_refine_paired_read(
-            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader1)),
-            ofile1,
-            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader2)),
-            ofile2,
-            actions,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-            threads,
-        ),
-        (true, false) => paired::reader_seq_refine_paired_read(
-            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader1)),
-            ofile1,
-            reader2,
-            ofile2,
-            actions,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-            threads,
-        ),
-        (false, true) => paired::reader_seq_refine_paired_read(
-            reader1,
-            ofile1,
-            MultiGzDecoder::new(BufReader::with_capacity(buffer_size, reader2)),
-            ofile2,
-            actions,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-            threads,
-        ),
-        (false, false) => paired::reader_seq_refine_paired_read(
-            reader1,
-            ofile1,
-            reader2,
-            ofile2,
-            actions,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-            threads,
-        ),
-    }
+    paired::reader_seq_refine_paired_read(
+        &mut reader1,
+        &mut writer1,
+        &mut reader2,
+        &mut writer2,
+        &actions,
+        chunk_size,
+        buffer_size,
+        batch_size,
+        nqueue,
+        threads,
+    )
 }
 
 extendr_module! {

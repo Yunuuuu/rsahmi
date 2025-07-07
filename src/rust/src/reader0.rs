@@ -1,13 +1,13 @@
-use std::io::Read;
+use std::io::{BufRead, Read, Write};
 
 use indicatif::ProgressBar;
 
-pub(crate) struct ProgressBarReader<R: Read> {
+pub(crate) struct ProgressBarReader<R> {
     bar: ProgressBar,
     reader: R,
 }
 
-impl<R: Read> ProgressBarReader<R> {
+impl<R> ProgressBarReader<R> {
     pub(crate) fn new(reader: R, bar: ProgressBar) -> Self {
         Self { bar, reader }
     }
@@ -20,6 +20,38 @@ impl<R: Read> Read for ProgressBarReader<R> {
         Ok(nbytes)
     }
 }
+
+impl<R: BufRead> BufRead for ProgressBarReader<R> {
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        self.reader.fill_buf()
+    }
+    fn consume(&mut self, amount: usize) {
+        self.reader.consume(amount);
+    }
+}
+
+pub(crate) struct ProgressBarWriter<W> {
+    bar: ProgressBar,
+    writer: W,
+}
+
+impl<W> ProgressBarWriter<W> {
+    pub(crate) fn new(writer: W, bar: ProgressBar) -> Self {
+        Self { bar, writer }
+    }
+}
+
+impl<W: Write> Write for ProgressBarWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.writer.write(buf)?;
+        self.bar.inc(n as u64);
+        Ok(n)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;

@@ -1,19 +1,91 @@
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::Read;
+use std::fs::File;
+use std::io::{BufRead, Read, Write};
+use std::io::{BufReader, BufWriter};
+use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use bytes::{Bytes, BytesMut};
+use flate2::bufread::MultiGzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use indicatif::ProgressBar;
 use memchr::memchr;
 use memchr::memchr2;
 
 use crate::parser::fastq::FastqParseError;
 use crate::parser::fastq::FastqRecord;
+use crate::reader0::*;
 
 pub(crate) struct FastqReader<R> {
     reader: R,
     offset: usize,
     label: Option<&'static str>,
+}
+
+fn gz_compressed(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map_or(false, |s| s.eq_ignore_ascii_case("gz"))
+}
+
+pub(crate) fn fastq_writer<P: AsRef<Path>>(
+    file: &P,
+    buffer_size: usize,
+    compression_level: u32,
+    progress_bar: Option<ProgressBar>,
+) -> Result<BufWriter<Box<dyn Write + Send>>> {
+    let path: &Path = file.as_ref();
+    let file = File::create(path)
+        .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
+    let writer: Box<dyn Write + Send>;
+    if gz_compressed(path) {
+        if let Some(bar) = progress_bar {
+            writer = Box::new(GzEncoder::new(
+                ProgressBarWriter::new(file, bar),
+                Compression::new(compression_level),
+            ));
+        } else {
+            writer = Box::new(GzEncoder::new(file, Compression::new(compression_level)));
+        }
+    } else {
+        if let Some(bar) = progress_bar {
+            writer = Box::new(ProgressBarWriter::new(file, bar));
+        } else {
+            writer = Box::new(file);
+        }
+    }
+    Ok(BufWriter::with_capacity(buffer_size, writer))
+}
+
+pub(crate) fn fastq_reader<P: AsRef<Path>>(
+    file: &P,
+    buffer_size: usize,
+    progress_bar: Option<ProgressBar>,
+) -> Result<Box<dyn Read + Send>> {
+    let path: &Path = file.as_ref();
+    let file =
+        File::open(path).map_err(|e| anyhow!("Failed to open file {}: {}", path.display(), e))?;
+    let reader: Box<dyn Read + Send>;
+    if gz_compressed(path) {
+        if let Some(bar) = progress_bar {
+            reader = Box::new(MultiGzDecoder::new(BufReader::with_capacity(
+                buffer_size,
+                ProgressBarReader::new(file, bar),
+            )));
+        } else {
+            reader = Box::new(MultiGzDecoder::new(BufReader::with_capacity(
+                buffer_size,
+                file,
+            )));
+        }
+    } else {
+        if let Some(bar) = progress_bar {
+            reader = Box::new(ProgressBarReader::new(file, bar));
+        } else {
+            reader = Box::new(file);
+        }
+    }
+    Ok(reader)
 }
 
 impl<R: Read> FastqReader<BufReader<R>> {
