@@ -114,6 +114,7 @@ kractor <- function(kreport, koutput, reads,
 }
 
 BATCH_SIZE <- 500L
+FASTQ_CHUNK <- 256
 CHUNK_SIZE <- 10L * 1024L * 1024L
 BUFFER_SIZE <- 1L * 1024L * 1024L
 

@@ -15,7 +15,6 @@ pub(crate) fn reader_seq_refine_single_read<R: Read + Send, W: Write + Send>(
     actions: &SubseqActions,
     chunk_size: usize,
     buffer_size: usize,
-    batch_size: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -51,7 +50,7 @@ pub(crate) fn reader_seq_refine_single_read<R: Read + Send, W: Write + Send>(
             let rx = reader_rx.clone();
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
+                let mut thread_tx = BatchSender::with_capacity(chunk_size, tx);
                 while let Ok(records) = rx.recv() {
                     for mut record in records {
                         actions.transform_fastq_bytes(&mut record)?;
@@ -135,7 +134,7 @@ mod tests {
         let actions = actions.build();
 
         let result =
-            reader_seq_refine_single_read(&mut input, &mut output, &actions, 1, 1, 10, Some(2), 2);
+            reader_seq_refine_single_read(&mut input, &mut output, &actions, 1, 10, Some(2), 2);
 
         assert!(
             result.is_ok(),

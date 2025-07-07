@@ -49,16 +49,13 @@ provided.}
 \item{descendants}{Logical. Whether to include descendants of the selected
 taxa (default: \code{TRUE}).}
 
-\item{chunk_size}{Integer. Size in bytes of the intermediate chunk used to
-split and distribute data to worker threads during processing. Default is
-\code{10 * 1024 * 1024} (10MB).}
+\item{chunk_size}{Integer. Number of FASTQ records to accumulate before
+dispatching a chunk to worker threads for processing. This controls the
+granularity of parallel work and affects memory usage and performance.
+Default is \code{256}.}
 
 \item{buffer_size}{Integer specifying the buffer size in bytes used for
-writing to disk. This controls the capacity of the buffered file writer.
-Default is \code{1 * 1024 * 1024} (1MB).}
-
-\item{batch_size}{Integer. Number of records to accumulate before triggering
-a write operation. Default is \code{500}.}
+reading/writing to disk. Default is \code{1 * 1024 * 1024} (1MB).}
 
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
 amount of in-flight data awaiting writing. Default: \code{3}.}

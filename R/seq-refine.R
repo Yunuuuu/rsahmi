@@ -28,14 +28,16 @@
 #'   `fq1`/`fq2`. `extra_actions2` is only allowed if `fq2` is provided. These
 #'   can be a single one or a list of them. By default, these actions
 #'   perform trimming of sequences and qualities unless otherwise specified.
-#' @param batch_size Integer. Number of records to accumulate before triggering
-#' a write operation. Default is `r code_quote(BATCH_SIZE, quote = FALSE)`.
-#' @param chunk_size Integer. Size in bytes of the intermediate chunk used to
-#'   split and distribute data to worker threads during processing. Default is
-#'   `10 * 1024 * 1024` (10MB).
+#' @param chunk_size Integer. Number of FASTQ records to accumulate before
+#'   dispatching a chunk to worker threads for processing. This controls the
+#'   granularity of parallel work and affects memory usage and performance.
+#'   Default is `r code_quote(FASTQ_CHUNK, quote = FALSE)`.
 #' @param buffer_size Integer specifying the buffer size in bytes used for
-#' writing to disk. This controls the capacity of the buffered file writer.
-#' Default is `1 * 1024 * 1024` (1MB).
+#' reading/writing to disk. Default is `1 * 1024 * 1024` (1MB).
+#' @param compression_level Integer from 0 to 9 (default: `4`). This sets the
+#' gzip compression level when writing output files. A higher value increases
+#' compression ratio but may slow down writing. Setting it to `0` disables
+#' compression. Only applies when output filenames end with `.gz`.
 #' @param nqueue Integer. Maximum number of buffers per thread, controlling the
 #'   amount of in-flight data awaiting writing. Default: `3`.
 #' @param threads Integer. Number of threads to use. Default will use all
@@ -56,13 +58,13 @@
 #' - Use [`embed()`], [`trim()`], or [`embed_trim()`] to specify the behavior.
 #'
 #' @export
-seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
+seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
                        umi_action1 = NULL, umi_action2 = NULL,
                        barcode_action1 = NULL, barcode_action2 = NULL,
                        extra_actions1 = NULL, extra_actions2 = NULL,
                        chunk_size = NULL, buffer_size = NULL,
-                       batch_size = NULL, nqueue = NULL,
-                       threads = NULL, odir = NULL) {
+                       compression_level = 4L,
+                       nqueue = NULL, threads = NULL, odir = NULL) {
     assert_string(fq1, allow_empty = FALSE)
     assert_string(ofile1, allow_empty = FALSE, allow_null = TRUE)
     assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
@@ -96,7 +98,7 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
 
     assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
-    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
+    assert_number_whole(compression_level, min = 0, max = 9)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE
@@ -105,9 +107,8 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
     odir <- odir %||% getwd()
     dir_create(odir)
-    chunk_size <- chunk_size %||% CHUNK_SIZE
+    chunk_size <- chunk_size %||% FASTQ_CHUNK
     buffer_size <- buffer_size %||% BUFFER_SIZE
-    batch_size <- batch_size %||% BATCH_SIZE
     threads <- threads %||% parallel::detectCores()
     actions1 <- c(list(umi_action1, barcode_action1), extra_actions1)
     actions1 <- actions1[
@@ -133,7 +134,7 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
         actions1 = actions1, actions2 = actions2,
         chunk_size = chunk_size,
         buffer_size = buffer_size,
-        batch_size = batch_size,
+        compression_level = compression_level,
         nqueue = nqueue,
         threads = threads
     )

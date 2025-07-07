@@ -22,7 +22,6 @@ pub(crate) fn reader_seq_refine_paired_read<
     actions: &SubseqPairedActions,
     chunk_size: usize,
     buffer_size: usize,
-    batch_size: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -147,7 +146,7 @@ pub(crate) fn reader_seq_refine_paired_read<
             ))?;
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
+                let mut thread_tx = BatchSender::with_capacity(chunk_size, tx);
                 loop {
                     let (records1, records2) = match (reader1_rx.recv(), reader2_rx.recv()) {
                         (Ok(rec1), Ok(rec2)) => (rec1, rec2),
@@ -311,7 +310,6 @@ mod tests {
             &actions,
             1,       // chunk_size
             10,      // buffer_size
-            1,       // batch_size
             Some(1), // queue size
             1,
         )?;

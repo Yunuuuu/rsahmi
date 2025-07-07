@@ -6,7 +6,7 @@
 \usage{
 seq_refine(
   fq1,
-  ofile1,
+  ofile1 = NULL,
   fq2 = NULL,
   ofile2 = NULL,
   umi_action1 = NULL,
@@ -17,7 +17,7 @@ seq_refine(
   extra_actions2 = NULL,
   chunk_size = NULL,
   buffer_size = NULL,
-  batch_size = NULL,
+  compression_level = 4L,
   nqueue = NULL,
   threads = NULL,
   odir = NULL
@@ -54,16 +54,18 @@ Specify ranges as with UMI actions, and customize using \code{\link[=embed]{embe
 can be a single one or a list of them. By default, these actions
 perform trimming of sequences and qualities unless otherwise specified.}
 
-\item{chunk_size}{Integer. Size in bytes of the intermediate chunk used to
-split and distribute data to worker threads during processing. Default is
-\code{10 * 1024 * 1024} (10MB).}
+\item{chunk_size}{Integer. Number of FASTQ records to accumulate before
+dispatching a chunk to worker threads for processing. This controls the
+granularity of parallel work and affects memory usage and performance.
+Default is \code{256}.}
 
 \item{buffer_size}{Integer specifying the buffer size in bytes used for
-writing to disk. This controls the capacity of the buffered file writer.
-Default is \code{1 * 1024 * 1024} (1MB).}
+reading/writing to disk. Default is \code{1 * 1024 * 1024} (1MB).}
 
-\item{batch_size}{Integer. Number of records to accumulate before triggering
-a write operation. Default is \code{500}.}
+\item{compression_level}{Integer from 0 to 9 (default: \code{4}). This sets the
+gzip compression level when writing output files. A higher value increases
+compression ratio but may slow down writing. Setting it to \code{0} disables
+compression. Only applies when output filenames end with \code{.gz}.}
 
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
 amount of in-flight data awaiting writing. Default: \code{3}.}

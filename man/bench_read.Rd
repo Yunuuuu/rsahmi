@@ -7,9 +7,10 @@
 bench_read(file, chunk_size = NULL, mmap = TRUE)
 }
 \arguments{
-\item{chunk_size}{Integer. Size in bytes of the intermediate chunk used to
-split and distribute data to worker threads during processing. Default is
-\code{10 * 1024 * 1024} (10MB).}
+\item{chunk_size}{Integer. Number of FASTQ records to accumulate before
+dispatching a chunk to worker threads for processing. This controls the
+granularity of parallel work and affects memory usage and performance.
+Default is \code{256}.}
 }
 \description{
 This function benchmarks the reading performance of a file by processing it
