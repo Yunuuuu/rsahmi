@@ -42,7 +42,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     } else {
         writer2 = None
     }
-
+    let threads = 3usize;
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
@@ -61,15 +61,26 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             Receiver<Vec<FastqRecord<Bytes>>>,
         ) = crate::new_channel(nqueue);
 
-        let (reader1_tx, reader1_rx): (
-            Sender<Vec<FastqRecord<Bytes>>>,
-            Receiver<Vec<FastqRecord<Bytes>>>,
-        ) = crate::new_channel(nqueue);
-
-        let (reader2_tx, reader2_rx): (
-            Sender<Vec<FastqRecord<Bytes>>>,
-            Receiver<Vec<FastqRecord<Bytes>>>,
-        ) = crate::new_channel(nqueue);
+        let mut reader1_tx_vec = Vec::with_capacity(threads);
+        let mut reader1_rx_vec = Vec::with_capacity(threads);
+        for _ in 0 .. threads {
+            let (reader_tx, reader_rx): (
+                Sender<Vec<FastqRecord<Bytes>>>,
+                Receiver<Vec<FastqRecord<Bytes>>>,
+            ) = crate::new_channel(nqueue);
+            reader1_tx_vec.push(reader_tx);
+            reader1_rx_vec.push(reader_rx);
+        }
+        let mut reader2_tx_vec = Vec::with_capacity(threads);
+        let mut reader2_rx_vec = Vec::with_capacity(threads);
+        for _ in 0 .. threads {
+            let (reader_tx, reader_rx): (
+                Sender<Vec<FastqRecord<Bytes>>>,
+                Receiver<Vec<FastqRecord<Bytes>>>,
+            ) = crate::new_channel(nqueue);
+            reader2_tx_vec.push(reader_tx);
+            reader2_rx_vec.push(reader_rx);
+        }
 
         let has_writer1 = writer1.is_some();
         let writer1_handle = if let Some(mut writer) = writer1 {
@@ -120,71 +131,76 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
 
         // ─── Parser Thread ─────────────────────────────────────
         let mut parser_handles = Vec::with_capacity(10);
-        for _ in 0 .. 10 {
-            let rx1 = reader1_rx.clone();
-            let rx2 = reader2_rx.clone();
+        for _ in 0 .. threads {
+            let reader1_rx = reader1_rx_vec.pop().ok_or(anyhow!("Not enough channel"))?;
+            let reader2_rx = reader2_rx_vec.pop().ok_or(anyhow!("Not enough channel"))?;
             let tx = parser_tx.clone();
-            let handle =
-                scope.spawn(move || -> Result<()> {
-                    let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
-                    loop {
-                        let (records1, records2) = match (rx1.recv(), rx2.recv()) {
-                            (Ok(rec1), Ok(rec2)) => (rec1, rec2),
-                            (Err(_), Ok(_)) => {
-                                return Err(anyhow!(
-                                    "FASTQ pairing error: read1 channel closed unexpectedly before read2"
-                                ));
-                            }
-                            (Ok(_), Err(_)) => {
-                                return Err(anyhow!(
-                                    "FASTQ pairing error: read2 channel closed unexpectedly before read1"
-                                ));
-                            }
-                            (Err(_), Err(_)) => {
-                                return Ok(());
-                            }
-                        };
-                        if records1.len() != records2.len() {
-                            return Err(anyhow!("FASTQ pairing error: mismatched record counts"));
-                        }
-                        // Initialize a thread-local batch sender for matching records
-                        for (mut record1, mut record2) in zip(records1, records2) {
-                            if record1.id != record2.id {
-                                return Err(anyhow!(
-                                    "FASTQ pairing error: mismatched record id (read1: {}, read2: {})",
-                                    String::from_utf8_lossy(&record1.id),
-                                    String::from_utf8_lossy(&record2.id)
-                                ));
-                            }
-                            actions.transform_fastq_bytes(&mut record1, &mut record2)?;
-                            thread_tx.send((record1, record2))?;
-                        }
+            let handle = scope.spawn(move || -> Result<()> {
+                let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
+                let (records1, records2) = match (reader1_rx.recv(), reader2_rx.recv()) {
+                    (Ok(rec1), Ok(rec2)) => (rec1, rec2),
+                    (Err(_), Ok(_)) => {
+                        return Err(anyhow!(
+                            "FASTQ pairing error: read1 channel closed unexpectedly before read2"
+                        ));
                     }
-                });
+                    (Ok(_), Err(_)) => {
+                        return Err(anyhow!(
+                            "FASTQ pairing error: read2 channel closed unexpectedly before read1"
+                        ));
+                    }
+                    (Err(_), Err(_)) => {
+                        return Ok(());
+                    }
+                };
+                if records1.len() != records2.len() {
+                    return Err(anyhow!("FASTQ pairing error: mismatched record counts"));
+                }
+                // Initialize a thread-local batch sender for matching records
+                for (mut record1, mut record2) in zip(records1, records2) {
+                    actions.transform_fastq_bytes(&mut record1, &mut record2)?;
+                    thread_tx.send((record1, record2))?;
+                }
+                Ok(())
+            });
             parser_handles.push(handle);
         }
-        drop(reader1_rx);
-        drop(reader2_rx);
         drop(parser_tx);
 
         // ─── reader Thread ─────────────────────────────────────
         let reader1_handle = scope.spawn(move || -> Result<()> {
+            let mut reader1_tx_vec = reader1_tx_vec
+                .into_iter()
+                .map(|tx| BatchSender::with_capacity(chunk_size, tx))
+                .collect::<Vec<_>>();
+            let mut n = 0usize;
             let mut reader1 = fastq_reader::FastqReader::new(BufReader::new(reader1));
-            let mut reader1_tx = BatchSender::with_capacity(chunk_size, reader1_tx);
             while let Some(record) = reader1.read_record()? {
-                reader1_tx.send(record)?;
+                let idx = n % threads;
+                reader1_tx_vec[idx].send(record)?;
+                n += 1;
             }
-            reader1_tx.flush()?;
+            for mut reader_tx in reader1_tx_vec {
+                reader_tx.flush()?;
+            }
             Ok(())
         });
 
         let reader2_handle = scope.spawn(move || -> Result<()> {
+            let mut reader2_tx_vec = reader2_tx_vec
+                .into_iter()
+                .map(|tx| BatchSender::with_capacity(chunk_size, tx))
+                .collect::<Vec<_>>();
+            let mut n = 0usize;
             let mut reader2 = fastq_reader::FastqReader::new(BufReader::new(reader2));
-            let mut reader2_tx = BatchSender::with_capacity(chunk_size, reader2_tx);
             while let Some(record) = reader2.read_record()? {
-                reader2_tx.send(record)?;
+                let idx = n % threads;
+                reader2_tx_vec[idx].send(record)?;
+                n += 1;
             }
-            reader2_tx.flush()?;
+            for mut reader_tx in reader2_tx_vec {
+                reader_tx.flush()?;
+            }
             Ok(())
         });
 
