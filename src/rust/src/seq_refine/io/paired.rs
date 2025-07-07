@@ -87,10 +87,14 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             Some(scope.spawn(move || -> Result<()> {
                 for chunk in writer1_rx {
                     for record in chunk {
-                        record.write(&mut writer)?;
+                        record.write(&mut writer).map_err(|e| {
+                            anyhow!("(Writer1) Failed to write FastqRecord to output: {}", e)
+                        })?;
                     }
                 }
-                writer.flush()?;
+                writer
+                    .flush()
+                    .map_err(|e| anyhow!("(Writer1) Failed to flush writer:  {}", e))?;
                 Ok(())
             }))
         } else {
@@ -102,10 +106,14 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             Some(scope.spawn(move || -> Result<()> {
                 for chunk in writer2_rx {
                     for record in chunk {
-                        record.write(&mut writer)?;
+                        record.write(&mut writer).map_err(|e| {
+                            anyhow!("(Writer2) Failed to write FastqRecord to output: {}", e)
+                        })?;
                     }
                 }
-                writer.flush()?;
+                writer
+                    .flush()
+                    .map_err(|e| anyhow!("(Writer2) Failed to flush writer: {}", e))?;
                 Ok(())
             }))
         } else {
@@ -120,47 +128,68 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 let (records1, records2): (Vec<FastqRecord<Bytes>>, Vec<FastqRecord<Bytes>>) =
                     chunk.into_iter().unzip();
                 if has_writer1 {
-                    writer1_tx.send(records1)?;
+                    writer1_tx.send(records1).map_err(|e| {
+                        anyhow!(
+                            "(Writer dispatch) Failed to send read1 batch to Writer1 thread: {}",
+                            e
+                        )
+                    })?;
                 }
                 if has_writer2 {
-                    writer2_tx.send(records2)?;
+                    writer2_tx.send(records2).map_err(|e| {
+                        anyhow!(
+                            "(Writer dispatch) Failed to send read2 batch to Writer2 thread: {}",
+                            e
+                        )
+                    })?;
                 }
             }
             Ok(())
         });
 
         // ─── Parser Thread ─────────────────────────────────────
-        let mut parser_handles = Vec::with_capacity(10);
+        let mut parser_handles = Vec::with_capacity(threads);
         for _ in 0 .. threads {
-            let reader1_rx = reader1_rx_vec.pop().ok_or(anyhow!("Not enough channel"))?;
-            let reader2_rx = reader2_rx_vec.pop().ok_or(anyhow!("Not enough channel"))?;
+            let reader1_rx = reader1_rx_vec.pop().ok_or(anyhow!(
+                "(Parser setup) Not enough read1 channels for threads"
+            ))?;
+            let reader2_rx = reader2_rx_vec.pop().ok_or(anyhow!(
+                "(Parser setup) Not enough read1 channels for threads"
+            ))?;
             let tx = parser_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
                 let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
-                let (records1, records2) = match (reader1_rx.recv(), reader2_rx.recv()) {
-                    (Ok(rec1), Ok(rec2)) => (rec1, rec2),
-                    (Err(_), Ok(_)) => {
-                        return Err(anyhow!(
-                            "FASTQ pairing error: read1 channel closed unexpectedly before read2"
-                        ));
+                loop {
+                    let (records1, records2) = match (reader1_rx.recv(), reader2_rx.recv()) {
+                        (Ok(rec1), Ok(rec2)) => (rec1, rec2),
+                        (Err(_), Ok(_)) => {
+                            return Err(anyhow!(
+                                "(Parser) FASTQ pairing error: read1 channel closed before read2"
+                            ));
+                        }
+                        (Ok(_), Err(_)) => {
+                            return Err(anyhow!(
+                                "(Parser) FASTQ pairing error: read2 channel closed before read1"
+                            ));
+                        }
+                        (Err(_), Err(_)) => {
+                            break;
+                        }
+                    };
+                    if records1.len() != records2.len() {
+                        return Err(anyhow!("(Parser) FASTQ pairing error: record count mismatch (read1: {}, read2: {})", records1.len(), records2.len()));
                     }
-                    (Ok(_), Err(_)) => {
-                        return Err(anyhow!(
-                            "FASTQ pairing error: read2 channel closed unexpectedly before read1"
-                        ));
+                    // Initialize a thread-local batch sender for matching records
+                    for (mut record1, mut record2) in zip(records1, records2) {
+                        actions.transform_fastq_bytes(&mut record1, &mut record2)?;
+                        thread_tx
+                            .send((record1, record2))
+                            .map_err(|e| anyhow!("(Parser) Failed to send parsed record pair to Writer thread: {}", e))?;
                     }
-                    (Err(_), Err(_)) => {
-                        return Ok(());
-                    }
-                };
-                if records1.len() != records2.len() {
-                    return Err(anyhow!("FASTQ pairing error: mismatched record counts"));
                 }
-                // Initialize a thread-local batch sender for matching records
-                for (mut record1, mut record2) in zip(records1, records2) {
-                    actions.transform_fastq_bytes(&mut record1, &mut record2)?;
-                    thread_tx.send((record1, record2))?;
-                }
+                thread_tx
+                    .flush()
+                    .map_err(|e| anyhow!("(Parser) Failed to flush remaining records to Writer thread: {}", e))?;
                 Ok(())
             });
             parser_handles.push(handle);
@@ -175,13 +204,23 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 .collect::<Vec<_>>();
             let mut n = 0usize;
             let mut reader1 = fastq_reader::FastqReader::new(BufReader::new(reader1));
-            while let Some(record) = reader1.read_record()? {
+            while let Some(record) = reader1
+                .read_record()
+                .map_err(|e| anyhow!("(Reader1) Error while reading FASTQ record: {}", e))?
+            {
                 let idx = n % threads;
-                reader1_tx_vec[idx].send(record)?;
+                reader1_tx_vec[idx].send(record).map_err(|e| {
+                    anyhow!(
+                        "(Reader1) Failed to send FASTQ record to Parser thread: {}",
+                        e
+                    )
+                })?;
                 n += 1;
             }
             for mut reader_tx in reader1_tx_vec {
-                reader_tx.flush()?;
+                reader_tx.flush().map_err(|e| {
+                    anyhow!("(Reader1) Failed to flush records to Parser thread: {}", e)
+                })?;
             }
             Ok(())
         });
@@ -193,13 +232,23 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 .collect::<Vec<_>>();
             let mut n = 0usize;
             let mut reader2 = fastq_reader::FastqReader::new(BufReader::new(reader2));
-            while let Some(record) = reader2.read_record()? {
+            while let Some(record) = reader2
+                .read_record()
+                .map_err(|e| anyhow!("(Reader1) Error while reading FASTQ record: {}", e))?
+            {
                 let idx = n % threads;
-                reader2_tx_vec[idx].send(record)?;
+                reader2_tx_vec[idx].send(record).map_err(|e| {
+                    anyhow!(
+                        "(Reader2) Failed to send FASTQ record to Parser thread: {}",
+                        e
+                    )
+                })?;
                 n += 1;
             }
             for mut reader_tx in reader2_tx_vec {
-                reader_tx.flush()?;
+                reader_tx.flush().map_err(|e| {
+                    anyhow!("(Reader2) Failed to flush records to Parser thread: {}", e)
+                })?;
             }
             Ok(())
         });
@@ -208,29 +257,28 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
         if let Some(writer_handle) = writer1_handle {
             writer_handle
                 .join()
-                .map_err(|e| anyhow!("Writer1 thread panicked: {:?}", e))??
+                .map_err(|e| anyhow!("(Writer1) thread panicked: {:?}", e))??;
         };
         if let Some(writer_handle) = writer2_handle {
             writer_handle
                 .join()
-                .map_err(|e| anyhow!("Writer2 thread panicked: {:?}", e))??
+                .map_err(|e| anyhow!("(Writer2) thread panicked: {:?}", e))??;
         };
         writer_handle
             .join()
-            .map_err(|e| anyhow!("Writer thread panicked: {:?}", e))??;
+            .map_err(|e| anyhow!("(Writer) thread panicked: {:?}", e))??;
 
-        // we ensure no data to send
         for handler in parser_handles {
             handler
                 .join()
-                .map_err(|e| anyhow!("Parser thread panicked: {:?}", e))??;
+                .map_err(|e| anyhow!("(Parser) thread panicked: {:?}", e))??;
         }
         reader1_handle
             .join()
-            .map_err(|e| anyhow!("Reader1 thread panicked: {:?}", e))??;
+            .map_err(|e| anyhow!("(Reader1) thread panicked: {:?}", e))??;
         reader2_handle
             .join()
-            .map_err(|e| anyhow!("Reader2 thread panicked: {:?}", e))??;
+            .map_err(|e| anyhow!("(Reader2) thread panicked: {:?}", e))??;
         Ok(())
     })
 }
