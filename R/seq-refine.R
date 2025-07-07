@@ -38,8 +38,8 @@
 #' Default is `1 * 1024 * 1024` (1MB).
 #' @param nqueue Integer. Maximum number of buffers per thread, controlling the
 #'   amount of in-flight data awaiting writing. Default: `3`.
-#' @param threads Integer. Number of threads to use. Default will determined
-#' atomatically by rayon.
+#' @param threads Integer. Number of threads to use. Default will use all
+#' available threads.
 #' @param odir A string of directory to save the output files. Please see
 #' `Value` section for details.
 #'
@@ -108,7 +108,7 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
     chunk_size <- chunk_size %||% CHUNK_SIZE
     buffer_size <- buffer_size %||% BUFFER_SIZE
     batch_size <- batch_size %||% BATCH_SIZE
-    threads <- threads %||% 0L # Let rayon to determine the threads
+    threads <- threads %||% parallel::detectCores()
     actions1 <- c(list(umi_action1, barcode_action1), extra_actions1)
     actions1 <- actions1[
         !vapply(actions1, is.null, logical(1L), USE.NAMES = FALSE)

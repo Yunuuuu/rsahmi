@@ -29,6 +29,7 @@ pub(crate) fn seq_refine(
 ) -> std::result::Result<(), String> {
     let actions1 = robj_to_seq_actions(&actions1, "actions1").map_err(|e| format!("{}", e))?;
     let actions2 = robj_to_seq_actions(&actions2, "actions2").map_err(|e| format!("{}", e))?;
+    let threads = threads.max(1); // always use at least one thread
     if let Some(fq2) = fq2 {
         reader_seq_refine_paired_read(
             fq1,
