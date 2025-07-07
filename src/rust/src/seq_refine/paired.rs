@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::iter::zip;
+use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
@@ -22,29 +23,37 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     buffer_size: usize,
     batch_size: usize,
     nqueue: Option<usize>,
+    threads: usize,
 ) -> Result<()> {
     // Create output file and wrap in buffered writer
-    let writer1;
+    let writer1: Option<Box<dyn Write + Send>>;
     if let Some(file) = ofile1 {
-        let file = File::create(&file)
-            .map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
+        let path: &Path = file.as_ref();
+        let file = File::create(path)
+            .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
         let bw = BufWriter::with_capacity(buffer_size, file);
-        writer1 = Some(GzEncoder::new(bw, Compression::new(4)));
-        // writer1 = Some(bw);
+        if crate::gz_compressed(path) {
+            writer1 = Some(Box::new(GzEncoder::new(bw, Compression::new(4))));
+        } else {
+            writer1 = Some(Box::new(bw))
+        }
     } else {
         writer1 = None
     }
-    let writer2;
+    let writer2: Option<Box<dyn Write + Send>>;
     if let Some(file) = ofile2 {
-        let file = File::create(&file)
-            .map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
+        let path: &Path = file.as_ref();
+        let file = File::create(path)
+            .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
         let bw = BufWriter::with_capacity(buffer_size, file);
-        writer2 = Some(GzEncoder::new(bw, Compression::new(4)));
-        // writer2 = Some(bw);
+        if crate::gz_compressed(path) {
+            writer2 = Some(Box::new(GzEncoder::new(bw, Compression::new(4))));
+        } else {
+            writer2 = Some(Box::new(bw))
+        }
     } else {
         writer2 = None
     }
-    let threads = 3usize;
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
@@ -329,6 +338,7 @@ mod tests {
             4096,    // buffer_size
             1,       // batch_size
             Some(4), // queue size
+            1,
         )?;
 
         // Decompress and read output

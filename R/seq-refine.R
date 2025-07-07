@@ -62,8 +62,7 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
                        extra_actions1 = NULL, extra_actions2 = NULL,
                        chunk_size = NULL, buffer_size = NULL,
                        batch_size = NULL, nqueue = NULL,
-                       threads = NULL, odir = NULL,
-                       mmap = TRUE) {
+                       threads = NULL, odir = NULL) {
     assert_string(fq1, allow_empty = FALSE)
     assert_string(ofile1, allow_empty = FALSE, allow_null = TRUE)
     assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
@@ -104,7 +103,6 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
     )
     nqueue <- check_queue(nqueue, 3L, threads)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
-    assert_bool(mmap)
     odir <- odir %||% getwd()
     dir_create(odir)
     chunk_size <- chunk_size %||% CHUNK_SIZE
@@ -137,7 +135,6 @@ seq_refine <- function(fq1, ofile1, fq2 = NULL, ofile2 = NULL,
         buffer_size = buffer_size,
         batch_size = batch_size,
         nqueue = nqueue,
-        mmap = mmap,
         threads = threads
     )
 

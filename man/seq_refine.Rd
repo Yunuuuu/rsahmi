@@ -20,8 +20,7 @@ seq_refine(
   batch_size = NULL,
   nqueue = NULL,
   threads = NULL,
-  odir = NULL,
-  mmap = TRUE
+  odir = NULL
 )
 }
 \arguments{
