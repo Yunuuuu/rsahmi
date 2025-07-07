@@ -26,7 +26,8 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     // Create output file and wrap in buffered writer
     let writer1;
     if let Some(file) = ofile1 {
-        let file = File::create(&file).map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
+        let file = File::create(&file)
+            .map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
         let bw = BufWriter::with_capacity(buffer_size, file);
         writer1 = Some(GzEncoder::new(bw, Compression::new(4)));
         // writer1 = Some(bw);
@@ -35,7 +36,8 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     }
     let writer2;
     if let Some(file) = ofile2 {
-        let file = File::create(&file).map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
+        let file = File::create(&file)
+            .map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
         let bw = BufWriter::with_capacity(buffer_size, file);
         writer2 = Some(GzEncoder::new(bw, Compression::new(4)));
         // writer2 = Some(bw);
@@ -51,15 +53,11 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             Receiver<Vec<(FastqRecord<Bytes>, FastqRecord<Bytes>)>>,
         ) = crate::new_channel(nqueue);
 
-        let (writer1_tx, writer1_rx): (
-            Sender<Vec<FastqRecord<Bytes>>>,
-            Receiver<Vec<FastqRecord<Bytes>>>,
-        ) = crate::new_channel(nqueue);
+        let (writer1_tx, writer1_rx): (Sender<Vec<Vec<u8>>>, Receiver<Vec<Vec<u8>>>) =
+            crate::new_channel(nqueue);
 
-        let (writer2_tx, writer2_rx): (
-            Sender<Vec<FastqRecord<Bytes>>>,
-            Receiver<Vec<FastqRecord<Bytes>>>,
-        ) = crate::new_channel(nqueue);
+        let (writer2_tx, writer2_rx): (Sender<Vec<Vec<u8>>>, Receiver<Vec<Vec<u8>>>) =
+            crate::new_channel(nqueue);
 
         let mut reader1_tx_vec = Vec::with_capacity(threads);
         let mut reader1_rx_vec = Vec::with_capacity(threads);
@@ -87,7 +85,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             Some(scope.spawn(move || -> Result<()> {
                 for chunk in writer1_rx {
                     for record in chunk {
-                        record.write(&mut writer).map_err(|e| {
+                        writer.write_all(&record).map_err(|e| {
                             anyhow!("(Writer1) Failed to write FastqRecord to output: {}", e)
                         })?;
                     }
@@ -106,7 +104,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             Some(scope.spawn(move || -> Result<()> {
                 for chunk in writer2_rx {
                     for record in chunk {
-                        record.write(&mut writer).map_err(|e| {
+                        writer.write_all(&record).map_err(|e| {
                             anyhow!("(Writer2) Failed to write FastqRecord to output: {}", e)
                         })?;
                     }
@@ -128,6 +126,10 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 let (records1, records2): (Vec<FastqRecord<Bytes>>, Vec<FastqRecord<Bytes>>) =
                     chunk.into_iter().unzip();
                 if has_writer1 {
+                    let records1: Vec<Vec<u8>> = records1
+                        .into_iter()
+                        .map(|recorde| recorde.as_vec())
+                        .collect();
                     writer1_tx.send(records1).map_err(|e| {
                         anyhow!(
                             "(Writer dispatch) Failed to send read1 batch to Writer1 thread: {}",
@@ -136,6 +138,10 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                     })?;
                 }
                 if has_writer2 {
+                    let records2: Vec<Vec<u8>> = records2
+                        .into_iter()
+                        .map(|recorde| recorde.as_vec())
+                        .collect();
                     writer2_tx.send(records2).map_err(|e| {
                         anyhow!(
                             "(Writer dispatch) Failed to send read2 batch to Writer2 thread: {}",
