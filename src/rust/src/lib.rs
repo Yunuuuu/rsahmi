@@ -44,7 +44,7 @@ pub(crate) fn progress_reader_style() -> std::result::Result<ProgressStyle, Temp
 
 pub(crate) fn progress_writer_style() -> std::result::Result<ProgressStyle, TemplateError> {
     ProgressStyle::with_template(
-        "{prefix:.bold.cyan/blue} {decimal_bytes} {spinner:.green} [{elapsed_precise}] {decimal_bytes_per_sec}",
+        "{prefix:.bold.cyan/blue} {decimal_bytes} {spinner:.green} {decimal_bytes_per_sec}",
     )
 }
 
