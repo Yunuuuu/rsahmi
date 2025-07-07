@@ -26,7 +26,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     // Create output file and wrap in buffered writer
     let writer1;
     if let Some(file) = ofile1 {
-        let file = File::create(&file)?;
+        let file = File::create(&file).map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
         let bw = BufWriter::with_capacity(buffer_size, file);
         writer1 = Some(GzEncoder::new(bw, Compression::new(4)));
         // writer1 = Some(bw);
@@ -35,7 +35,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
     }
     let writer2;
     if let Some(file) = ofile2 {
-        let file = File::create(&file)?;
+        let file = File::create(&file).map_err(|e| anyhow!("Failed to create output file {}: {}", file, e))?;
         let bw = BufWriter::with_capacity(buffer_size, file);
         writer2 = Some(GzEncoder::new(bw, Compression::new(4)));
         // writer2 = Some(bw);
@@ -154,7 +154,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
                 "(Parser setup) Not enough read1 channels for threads"
             ))?;
             let reader2_rx = reader2_rx_vec.pop().ok_or(anyhow!(
-                "(Parser setup) Not enough read1 channels for threads"
+                "(Parser setup) Not enough read2 channels for threads"
             ))?;
             let tx = parser_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
@@ -234,7 +234,7 @@ pub(crate) fn reader_seq_refine_paired_read<R1: Read + Send, R2: Read + Send>(
             let mut reader2 = fastq_reader::FastqReader::new(BufReader::new(reader2));
             while let Some(record) = reader2
                 .read_record()
-                .map_err(|e| anyhow!("(Reader1) Error while reading FASTQ record: {}", e))?
+                .map_err(|e| anyhow!("(Reader2) Error while reading FASTQ record: {}", e))?
             {
                 let idx = n % threads;
                 reader2_tx_vec[idx].send(record).map_err(|e| {
