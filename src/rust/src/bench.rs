@@ -20,7 +20,7 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
     let path: &Path = file.as_ref();
     let reader = File::open(file)?;
     let size = reader.metadata()?.len();
-    let style = crate::progress_style()?;
+    let style = crate::progress_reader_style()?;
     let pb = ProgressBar::new(size).with_finish(ProgressFinish::Abandon);
     pb.set_prefix(format!("Reading {}", file));
     pb.set_style(style);

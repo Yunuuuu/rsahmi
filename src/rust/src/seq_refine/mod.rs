@@ -67,17 +67,18 @@ fn reader_seq_refine_single_read(
 ) -> Result<()> {
     let ofile1 = ofile1.ok_or_else(|| anyhow!("No output file specified."))?;
     let actions = actions.ok_or_else(|| anyhow!("No sequence actions were specified."))?;
-    let style = crate::progress_style()?;
+    let reader_style = crate::progress_reader_style()?;
+    let writer_style = crate::progress_writer_style()?;
     let progress = MultiProgress::new();
     let pb1 = progress.add(
         ProgressBar::new(std::fs::metadata(fq1)?.len() as u64).with_finish(ProgressFinish::Abandon),
     );
     pb1.set_prefix("Reading fastq");
-    pb1.set_style(style.clone());
+    pb1.set_style(reader_style);
 
     let pb2 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
     pb2.set_prefix("Writing fastq");
-    pb2.set_style(style);
+    pb2.set_style(writer_style);
     let mut reader = fastq_reader(&fq1, buffer_size, Some(pb1))?;
     let mut writer = fastq_writer(&ofile1, buffer_size, compression_level as u32, Some(pb2))?;
     single::reader_seq_refine_single_read(
@@ -113,18 +114,19 @@ fn reader_seq_refine_paired_read(
         ));
     }
 
-    let style = crate::progress_style()?;
+    let reader_style = crate::progress_reader_style()?;
+    let writer_style = crate::progress_writer_style()?;
     let progress = MultiProgress::new();
     let pb1 = progress.add(
         ProgressBar::new(std::fs::metadata(fq1)?.len() as u64).with_finish(ProgressFinish::Abandon),
     );
     pb1.set_prefix("Reading fq1");
-    pb1.set_style(style.clone());
+    pb1.set_style(reader_style.clone());
     let mut reader1 = fastq_reader(&fq1, buffer_size, Some(pb1))?;
     let mut writer1 = if let Some(file) = ofile1 {
         let pb2 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
         pb2.set_prefix("Writing fq1");
-        pb2.set_style(style.clone());
+        pb2.set_style(writer_style.clone());
         Some(fastq_writer(
             &file,
             buffer_size,
@@ -139,13 +141,13 @@ fn reader_seq_refine_paired_read(
         ProgressBar::new(std::fs::metadata(fq2)?.len() as u64).with_finish(ProgressFinish::Abandon),
     );
     pb3.set_prefix("Reading fq2");
-    pb3.set_style(style.clone());
+    pb3.set_style(reader_style);
     let mut reader2 = fastq_reader(&fq2, buffer_size, Some(pb3))?;
 
     let mut writer2 = if let Some(file) = ofile2 {
         let pb4 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
         pb4.set_prefix("Writing fq2");
-        pb4.set_style(style.clone());
+        pb4.set_style(writer_style);
         Some(fastq_writer(
             &file,
             buffer_size,

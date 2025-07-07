@@ -219,7 +219,7 @@ pub(crate) fn kractor_koutput(
             nqueue,
         )
     } else {
-        let style = crate::progress_style()?;
+        let style = crate::progress_reader_style()?;
         let pb =
             ProgressBar::new(file.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon);
         pb.set_prefix("Parsing koutput");

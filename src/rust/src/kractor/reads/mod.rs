@@ -42,7 +42,7 @@ pub(crate) fn kractor_reads(
         fq2.map_or_else(|| String::from(""), |s| format!("and {}", s))
     );
     let file = File::open(fq1)?;
-    let style = crate::progress_style()?;
+    let style = crate::progress_reader_style()?;
 
     if let Some(fq2) = fq2 {
         let ofile2 = ofile2.ok_or(anyhow!(

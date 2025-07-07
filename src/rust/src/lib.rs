@@ -36,9 +36,15 @@ pub(crate) fn mmap_advice(map: &Mmap) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub(crate) fn progress_style() -> std::result::Result<ProgressStyle, TemplateError> {
+pub(crate) fn progress_reader_style() -> std::result::Result<ProgressStyle, TemplateError> {
     ProgressStyle::with_template(
         "{prefix:.bold.cyan/blue} {decimal_bytes}/{decimal_total_bytes} {spinner:.green} [{elapsed_precise}] {decimal_bytes_per_sec} (ETA {eta})",
+    )
+}
+
+pub(crate) fn progress_writer_style() -> std::result::Result<ProgressStyle, TemplateError> {
+    ProgressStyle::with_template(
+        "{prefix:.bold.cyan/blue} {decimal_bytes} {spinner:.green} [{elapsed_precise}] {decimal_bytes_per_sec}",
     )
 }
 
