@@ -17,6 +17,7 @@ use crate::reader0::*;
 pub(crate) struct FastqReader<R> {
     reader: R,
     offset: usize,
+    leftover: Option<BytesMut>,
     label: Option<&'static str>,
 }
 
@@ -93,43 +94,50 @@ impl<R: Read> FastqReader<BufReader<R>> {
         Self {
             reader,
             offset: 0,
+            leftover: None,
             label: None,
         }
     }
 
+    #[inline]
     fn read_line(&mut self) -> Result<Option<BytesMut>> {
-        // No enough data; take what's left
-        let mut line = BytesMut::new();
-        // Refill until we get the `byte` or EOF
         loop {
-            let available = self.reader.fill_buf()?;
-            let (done, used) = match memchr(b'\n', available) {
-                Some(i) => {
-                    if i > 0 && available[i - 1] == b'\r' {
-                        line.extend_from_slice(&available[.. i - 1]);
-                    } else {
-                        line.extend_from_slice(&available[.. i]);
-                    }
-                    (true, i + 1)
-                }
-                None => {
-                    line.extend_from_slice(available);
-                    (false, available.len())
-                }
-            };
-            self.reader.consume(used);
-            if done || used == 0 {
-                break;
+            let buffer = self.reader.fill_buf()?;
+            if buffer.is_empty() {
+                return Ok(self.leftover.take().filter(|b| !b.is_empty()));
             }
-        }
-        if line.is_empty() {
-            return Ok(None);
-        } else {
-            self.offset += 1;
-            return Ok(Some(line));
+
+            if let Some(pos) = memchr(b'\n', buffer) {
+                // Fast path: newline found
+                let end = if pos > 0 && buffer[pos - 1] == b'\r' {
+                    pos - 1
+                } else {
+                    pos
+                };
+
+                let line = if let Some(mut leftover) = self.leftover.take() {
+                    leftover.extend_from_slice(&buffer[.. end]);
+                    leftover
+                } else {
+                    // Directly build from slice without heap copying if possible
+                    BytesMut::from(&buffer[.. end])
+                };
+
+                self.reader.consume(pos + 1);
+                return Ok(Some(line));
+            }
+
+            // No newline: accumulate buffer and continue
+            let len = buffer.len();
+            if self.leftover.is_none() {
+                self.leftover = Some(BytesMut::with_capacity(len.max(64)));
+            }
+            self.leftover.as_mut().unwrap().extend_from_slice(buffer);
+            self.reader.consume(len);
         }
     }
 
+    #[inline]
     pub(crate) fn read_record(&mut self) -> Result<Option<FastqRecord<Bytes>>> {
         let mut header;
         loop {
@@ -279,6 +287,7 @@ mod tests {
         FastqReader {
             reader: bytes_reader,
             offset: 0,
+            leftover: None,
             label: None,
         }
     }
