@@ -351,19 +351,16 @@ impl SubseqTrimAction {
         if cursor < len {
             keep.push((cursor, len))
         }
-        let trimmed_seq = keep
-            .iter()
-            .map(|(start, end)| &seq[*start .. *end])
-            .flatten()
-            .copied()
-            .collect();
-        let trimmed_qual = keep
-            .iter()
-            .map(|(start, end)| &qual[*start .. *end])
-            .flatten()
-            .copied()
-            .collect();
-        Ok((trimmed_seq, trimmed_qual))
+
+        let total_seq_len = keep.iter().map(|(start, end)| end - start).sum();
+        let mut trimmed_seq = BytesMut::with_capacity(total_seq_len);
+        let mut trimmed_qual = BytesMut::with_capacity(total_seq_len);
+
+        for (start, end) in keep {
+            trimmed_seq.extend_from_slice(&seq[start .. end]);
+            trimmed_qual.extend_from_slice(&qual[start .. end]);
+        }
+        Ok((trimmed_seq.freeze(), trimmed_qual.freeze()))
     }
 }
 
@@ -401,12 +398,12 @@ impl SubseqActions {
     }
 
     fn embedded_tags(&self, seq: &[u8]) -> Result<Vec<Bytes>> {
-        let out = self
-            .tag_sequence(seq)?
-            .into_iter()
-            .map(|(tag, sequence)| tag_sequence(tag, sequence))
-            .collect();
-        Ok(out)
+        let tags = self.tag_sequence(seq)?;
+        let mut result = Vec::with_capacity(tags.len());
+        for (tag, sequence) in tags {
+            result.push(tag_sequence(tag, sequence));
+        }
+        Ok(result)
     }
 
     fn tag_sequence<'actions, 'seq>(
