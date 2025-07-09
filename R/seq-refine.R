@@ -34,10 +34,10 @@
 #'   Default is `r code_quote(FASTQ_CHUNK, quote = FALSE)`.
 #' @param buffer_size Integer specifying the buffer size in bytes used for
 #' reading/writing to disk. Default is `1 * 1024 * 1024` (1MB).
-#' @param compression_level Integer from 0 to 9 (default: `4`). This sets the
+#' @param compression_level Integer from 1 to 12 (default: `4`). This sets the
 #' gzip compression level when writing output files. A higher value increases
-#' compression ratio but may slow down writing. Setting it to `0` disables
-#' compression. Only applies when output filenames end with `.gz`.
+#' compression ratio but may slow down writing. Only applies when output
+#' filenames end with `.gz`.
 #' @param nqueue Integer. Maximum number of buffers per thread, controlling the
 #'   amount of in-flight data awaiting writing. Default: `3`.
 #' @param threads Integer. Number of threads to use. Default will use all
@@ -117,7 +117,7 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
         ))
     }
 
-    if ((is.null(fq2) && is.null(ofile1)) || 
+    if ((is.null(fq2) && is.null(ofile1)) ||
         (!is.null(fq2) && is.null(ofile1) && is.null(ofile2))) {
         cli::cli_abort(c(
             "No output specified.",
@@ -127,7 +127,7 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
 
     assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
     assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
-    assert_number_whole(compression_level, min = 0, max = 9)
+    assert_number_whole(compression_level, min = 1, max = 12)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
         allow_null = TRUE

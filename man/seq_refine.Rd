@@ -62,10 +62,10 @@ Default is \code{256}.}
 \item{buffer_size}{Integer specifying the buffer size in bytes used for
 reading/writing to disk. Default is \code{1 * 1024 * 1024} (1MB).}
 
-\item{compression_level}{Integer from 0 to 9 (default: \code{4}). This sets the
+\item{compression_level}{Integer from 1 to 12 (default: \code{4}). This sets the
 gzip compression level when writing output files. A higher value increases
-compression ratio but may slow down writing. Setting it to \code{0} disables
-compression. Only applies when output filenames end with \code{.gz}.}
+compression ratio but may slow down writing. Only applies when output
+filenames end with \code{.gz}.}
 
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
 amount of in-flight data awaiting writing. Default: \code{3}.}
