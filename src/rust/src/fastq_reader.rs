@@ -48,9 +48,9 @@ pub(crate) fn fastq_pack(bytes: &[u8], compressor: &mut Compressor, gzip: bool) 
     if gzip {
         let pack_size = compressor.gzip_compress_bound(bytes.len());
         pack = Vec::with_capacity(pack_size);
-        unsafe { pack.set_len(pack_size) };
+        pack.resize(pack_size, 0);
         let size = compressor.gzip_compress(bytes, &mut pack)?;
-        unsafe { pack.set_len(size) };
+        pack.truncate(size);
     } else {
         pack = Vec::with_capacity(bytes.len());
         pack.extend_from_slice(bytes);

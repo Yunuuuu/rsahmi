@@ -65,6 +65,34 @@ seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
                        chunk_size = NULL, buffer_size = NULL,
                        compression_level = 4L,
                        nqueue = NULL, threads = NULL, odir = NULL) {
+    rust_seq_refine(
+        fq1 = fq1,
+        ofile1 = ofile1,
+        fq2 = fq2,
+        ofile2 = ofile2,
+        umi_action1 = umi_action1,
+        umi_action2 = umi_action2,
+        barcode_action1 = barcode_action1,
+        barcode_action2 = barcode_action2,
+        extra_actions1 = extra_actions1,
+        extra_actions2 = extra_actions2,
+        chunk_size = chunk_size,
+        buffer_size = buffer_size,
+        compression_level = compression_level,
+        nqueue = nqueue,
+        threads = threads,
+        odir = odir
+    )
+}
+
+rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
+                            umi_action1 = NULL, umi_action2 = NULL,
+                            barcode_action1 = NULL, barcode_action2 = NULL,
+                            extra_actions1 = NULL, extra_actions2 = NULL,
+                            chunk_size = NULL, buffer_size = NULL,
+                            compression_level = 4L,
+                            nqueue = NULL, threads = NULL, odir = NULL,
+                            pprof = NULL) {
     assert_string(fq1, allow_empty = FALSE)
     assert_string(ofile1, allow_empty = FALSE, allow_null = TRUE)
     assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
@@ -105,6 +133,7 @@ seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
     )
     nqueue <- check_queue(nqueue, 3L, threads)
     assert_string(odir, allow_empty = FALSE, allow_null = TRUE)
+    assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     odir <- odir %||% getwd()
     dir_create(odir)
     chunk_size <- chunk_size %||% FASTQ_CHUNK
@@ -127,18 +156,32 @@ seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
         ))
     }
 
-    rust_call(
-        "seq_refine",
-        fq1 = fq1, ofile1 = ofile1,
-        fq2 = fq2, ofile2 = ofile2,
-        actions1 = actions1, actions2 = actions2,
-        chunk_size = chunk_size,
-        buffer_size = buffer_size,
-        compression_level = compression_level,
-        nqueue = nqueue,
-        threads = threads
-    )
-
+    if (is.null(pprof)) {
+        rust_call(
+            "seq_refine",
+            fq1 = fq1, ofile1 = ofile1,
+            fq2 = fq2, ofile2 = ofile2,
+            actions1 = actions1, actions2 = actions2,
+            chunk_size = chunk_size,
+            buffer_size = buffer_size,
+            compression_level = compression_level,
+            nqueue = nqueue,
+            threads = threads
+        )
+    } else {
+        rust_call(
+            "pprof_seq_refine",
+            fq1 = fq1, ofile1 = ofile1,
+            fq2 = fq2, ofile2 = ofile2,
+            actions1 = actions1, actions2 = actions2,
+            chunk_size = chunk_size,
+            buffer_size = buffer_size,
+            compression_level = compression_level,
+            nqueue = nqueue,
+            threads = threads,
+            pprof_file = file.path(odir, pprof)
+        )
+    }
     cli::cli_inform(c("v" = "Finished"))
 }
 

@@ -90,7 +90,7 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                 let mut writer = fastq_writer(output, output2_bar)?;
                 for chunk in writer2_rx {
                     writer.write_all(&chunk).map_err(|e| {
-                        anyhow!("(Writer) Failed to write FastqRecord to output: {}", e)
+                        anyhow!("(Writer2) Failed to write FastqRecord to output: {}", e)
                     })?;
                 }
                 writer

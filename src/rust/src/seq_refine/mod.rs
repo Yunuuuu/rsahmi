@@ -54,6 +54,51 @@ pub(crate) fn seq_refine(
     }
 }
 
+#[extendr]
+#[cfg(feature = "bench")]
+fn pprof_seq_refine(
+    fq1: &str,
+    ofile1: Option<&str>,
+    fq2: Option<&str>,
+    ofile2: Option<&str>,
+    actions1: Robj,
+    actions2: Robj,
+    chunk_size: usize,
+    buffer_size: usize,
+    compression_level: i32,
+    nqueue: Option<usize>,
+    threads: usize,
+    pprof_file: &str,
+) -> std::result::Result<(), String> {
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(2000)
+        .build()
+        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+    let out = kractor_reads(
+        fq1,
+        ofile1,
+        fq2,
+        ofile2,
+        actions1,
+        actions2,
+        chunk_size,
+        buffer_size,
+        compression_level,
+        nqueue,
+        threads,
+    );
+    if let Ok(report) = guard.report().build() {
+        let file = std::fs::File::create(pprof_file)
+            .map_err(|e| format!("Failed to create file {}: {}", pprof_file, e))?;
+        let mut options = pprof::flamegraph::Options::default();
+        options.image_width = Some(2500);
+        report
+            .flamegraph_with_options(file, &mut options)
+            .map_err(|e| format!("Failed to write flamegraph to {}: {}", pprof_file, e))?;
+    };
+    out
+}
+
 fn reader_seq_refine_single_read(
     fq1: &str,
     ofile1: Option<&str>,
@@ -165,7 +210,15 @@ fn reader_seq_refine_paired_read(
     )
 }
 
+#[cfg(not(feature = "bench"))]
 extendr_module! {
     mod seq_refine;
     fn seq_refine;
+}
+
+#[cfg(feature = "bench")]
+extendr_module! {
+    mod kractor;
+    fn seq_refine;
+    fn pprof_seq_refine;
 }
