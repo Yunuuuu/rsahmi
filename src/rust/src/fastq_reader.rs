@@ -8,8 +8,7 @@ use bytes::{Bytes, BytesMut};
 use indicatif::ProgressBar;
 use isal::read::GzipDecoder;
 use libdeflater::Compressor;
-use memchr::memchr;
-use memchr::memchr2;
+use memchr::{memchr, memchr2};
 
 use crate::parser::fastq::FastqParseError;
 use crate::parser::fastq::FastqRecord;
