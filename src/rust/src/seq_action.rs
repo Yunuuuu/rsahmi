@@ -373,12 +373,14 @@ pub(crate) struct SubseqActions {
 }
 
 fn tag_sequence(tag: &str, sequence: Vec<&[u8]>) -> Bytes {
-    tag.as_bytes()
-        .iter()
-        .chain(std::iter::once(&b':'))
-        .chain(sequence.into_iter().flatten())
-        .copied()
-        .collect::<Bytes>()
+    let total_len = tag.len() + 1 + sequence.iter().map(|s| s.len()).sum::<usize>();
+    let mut out = BytesMut::with_capacity(total_len);
+    out.extend_from_slice(tag.as_bytes());
+    out.put_u8(b':');
+    for s in sequence {
+        out.extend_from_slice(s);
+    }
+    out.freeze()
 }
 
 impl SubseqActions {
@@ -388,6 +390,14 @@ impl SubseqActions {
             embed_list: Vec::new(),
             trim_list: Vec::new(),
         }
+    }
+
+    fn has_embed(&self) -> bool {
+        !self.embed.is_empty()
+    }
+
+    fn has_trim(&self) -> bool {
+        self.trim.ranges.len() > 0
     }
 
     fn embedded_tags(&self, seq: &[u8]) -> Result<Vec<Bytes>> {
@@ -412,14 +422,6 @@ impl SubseqActions {
 
     fn trim(&self, seq: &[u8], qual: &[u8]) -> Result<(Bytes, Bytes)> {
         self.trim.trim(seq, qual)
-    }
-
-    fn has_embed(&self) -> bool {
-        !self.embed.is_empty()
-    }
-
-    fn has_trim(&self) -> bool {
-        self.trim.ranges.len() > 0
     }
 
     pub(crate) fn transform_fastq_slice(
