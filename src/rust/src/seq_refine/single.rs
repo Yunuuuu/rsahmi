@@ -60,7 +60,7 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
             let rx = reader_rx.clone();
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut records_pool: Vec<u8> = Vec::with_capacity(6 * 1024 * 1024);
+                let mut records_pool: Vec<u8> = Vec::with_capacity(crate::BLOCK_SIZE);
                 let mut compressor = Compressor::new(compression_level);
                 while let Ok(records) = rx.recv() {
                     for mut record in records {

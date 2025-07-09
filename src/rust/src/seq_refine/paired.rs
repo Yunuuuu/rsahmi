@@ -142,8 +142,8 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             ))?;
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut records1_pool: Vec<u8> = Vec::with_capacity(6 * 1024 * 1024);
-                let mut records2_pool: Vec<u8> = Vec::with_capacity(6 * 1024 * 1024);
+                let mut records1_pool: Vec<u8> = Vec::with_capacity(crate::BLOCK_SIZE);
+                let mut records2_pool: Vec<u8> = Vec::with_capacity(crate::BLOCK_SIZE);
                 let mut compressor = Compressor::new(compression_level);
                 loop {
                     let (records1, records2) = match (reader1_rx.recv(), reader2_rx.recv()) {
