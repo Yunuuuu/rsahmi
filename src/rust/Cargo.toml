@@ -14,6 +14,8 @@ extendr-api = { version = "0.8.0", features = [ "result_list" ] }
 anyhow = '*'
 memmap2 = '*'
 flate2 = { version = "*", features = ["zlib-rs"]}
+libdeflater = { version = "*" }
+isal-rs = { version = "*" }
 indicatif = '*'
 bytes = '*'
 rayon = '*'

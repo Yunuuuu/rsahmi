@@ -5,10 +5,10 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use bytes::{Bytes, BytesMut};
-use flate2::bufread::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use indicatif::ProgressBar;
+use isal::read::GzipDecoder;
 use memchr::memchr;
 use memchr::memchr2;
 
@@ -28,16 +28,16 @@ fn gz_compressed(path: &Path) -> bool {
         .map_or(false, |s| s.eq_ignore_ascii_case("gz"))
 }
 
-pub(crate) fn fastq_writer<P: AsRef<Path>>(
+pub(crate) fn fastq_writer<P: AsRef<Path> + ?Sized>(
     file: &P,
     buffer_size: usize,
     compression_level: u32,
     progress_bar: Option<ProgressBar>,
-) -> Result<BufWriter<Box<dyn Write + Send>>> {
+) -> Result<BufWriter<Box<dyn Write>>> {
     let path: &Path = file.as_ref();
     let file = File::create(path)
         .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
-    let writer: Box<dyn Write + Send>;
+    let writer: Box<dyn Write>;
     if gz_compressed(path) {
         if let Some(bar) = progress_bar {
             writer = Box::new(GzEncoder::new(
@@ -57,26 +57,19 @@ pub(crate) fn fastq_writer<P: AsRef<Path>>(
     Ok(BufWriter::with_capacity(buffer_size, writer))
 }
 
-pub(crate) fn fastq_reader<P: AsRef<Path>>(
+pub(crate) fn fastq_reader<P: AsRef<Path> + ?Sized>(
     file: &P,
-    buffer_size: usize,
     progress_bar: Option<ProgressBar>,
-) -> Result<Box<dyn Read + Send>> {
+) -> Result<Box<dyn Read>> {
     let path: &Path = file.as_ref();
     let file =
         File::open(path).map_err(|e| anyhow!("Failed to open file {}: {}", path.display(), e))?;
-    let reader: Box<dyn Read + Send>;
+    let reader: Box<dyn Read>;
     if gz_compressed(path) {
         if let Some(bar) = progress_bar {
-            reader = Box::new(MultiGzDecoder::new(BufReader::with_capacity(
-                buffer_size,
-                ProgressBarReader::new(file, bar),
-            )));
+            reader = Box::new(GzipDecoder::new(ProgressBarReader::new(file, bar)));
         } else {
-            reader = Box::new(MultiGzDecoder::new(BufReader::with_capacity(
-                buffer_size,
-                file,
-            )));
+            reader = Box::new(GzipDecoder::new(file));
         }
     } else {
         if let Some(bar) = progress_bar {

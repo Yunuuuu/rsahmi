@@ -2,10 +2,9 @@ use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 
-pub(crate) mod paired;
-pub(crate) mod single;
+mod paired;
+mod single;
 
-use crate::fastq_reader::*;
 use crate::seq_action::*;
 
 #[extendr]
@@ -18,7 +17,7 @@ pub(crate) fn seq_refine(
     actions2: Robj,
     chunk_size: usize,
     buffer_size: usize,
-    compression_level: usize,
+    compression_level: u32,
     nqueue: Option<usize>,
     threads: usize,
 ) -> std::result::Result<(), String> {
@@ -61,7 +60,7 @@ fn reader_seq_refine_single_read(
     actions: Option<SubseqActions>,
     chunk_size: usize,
     buffer_size: usize,
-    compression_level: usize,
+    compression_level: u32,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -79,12 +78,14 @@ fn reader_seq_refine_single_read(
     let pb2 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
     pb2.set_prefix("Writing fastq");
     pb2.set_style(writer_style);
-    let mut reader = fastq_reader(&fq1, buffer_size, Some(pb1))?;
-    let mut writer = fastq_writer(&ofile1, buffer_size, compression_level as u32, Some(pb2))?;
+
     single::reader_seq_refine_single_read(
-        &mut reader,
-        &mut writer,
+        &fq1,
+        Some(pb1),
+        &ofile1,
+        Some(pb2),
         &actions,
+        compression_level,
         chunk_size,
         buffer_size,
         nqueue,
@@ -101,7 +102,7 @@ fn reader_seq_refine_paired_read(
     actions2: Option<SubseqActions>,
     chunk_size: usize,
     buffer_size: usize,
-    compression_level: usize,
+    compression_level: u32,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -122,17 +123,11 @@ fn reader_seq_refine_paired_read(
     );
     pb1.set_prefix("Reading fq1");
     pb1.set_style(reader_style.clone());
-    let mut reader1 = fastq_reader(&fq1, buffer_size, Some(pb1))?;
-    let mut writer1 = if let Some(file) = ofile1 {
+    let pb2 = if let Some(_) = ofile1 {
         let pb2 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
         pb2.set_prefix("Writing fq1");
         pb2.set_style(writer_style.clone());
-        Some(fastq_writer(
-            &file,
-            buffer_size,
-            compression_level as u32,
-            Some(pb2),
-        )?)
+        Some(pb2)
     } else {
         None
     };
@@ -142,28 +137,27 @@ fn reader_seq_refine_paired_read(
     );
     pb3.set_prefix("Reading fq2");
     pb3.set_style(reader_style);
-    let mut reader2 = fastq_reader(&fq2, buffer_size, Some(pb3))?;
-
-    let mut writer2 = if let Some(file) = ofile2 {
+    let pb4 = if let Some(_) = ofile2 {
         let pb4 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
         pb4.set_prefix("Writing fq2");
         pb4.set_style(writer_style);
-        Some(fastq_writer(
-            &file,
-            buffer_size,
-            compression_level as u32,
-            Some(pb4),
-        )?)
+        Some(pb4)
     } else {
         None
     };
+
     let actions = SubseqPairedActions::new(actions1, actions2);
     paired::reader_seq_refine_paired_read(
-        &mut reader1,
-        &mut writer1,
-        &mut reader2,
-        &mut writer2,
+        fq1,
+        Some(pb1),
+        fq2,
+        Some(pb3),
+        ofile1,
+        pb2,
+        ofile2,
+        pb4,
         &actions,
+        compression_level,
         chunk_size,
         buffer_size,
         nqueue,
