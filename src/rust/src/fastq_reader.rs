@@ -60,6 +60,7 @@ pub(crate) fn fastq_pack(bytes: &[u8], compressor: &mut Compressor, gzip: bool) 
 
 pub(crate) fn fastq_reader<P: AsRef<Path> + ?Sized>(
     file: &P,
+    buffer_size: usize,
     progress_bar: Option<ProgressBar>,
 ) -> Result<Box<dyn Read>> {
     let path: &Path = file.as_ref();
@@ -68,9 +69,15 @@ pub(crate) fn fastq_reader<P: AsRef<Path> + ?Sized>(
     let reader: Box<dyn Read>;
     if gz_compressed(path) {
         if let Some(bar) = progress_bar {
-            reader = Box::new(GzipDecoder::new(ProgressBarReader::new(file, bar)));
+            reader = Box::new(GzipDecoder::new(BufReader::with_capacity(
+                buffer_size,
+                ProgressBarReader::new(file, bar),
+            )));
         } else {
-            reader = Box::new(GzipDecoder::new(file));
+            reader = Box::new(GzipDecoder::new(BufReader::with_capacity(
+                buffer_size,
+                file,
+            )));
         }
     } else {
         if let Some(bar) = progress_bar {

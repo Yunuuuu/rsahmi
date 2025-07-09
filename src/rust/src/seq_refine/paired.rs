@@ -221,7 +221,7 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         // ─── reader Thread ─────────────────────────────────────
         let input1: &Path = input1_path.as_ref();
         let reader1_handle = scope.spawn(move || -> Result<()> {
-            let reader = fastq_reader(input1, input1_bar)?;
+            let reader = fastq_reader(input1, buffer_size, input1_bar)?;
             let mut reader = FastqReader::new(BufReader::with_capacity(buffer_size, reader));
             let mut reader1_tx_vec = reader1_tx_vec
                 .into_iter()
@@ -251,7 +251,7 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
 
         let input2: &Path = input2_path.as_ref();
         let reader2_handle = scope.spawn(move || -> Result<()> {
-            let reader2 = fastq_reader(input2, input2_bar)?;
+            let reader2 = fastq_reader(input2, buffer_size, input2_bar)?;
             let mut reader2 = FastqReader::new(BufReader::with_capacity(buffer_size, reader2));
             let mut reader2_tx_vec = reader2_tx_vec
                 .into_iter()

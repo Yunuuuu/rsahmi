@@ -96,7 +96,7 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
 
         // ─── reader Thread ─────────────────────────────────────
         let reader_handle = scope.spawn(move || -> Result<()> {
-            let reader = fastq_reader(input, input_bar)?;
+            let reader = fastq_reader(input, buffer_size, input_bar)?;
             let mut reader = FastqReader::new(BufReader::with_capacity(buffer_size, reader));
             let mut reader_tx = BatchSender::with_capacity(chunk_size, reader_tx);
             while let Some(record) = reader
