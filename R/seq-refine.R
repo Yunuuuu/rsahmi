@@ -117,7 +117,8 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
         ))
     }
 
-    if (is.null(ofile1) && is.null(ofile2)) {
+    if ((is.null(fq2) && is.null(ofile1)) || 
+        (!is.null(fq2) && is.null(ofile1) && is.null(ofile2))) {
         cli::cli_abort(c(
             "No output specified.",
             i = "Please provide at least one of {.arg ofile1} or {.arg ofile2} to write the results."
