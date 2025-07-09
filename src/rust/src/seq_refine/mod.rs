@@ -8,7 +8,7 @@ mod single;
 use crate::seq_action::*;
 
 #[extendr]
-pub(crate) fn seq_refine(
+fn seq_refine(
     fq1: &str,
     ofile1: Option<&str>,
     fq2: Option<&str>,
@@ -74,7 +74,7 @@ fn pprof_seq_refine(
         .frequency(2000)
         .build()
         .map_err(|e| format!("cannot create profile guard {:?}", e))?;
-    let out = kractor_reads(
+    let out = seq_refine(
         fq1,
         ofile1,
         fq2,
@@ -218,7 +218,7 @@ extendr_module! {
 
 #[cfg(feature = "bench")]
 extendr_module! {
-    mod kractor;
+    mod seq_refine;
     fn seq_refine;
     fn pprof_seq_refine;
 }
