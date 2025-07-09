@@ -5,12 +5,12 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
+use libdeflater::{CompressionLvl, Compressor};
 
-// use libdeflater::Compressor;
 use crate::batchsender::BatchSender;
-use crate::fastq_reader::*;
 use crate::parser::fastq::FastqRecord;
 use crate::seq_action::*;
+use crate::{fastq_reader::*, gz_compressed};
 
 pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
     input_path: &P,
@@ -18,7 +18,7 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
     output_path: &P,
     output_bar: Option<ProgressBar>,
     actions: &SubseqActions,
-    compression_level: u32,
+    compression_level: i32,
     chunk_size: usize,
     buffer_size: usize,
     nqueue: Option<usize>,
@@ -26,13 +26,13 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
 ) -> Result<()> {
     let input: &Path = input_path.as_ref();
     let output: &Path = output_path.as_ref();
+    let compression_level = CompressionLvl::new(compression_level)
+        .map_err(|e| anyhow!("Invalid 'compression_level': {:?}", e))?;
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
-        let (writer_tx, writer_rx): (
-            Sender<Vec<FastqRecord<Bytes>>>,
-            Receiver<Vec<FastqRecord<Bytes>>>,
-        ) = crate::new_channel(nqueue);
+        let (writer_tx, writer_rx): (Sender<Vec<u8>>, Receiver<Vec<u8>>) =
+            crate::new_channel(nqueue);
 
         let (reader_tx, reader_rx): (
             Sender<Vec<FastqRecord<Bytes>>>,
@@ -42,41 +42,51 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file
         let writer_handle = scope.spawn(move || -> Result<()> {
-            let mut writer = fastq_writer(output, buffer_size, compression_level, output_bar)?;
+            let mut writer = fastq_writer(output, output_bar)?;
 
             // Iterate over each received batch of records
             for chunk in writer_rx {
-                for record in chunk {
-                    record.write(&mut writer)?;
-                }
+                writer.write_all(&chunk).map_err(|e| {
+                    anyhow!("(Writer) Failed to write FastqRecord to output: {}", e)
+                })?;
             }
             Ok(())
         });
 
         // ─── Parser Thread ─────────────────────────────────────
         let mut parser_handles = Vec::with_capacity(threads);
+        let gzip = gz_compressed(output);
         for _ in 0 .. threads {
             let rx = reader_rx.clone();
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut thread_tx = BatchSender::with_capacity(chunk_size, tx);
+                let mut records_pool: Vec<u8> = Vec::with_capacity(6 * 1024 * 1024);
+                let mut compressor = Compressor::new(compression_level);
                 while let Ok(records) = rx.recv() {
                     for mut record in records {
                         actions.transform_fastq_bytes(&mut record)?;
-                        thread_tx.send(record).map_err(|e| {
-                            anyhow!(
-                                "(Parser) Failed to send parsed record to Writer thread: {}",
-                                e
-                            )
-                        })?;
+                        if records_pool.capacity() - records_pool.len() < record.bytes_size() {
+                            let pack = fastq_pack(&records_pool, &mut compressor, gzip)?;
+                            tx.send(pack).map_err(|e| {
+                                anyhow!(
+                                    "(Parser) Failed to send parsed record to Writer thread: {}",
+                                    e
+                                )
+                            })?;
+                            records_pool.clear();
+                        }
+                        record.extend(&mut records_pool);
                     }
                 }
-                thread_tx.flush().map_err(|e| {
-                    anyhow!(
-                        "(Parser) Failed to flush remaining records to Writer thread: {}",
-                        e
-                    )
-                })?;
+                if !records_pool.is_empty() {
+                    let pack = fastq_pack(&records_pool, &mut compressor, gzip)?;
+                    tx.send(pack).map_err(|e| {
+                        anyhow!(
+                            "(Parser) Failed to send parsed record to Writer thread: {}",
+                            e
+                        )
+                    })?;
+                }
                 Ok(())
             });
             parser_handles.push(handle);
@@ -164,7 +174,7 @@ mod tests {
             &output_path,
             None, // No progress bar
             &actions,
-            0,    // No compression
+            1,       // No compression
             1,       // chunk size
             8192,    // buffer size
             Some(2), // queue size

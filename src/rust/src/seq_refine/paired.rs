@@ -6,9 +6,10 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
+use libdeflater::{CompressionLvl, Compressor};
 
 use crate::batchsender::BatchSender;
-use crate::fastq_reader::*;
+use crate::{fastq_reader::*, gz_compressed};
 use crate::parser::fastq::FastqRecord;
 use crate::{fastq_reader::FastqReader, seq_action::*};
 
@@ -22,24 +23,24 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
     output2_path: Option<&P>,
     output2_bar: Option<ProgressBar>,
     actions: &SubseqPairedActions,
-    compression_level: u32,
+    compression_level: i32,
     chunk_size: usize,
     buffer_size: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
+    let compression_level = CompressionLvl::new(compression_level)
+        .map_err(|e| anyhow!("Invalid 'compression_level': {:?}", e))?;
     std::thread::scope(|scope| -> Result<()> {
         // Create a channel between the parser and writer threads
         // The channel transmits batches (Vec<FastqRecord>)
-        let (writer_tx, writer_rx): (
-            Sender<Vec<(FastqRecord<Bytes>, FastqRecord<Bytes>)>>,
-            Receiver<Vec<(FastqRecord<Bytes>, FastqRecord<Bytes>)>>,
-        ) = crate::new_channel(nqueue);
-
-        let (writer1_tx, writer1_rx): (Sender<Vec<Vec<u8>>>, Receiver<Vec<Vec<u8>>>) =
+        let (writer_tx, writer_rx): (Sender<(Option<Vec<u8>>, Option<Vec<u8>>)>, Receiver<(Option<Vec<u8>>, Option<Vec<u8>>)>) =
             crate::new_channel(nqueue);
 
-        let (writer2_tx, writer2_rx): (Sender<Vec<Vec<u8>>>, Receiver<Vec<Vec<u8>>>) =
+        let (writer1_tx, writer1_rx): (Sender<Vec<u8>>, Receiver<Vec<u8>>) =
+            crate::new_channel(nqueue);
+
+        let (writer2_tx, writer2_rx): (Sender<Vec<u8>>, Receiver<Vec<u8>>) =
             crate::new_channel(nqueue);
 
         let mut reader1_tx_vec = Vec::with_capacity(threads);
@@ -63,60 +64,52 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             reader2_rx_vec.push(reader_rx);
         }
 
-        let writer1_handle = if let Some(output_path) = output1_path {
+        let (writer1_handle, gzip1) = if let Some(output_path) = output1_path {
             let output: &Path = output_path.as_ref();
-            Some(scope.spawn(move || -> Result<()> {
-                let mut writer = fastq_writer(output, buffer_size, compression_level, output1_bar)?;
+            let handle = Some(scope.spawn(move || -> Result<()> {
+                let mut writer = fastq_writer(output, output1_bar)?;
                 for chunk in writer1_rx {
-                    for record in chunk {
-                        writer.write_all(&record).map_err(|e| {
-                            anyhow!("(Writer1) Failed to write FastqRecord to output: {}", e)
-                        })?;
-                    }
+                    writer.write_all(&chunk).map_err(|e| {
+                        anyhow!("(Writer1) Failed to write FastqRecord to output: {}", e)
+                    })?;
                 }
                 writer
                     .flush()
                     .map_err(|e| anyhow!("(Writer1) Failed to flush writer:  {}", e))?;
                 Ok(())
-            }))
+            }));
+            let gzip = gz_compressed(output);
+            (handle, gzip)
         } else {
-            None
+            (None, false)
         };
 
-        let writer2_handle = if let Some(output_path) = output2_path {
+        let (writer2_handle, gzip2) = if let Some(output_path) = output2_path {
             let output: &Path = output_path.as_ref();
-            Some(scope.spawn(move || -> Result<()> {
-                let mut writer = fastq_writer(output, buffer_size, compression_level, output2_bar)?;
+            let handle =Some(scope.spawn(move || -> Result<()> {
+                let mut writer = fastq_writer(output, output2_bar)?;
                 for chunk in writer2_rx {
-                    for record in chunk {
-                        writer.write_all(&record).map_err(|e| {
-                            anyhow!("(Writer2) Failed to write FastqRecord to output: {}", e)
-                        })?;
-                    }
+                    writer.write_all(&chunk).map_err(|e| {
+                        anyhow!("(Writer) Failed to write FastqRecord to output: {}", e)
+                    })?;
                 }
                 writer
                     .flush()
                     .map_err(|e| anyhow!("(Writer2) Failed to flush writer: {}", e))?;
                 Ok(())
-            }))
+            }));
+            let gzip = gz_compressed(output);
+            (handle, gzip)
         } else {
-            None
+            (None, false)
         };
 
         // ─── Writer Thread ─────────────────────────────────────
-        let has_writer1 = writer2_handle.is_some();
-        let has_writer2 = writer2_handle.is_some();
         // Consumes batches of records and writes them to file
         let writer_handle = scope.spawn(move || -> Result<()> {
             // Iterate over each received batch of records
-            for chunk in writer_rx {
-                let (records1, records2): (Vec<FastqRecord<Bytes>>, Vec<FastqRecord<Bytes>>) =
-                    chunk.into_iter().unzip();
-                if has_writer1 {
-                    let records1: Vec<Vec<u8>> = records1
-                        .into_iter()
-                        .map(|recorde| recorde.as_vec())
-                        .collect();
+            for (records1, records2) in writer_rx {
+                if let Some(records1) = records1 {
                     writer1_tx.send(records1).map_err(|e| {
                         anyhow!(
                             "(Writer dispatch) Failed to send read1 batch to Writer1 thread: {}",
@@ -124,11 +117,7 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                         )
                     })?;
                 }
-                if has_writer2 {
-                    let records2: Vec<Vec<u8>> = records2
-                        .into_iter()
-                        .map(|recorde| recorde.as_vec())
-                        .collect();
+                if let Some(records2) = records2 {
                     writer2_tx.send(records2).map_err(|e| {
                         anyhow!(
                             "(Writer dispatch) Failed to send read2 batch to Writer2 thread: {}",
@@ -141,6 +130,8 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         });
 
         // ─── Parser Thread ─────────────────────────────────────
+        let has_writer1 = writer2_handle.is_some();
+        let has_writer2 = writer2_handle.is_some();
         let mut parser_handles = Vec::with_capacity(threads);
         for _ in 0 .. threads {
             let reader1_rx = reader1_rx_vec.pop().ok_or(anyhow!(
@@ -151,7 +142,9 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             ))?;
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut thread_tx = BatchSender::with_capacity(chunk_size, tx);
+                let mut records1_pool: Vec<u8> = Vec::with_capacity(6 * 1024 * 1024);
+                let mut records2_pool: Vec<u8> = Vec::with_capacity(6 * 1024 * 1024);
+                let mut compressor = Compressor::new(compression_level);
                 loop {
                     let (records1, records2) = match (reader1_rx.recv(), reader2_rx.recv()) {
                         (Ok(rec1), Ok(rec2)) => (rec1, rec2),
@@ -172,17 +165,53 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                     if records1.len() != records2.len() {
                         return Err(anyhow!("(Parser) FASTQ pairing error: record count mismatch (read1: {}, read2: {})", records1.len(), records2.len()));
                     }
+
                     // Initialize a thread-local batch sender for matching records
                     for (mut record1, mut record2) in zip(records1, records2) {
                         actions.transform_fastq_bytes(&mut record1, &mut record2)?;
-                        thread_tx
-                            .send((record1, record2))
-                            .map_err(|e| anyhow!("(Parser) Failed to send parsed record pair to Writer thread: {}", e))?;
+                        if (records1_pool.capacity() - records1_pool.len() < record1.bytes_size()) ||
+                            (records2_pool.capacity() - records2_pool.len() < record2.bytes_size()) {
+                            let pack1 = if has_writer1 {
+                                Some(fastq_pack(&records1_pool, &mut compressor, gzip1)?)
+                            } else {
+                                None
+                            };
+                            let pack2 = if has_writer2 {
+                                Some(fastq_pack(&records2_pool, &mut compressor, gzip2)?)
+                            } else {
+                                None
+                            };
+                            tx.send((pack1, pack2)).map_err(|e| {
+                                anyhow!(
+                                    "(Parser) Failed to send send parsed record pair to Writer thread: {}",
+                                    e
+                                )
+                            })?;
+                            records1_pool.clear();
+                            records2_pool.clear();
+                        }
+                        record1.extend(&mut records1_pool);
+                        record2.extend(&mut records2_pool);
                     }
                 }
-                thread_tx
-                    .flush()
-                    .map_err(|e| anyhow!("(Parser) Failed to flush remaining records to Writer thread: {}", e))?;
+                if !records1_pool.is_empty() {
+                    let pack1 = if has_writer1 {
+                        Some(fastq_pack(&records1_pool, &mut compressor, gzip1)?)
+                    } else {
+                        None
+                    };
+                    let pack2 = if has_writer2 {
+                        Some(fastq_pack(&records2_pool, &mut compressor, gzip2)?)
+                    } else {
+                        None
+                    };
+                    tx.send((pack1, pack2)).map_err(|e| {
+                        anyhow!(
+                            "(Parser) Failed to send send parsed record pair to Writer thread: {}",
+                            e
+                        )
+                    })?;
+                }
                 Ok(())
             });
             parser_handles.push(handle);
@@ -285,7 +314,7 @@ mod tests {
     use std::fs::File;
     use std::io::Read;
 
-    use flate2::read::GzDecoder;
+    use isal::read::GzipDecoder;
 
     use super::*;
 
@@ -335,9 +364,9 @@ mod tests {
 
         // Decompress and read output
         let mut buf1 = String::new();
-        GzDecoder::new(File::open(out1_path)?).read_to_string(&mut buf1)?;
+        GzipDecoder::new(File::open(out1_path)?).read_to_string(&mut buf1)?;
         let mut buf2 = String::new();
-        GzDecoder::new(File::open(out2_path)?).read_to_string(&mut buf2)?;
+        GzipDecoder::new(File::open(out2_path)?).read_to_string(&mut buf2)?;
 
         // Check contents
         assert_eq!(

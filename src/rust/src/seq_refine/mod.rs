@@ -17,7 +17,7 @@ pub(crate) fn seq_refine(
     actions2: Robj,
     chunk_size: usize,
     buffer_size: usize,
-    compression_level: u32,
+    compression_level: i32,
     nqueue: Option<usize>,
     threads: usize,
 ) -> std::result::Result<(), String> {
@@ -60,7 +60,7 @@ fn reader_seq_refine_single_read(
     actions: Option<SubseqActions>,
     chunk_size: usize,
     buffer_size: usize,
-    compression_level: u32,
+    compression_level: i32,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -102,7 +102,7 @@ fn reader_seq_refine_paired_read(
     actions2: Option<SubseqActions>,
     chunk_size: usize,
     buffer_size: usize,
-    compression_level: u32,
+    compression_level: i32,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {

@@ -1,14 +1,13 @@
 use std::fs::File;
+use std::io::BufReader;
 use std::io::{BufRead, Read, Write};
-use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use bytes::{Bytes, BytesMut};
-use flate2::write::GzEncoder;
-use flate2::Compression;
 use indicatif::ProgressBar;
 use isal::read::GzipDecoder;
+use libdeflater::Compressor;
 use memchr::memchr;
 use memchr::memchr2;
 
@@ -30,31 +29,33 @@ fn gz_compressed(path: &Path) -> bool {
 
 pub(crate) fn fastq_writer<P: AsRef<Path> + ?Sized>(
     file: &P,
-    buffer_size: usize,
-    compression_level: u32,
     progress_bar: Option<ProgressBar>,
-) -> Result<BufWriter<Box<dyn Write>>> {
+) -> Result<Box<dyn Write>> {
     let path: &Path = file.as_ref();
     let file = File::create(path)
         .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
     let writer: Box<dyn Write>;
-    if gz_compressed(path) {
-        if let Some(bar) = progress_bar {
-            writer = Box::new(GzEncoder::new(
-                ProgressBarWriter::new(file, bar),
-                Compression::new(compression_level),
-            ));
-        } else {
-            writer = Box::new(GzEncoder::new(file, Compression::new(compression_level)));
-        }
+    if let Some(bar) = progress_bar {
+        writer = Box::new(ProgressBarWriter::new(file, bar));
     } else {
-        if let Some(bar) = progress_bar {
-            writer = Box::new(ProgressBarWriter::new(file, bar));
-        } else {
-            writer = Box::new(file);
-        }
+        writer = Box::new(file);
     }
-    Ok(BufWriter::with_capacity(buffer_size, writer))
+    Ok(writer)
+}
+
+pub(crate) fn fastq_pack(bytes: &[u8], compressor: &mut Compressor, gzip: bool) -> Result<Vec<u8>> {
+    let mut pack: Vec<u8>;
+    if gzip {
+        let pack_size = compressor.gzip_compress_bound(bytes.len());
+        pack = Vec::with_capacity(pack_size);
+        unsafe { pack.set_len(pack_size) };
+        let size = compressor.gzip_compress(bytes, &mut pack)?;
+        unsafe { pack.set_len(size) };
+    } else {
+        pack = Vec::with_capacity(bytes.len());
+        pack.extend_from_slice(bytes);
+    }
+    Ok(pack)
 }
 
 pub(crate) fn fastq_reader<P: AsRef<Path> + ?Sized>(
