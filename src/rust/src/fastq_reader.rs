@@ -21,7 +21,7 @@ pub(crate) struct FastqReader<R> {
     label: Option<&'static str>,
 }
 
-fn gz_compressed(path: &Path) -> bool {
+pub(crate) fn gz_compressed(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map_or(false, |s| s.eq_ignore_ascii_case("gz"))

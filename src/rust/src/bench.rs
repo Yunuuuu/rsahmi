@@ -28,7 +28,7 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
         let map = unsafe { Mmap::map(&reader) }?;
         crate::mmap_advice(&map)?;
 
-        if crate::gz_compressed(path) {
+        if crate::fastq_reader::gz_compressed(path) {
             let reader = BytesReader::new(MultiGzDecoder::new(ProgressBarReader::new(
                 Cursor::new(map),
                 pb,
@@ -57,7 +57,7 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
         }
     } else {
         let reader = ProgressBarReader::new(reader, pb);
-        if crate::gz_compressed(path) {
+        if crate::fastq_reader::gz_compressed(path) {
             let reader = BytesReader::new(MultiGzDecoder::new(reader));
             let mut reader = crate::kractor::koutput::io::KoutputBytesChunkReader::new(reader);
             while let Some(_) = reader.chunk_reader()? {}

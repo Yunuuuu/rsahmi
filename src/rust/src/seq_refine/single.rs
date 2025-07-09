@@ -8,9 +8,9 @@ use indicatif::ProgressBar;
 use libdeflater::{CompressionLvl, Compressor};
 
 use crate::batchsender::BatchSender;
+use crate::fastq_reader::*;
 use crate::parser::fastq::FastqRecord;
 use crate::seq_action::*;
-use crate::{fastq_reader::*, gz_compressed};
 
 pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
     input_path: &P,

@@ -50,12 +50,6 @@ pub(crate) fn progress_writer_style() -> std::result::Result<ProgressStyle, Temp
     )
 }
 
-pub(crate) fn gz_compressed(path: &std::path::Path) -> bool {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .map_or(false, |s| s.eq_ignore_ascii_case("gz"))
-}
-
 // https://extendr.github.io/extendr/extendr_api/#returning-resultt-e-to-r
 // https://github.com/extendr/extendr/blob/master/extendr-api/src/robj/into_robj.rs#L100
 // The memory-safe way to do error handling with extendr is to return a Result<T, E> to R.

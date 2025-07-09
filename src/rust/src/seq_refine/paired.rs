@@ -9,7 +9,7 @@ use indicatif::ProgressBar;
 use libdeflater::{CompressionLvl, Compressor};
 
 use crate::batchsender::BatchSender;
-use crate::{fastq_reader::*, gz_compressed};
+use crate::fastq_reader::*;
 use crate::parser::fastq::FastqRecord;
 use crate::{fastq_reader::FastqReader, seq_action::*};
 
