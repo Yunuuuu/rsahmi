@@ -1,18 +1,18 @@
 use std::fs::File;
-use std::io::{BufRead, BufReader};
 
 use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
 
+use crate::reader0::LineReader;
+
 pub(crate) fn parse_kreport(kreport: &str) -> Result<Vec<Kreport>> {
-    let reader = BufReader::with_capacity(126 * 1024, File::open(kreport)?);
+    let mut reader = LineReader::with_capacity(126 * 1024, File::open(kreport)?);
     let mut kreports: Vec<Kreport> = Vec::with_capacity(10);
     let mut ancestors = Vec::with_capacity(10);
     let mut pos = 0; // The line offset of the ancestors
-    for line_result in reader.split(b'\n') {
-        let line = line_result?;
+    while let Some(line) = reader.read_line()? {
+        let line = line.freeze();
         let fields: Vec<&[u8]> = line.split(|b| *b == b'\t').collect();
-
         // Parse fixed columns
         let percents = parse_f64(fields[0])?;
         let total_reads = parse_usize(fields[1])?;

@@ -8,19 +8,11 @@ use bytes::{Bytes, BytesMut};
 use indicatif::ProgressBar;
 use isal::read::GzipDecoder;
 use libdeflater::Compressor;
-use memchr::{memchr, memchr2};
+use memchr::memchr2;
 
 use crate::parser::fastq::FastqParseError;
 use crate::parser::fastq::FastqRecord;
 use crate::reader0::*;
-
-pub(crate) struct FastqReader<R> {
-    reader: R,
-    offset: usize,
-    buffer: Option<BytesMut>,
-    buffer_size: usize,
-    leftover: Option<BytesMut>,
-}
 
 pub(crate) fn gz_compressed(path: &Path) -> bool {
     path.extension()
@@ -90,6 +82,10 @@ pub(crate) fn fastq_reader<P: AsRef<Path> + ?Sized>(
     Ok(reader)
 }
 
+pub(crate) struct FastqReader<R> {
+    reader: LineReader<R>,
+}
+
 impl<R: Read> FastqReader<R> {
     #[allow(dead_code)]
     pub(crate) fn new(reader: R) -> Self {
@@ -98,66 +94,17 @@ impl<R: Read> FastqReader<R> {
 
     pub(crate) fn with_capacity(capacity: usize, reader: R) -> Self {
         Self {
-            reader,
-            offset: 0,
-            buffer: None,
-            buffer_size: capacity,
-            leftover: None,
+            reader: LineReader::with_capacity(capacity, reader),
         }
     }
 
-    fn fill_buf(&mut self) -> std::io::Result<()> {
-        if self.buffer.is_none() {
-            let mut buffer = BytesMut::with_capacity(self.buffer_size);
-            unsafe { buffer.set_len(self.buffer_size) };
-            let nbytes = self.reader.read(&mut buffer)?;
-            unsafe { buffer.set_len(nbytes) };
-            if nbytes > 0 {
-                self.buffer = Some(buffer)
-            }
-        }
-        Ok(())
+    pub(crate) fn offset(&self) -> usize {
+        self.reader.offset()
     }
 
     #[inline]
-    fn read_line(&mut self) -> Result<Option<BytesMut>> {
-        loop {
-            self.fill_buf()?;
-            if let Some(buffer) = self.buffer.as_mut() {
-                if let Some(pos) = memchr(b'\n', &buffer) {
-                    // Fast path: newline found
-                    let mut buf = buffer.split_to(pos + 1);
-                    let end = if pos > 0 && buf[pos - 1] == b'\r' {
-                        pos - 1
-                    } else {
-                        pos
-                    };
-                    let line = if let Some(mut leftover) = self.leftover.take() {
-                        leftover.extend_from_slice(&buf[.. end]);
-                        leftover
-                    } else {
-                        // Directly build from slice without heap copying if possible
-                        buf.split_to(end)
-                    };
-                    self.offset += 1;
-                    return Ok(Some(line));
-                }
-
-                // No newline: accumulate leftover and continue
-                if let Some(left) = self.leftover.as_mut() {
-                    left.extend_from_slice(&buffer);
-                    self.buffer = None
-                } else {
-                    std::mem::swap(&mut self.buffer, &mut self.leftover);
-                }
-            } else {
-                let left = std::mem::take(&mut self.leftover);
-                if left.is_some() {
-                    self.offset += 1;
-                }
-                return Ok(left);
-            }
-        }
+    fn read_line(&mut self) -> std::io::Result<Option<BytesMut>> {
+        self.reader.read_line()
     }
 
     #[inline]
@@ -181,7 +128,7 @@ impl<R: Read> FastqReader<R> {
             Err(FastqParseError::InvalidHead {
                 label: None,
                 record: format!("{}", String::from_utf8_lossy(&header)),
-                pos: self.offset,
+                pos: self.offset(),
             })?;
         }
         let _ = header.split_to(1); // remove the '@' from the start of the sequence ID
@@ -215,7 +162,7 @@ impl<R: Read> FastqReader<R> {
                             .map_or_else(|| -> &[u8] { b"" }, |d| -> &[u8] { &d })
                     )
                 ),
-                pos: self.offset,
+                pos: self.offset(),
             })
         }?;
 
@@ -235,7 +182,7 @@ impl<R: Read> FastqReader<R> {
                         String::from_utf8_lossy(&seq),
                         String::from_utf8_lossy(&line)
                     ),
-                    pos: self.offset,
+                    pos: self.offset(),
                 })
             } else {
                 Ok(line.freeze())
@@ -252,7 +199,7 @@ impl<R: Read> FastqReader<R> {
                     ),
                     String::from_utf8_lossy(&seq)
                 ),
-                pos: self.offset,
+                pos: self.offset(),
             })
         }?;
 
@@ -274,7 +221,7 @@ impl<R: Read> FastqReader<R> {
                         String::from_utf8_lossy(&sep),
                         String::from_utf8_lossy(&line)
                     ),
-                    pos: self.offset,
+                    pos: self.offset(),
                 })
             } else {
                 Ok(line.freeze())
@@ -291,7 +238,7 @@ impl<R: Read> FastqReader<R> {
                     String::from_utf8_lossy(&seq),
                     String::from_utf8_lossy(&sep),
                 ),
-                pos: self.offset,
+                pos: self.offset(),
             })
         }?;
         Ok(Some(FastqRecord::new(id, desc, seq, sep, qual)))

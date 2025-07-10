@@ -1,6 +1,8 @@
-use std::io::{BufRead, Read, Write};
+use std::io::{Read, Write};
 
+use bytes::BytesMut;
 use indicatif::ProgressBar;
+use memchr::memchr;
 
 pub(crate) struct ProgressBarReader<R> {
     bar: ProgressBar,
@@ -18,15 +20,6 @@ impl<R: Read> Read for ProgressBarReader<R> {
         let nbytes = self.reader.read(buf)?;
         self.bar.inc(nbytes as u64);
         Ok(nbytes)
-    }
-}
-
-impl<R: BufRead> BufRead for ProgressBarReader<R> {
-    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
-        self.reader.fill_buf()
-    }
-    fn consume(&mut self, amount: usize) {
-        self.reader.consume(amount);
     }
 }
 
@@ -49,6 +42,101 @@ impl<W: Write> Write for ProgressBarWriter<W> {
     }
     fn flush(&mut self) -> std::io::Result<()> {
         self.writer.flush()
+    }
+}
+
+/// LineReader: Efficient zero-copy line-based reader using BytesMut.
+///
+/// This reader avoids unnecessary heap allocations and copying by:
+/// - Reusing a fixed-size buffer (`BytesMut`)
+/// - Using `split_to()` to transfer ownership without copying
+/// - Accumulating "leftover" when a line spans multiple reads
+///
+/// Supports CRLF or LF endings and returns each line as a `BytesMut`.
+pub(crate) struct LineReader<R> {
+    reader: R,                  // Underlying reader (e.g., File)
+    offset: usize,              // Line count
+    buffer_size: usize,         // buffer capacity
+    buffer: Option<BytesMut>,   // Current buffer filled from reader
+    leftover: Option<BytesMut>, // Accumulates data when line spans multiple buffers
+}
+
+impl<R: Read> LineReader<R> {
+    #[allow(dead_code)]
+    #[inline]
+    pub(crate) fn new(reader: R) -> Self {
+        Self::with_capacity(8 * 1024, reader)
+    }
+
+    #[inline]
+    pub(crate) fn with_capacity(capacity: usize, reader: R) -> Self {
+        Self {
+            reader,
+            offset: 0,
+            buffer: None,
+            buffer_size: capacity,
+            leftover: None,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn offset(&self) -> usize {
+        self.offset
+    }
+
+    #[inline]
+    pub(crate) fn read_line(&mut self) -> std::io::Result<Option<BytesMut>> {
+        loop {
+            self.fill_buf()?;
+            if let Some(buffer) = self.buffer.as_mut() {
+                if let Some(pos) = memchr(b'\n', &buffer) {
+                    // Fast path: newline found
+                    let mut buf = buffer.split_to(pos + 1);
+                    let end = if pos > 0 && buf[pos - 1] == b'\r' {
+                        pos - 1
+                    } else {
+                        pos
+                    };
+                    let line = if let Some(mut leftover) = self.leftover.take() {
+                        leftover.extend_from_slice(&buf[.. end]);
+                        leftover
+                    } else {
+                        // Directly build from slice without heap copying if possible
+                        buf.split_to(end)
+                    };
+                    self.offset += 1;
+                    return Ok(Some(line));
+                }
+
+                // No newline: accumulate leftover and continue
+                if let Some(left) = self.leftover.as_mut() {
+                    left.extend_from_slice(&buffer);
+                    self.buffer = None
+                } else {
+                    std::mem::swap(&mut self.buffer, &mut self.leftover);
+                }
+            } else {
+                let left = std::mem::take(&mut self.leftover);
+                if left.is_some() {
+                    self.offset += 1;
+                }
+                return Ok(left);
+            }
+        }
+    }
+
+    #[inline]
+    fn fill_buf(&mut self) -> std::io::Result<()> {
+        if self.buffer.is_none() {
+            let mut buffer = BytesMut::with_capacity(self.buffer_size);
+            unsafe { buffer.set_len(self.buffer_size) };
+            let nbytes = self.reader.read(&mut buffer)?;
+            unsafe { buffer.set_len(nbytes) };
+            if nbytes > 0 {
+                self.buffer = Some(buffer)
+            }
+        }
+        Ok(())
     }
 }
 
