@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
-use std::io::{BufRead, Read, Write};
+use std::io::{Read, Write};
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
@@ -17,8 +17,9 @@ use crate::reader0::*;
 pub(crate) struct FastqReader<R> {
     reader: R,
     offset: usize,
+    buffer: Option<BytesMut>,
+    buffer_size: usize,
     leftover: Option<BytesMut>,
-    label: Option<&'static str>,
 }
 
 pub(crate) fn gz_compressed(path: &Path) -> bool {
@@ -89,51 +90,73 @@ pub(crate) fn fastq_reader<P: AsRef<Path> + ?Sized>(
     Ok(reader)
 }
 
-impl<R: Read> FastqReader<BufReader<R>> {
-    pub(crate) fn new(reader: BufReader<R>) -> Self {
+impl<R: Read> FastqReader<R> {
+    #[allow(dead_code)]
+    pub(crate) fn new(reader: R) -> Self {
+        Self::with_capacity(8 * 1024, reader)
+    }
+
+    pub(crate) fn with_capacity(capacity: usize, reader: R) -> Self {
         Self {
             reader,
             offset: 0,
+            buffer: None,
+            buffer_size: capacity,
             leftover: None,
-            label: None,
         }
+    }
+
+    fn fill_buf(&mut self) -> std::io::Result<()> {
+        if self.buffer.is_none() {
+            let mut buffer = BytesMut::with_capacity(self.buffer_size);
+            unsafe { buffer.set_len(self.buffer_size) };
+            let nbytes = self.reader.read(&mut buffer)?;
+            unsafe { buffer.set_len(nbytes) };
+            if nbytes > 0 {
+                self.buffer = Some(buffer)
+            }
+        }
+        Ok(())
     }
 
     #[inline]
     fn read_line(&mut self) -> Result<Option<BytesMut>> {
         loop {
-            let buffer = self.reader.fill_buf()?;
-            if buffer.is_empty() {
-                return Ok(self.leftover.take().filter(|b| !b.is_empty()));
-            }
+            self.fill_buf()?;
+            if let Some(buffer) = self.buffer.as_mut() {
+                if let Some(pos) = memchr(b'\n', &buffer) {
+                    // Fast path: newline found
+                    let mut buf = buffer.split_to(pos + 1);
+                    let end = if pos > 0 && buf[pos - 1] == b'\r' {
+                        pos - 1
+                    } else {
+                        pos
+                    };
+                    let line = if let Some(mut leftover) = self.leftover.take() {
+                        leftover.extend_from_slice(&buf[.. end]);
+                        leftover
+                    } else {
+                        // Directly build from slice without heap copying if possible
+                        buf.split_to(end)
+                    };
+                    self.offset += 1;
+                    return Ok(Some(line));
+                }
 
-            if let Some(pos) = memchr(b'\n', buffer) {
-                // Fast path: newline found
-                let end = if pos > 0 && buffer[pos - 1] == b'\r' {
-                    pos - 1
+                // No newline: accumulate leftover and continue
+                if let Some(left) = self.leftover.as_mut() {
+                    left.extend_from_slice(&buffer);
+                    self.buffer = None
                 } else {
-                    pos
-                };
-
-                let line = if let Some(mut leftover) = self.leftover.take() {
-                    leftover.extend_from_slice(&buffer[.. end]);
-                    leftover
-                } else {
-                    // Directly build from slice without heap copying if possible
-                    BytesMut::from(&buffer[.. end])
-                };
-
-                self.reader.consume(pos + 1);
-                return Ok(Some(line));
+                    std::mem::swap(&mut self.buffer, &mut self.leftover);
+                }
+            } else {
+                let left = std::mem::take(&mut self.leftover);
+                if left.is_some() {
+                    self.offset += 1;
+                }
+                return Ok(left);
             }
-
-            // No newline: accumulate buffer and continue
-            let len = buffer.len();
-            if self.leftover.is_none() {
-                self.leftover = Some(BytesMut::with_capacity(len.max(64)));
-            }
-            self.leftover.as_mut().unwrap().extend_from_slice(buffer);
-            self.reader.consume(len);
         }
     }
 
@@ -156,7 +179,7 @@ impl<R: Read> FastqReader<BufReader<R>> {
         // SAFETY: we must ensure line is not empty, this is ensured by the caller function
         if header.is_empty() || unsafe { *header.get_unchecked(0) } != b'@' {
             Err(FastqParseError::InvalidHead {
-                label: self.label,
+                label: None,
                 record: format!("{}", String::from_utf8_lossy(&header)),
                 pos: self.offset,
             })?;
@@ -183,7 +206,7 @@ impl<R: Read> FastqReader<BufReader<R>> {
             Ok(line.freeze())
         } else {
             Err(FastqParseError::IncompleteRecord {
-                label: self.label,
+                label: None,
                 record: format!(
                     "{}{}",
                     String::from_utf8_lossy(&id),
@@ -201,7 +224,7 @@ impl<R: Read> FastqReader<BufReader<R>> {
             // Separator: begins with a '+' character and is optionally followed by the same sequence identifier
             if line.is_empty() || unsafe { *line.get_unchecked(0) } != b'+' {
                 Err(FastqParseError::InvalidSep {
-                    label: self.label,
+                    label: None,
                     record: format!(
                         "{}{}\n{}\n{}",
                         String::from_utf8_lossy(&id),
@@ -219,7 +242,7 @@ impl<R: Read> FastqReader<BufReader<R>> {
             }
         } else {
             Err(FastqParseError::IncompleteRecord {
-                label: self.label,
+                label: None,
                 record: format!(
                     "{}{}\n{}",
                     String::from_utf8_lossy(&id),
@@ -237,7 +260,7 @@ impl<R: Read> FastqReader<BufReader<R>> {
         let qual = if let Some(line) = self.read_line()? {
             if seq.len() != line.len() {
                 Err(FastqParseError::UnequalLength {
-                    label: self.label,
+                    label: None,
                     seq: seq.len(),
                     qual: line.len(),
                     record: format!(
@@ -258,7 +281,7 @@ impl<R: Read> FastqReader<BufReader<R>> {
             }
         } else {
             Err(FastqParseError::IncompleteRecord {
-                label: self.label,
+                label: None,
                 record: format!(
                     "{}\n{}\n{}",
                     String::from_utf8_lossy(
@@ -284,12 +307,7 @@ mod tests {
     fn create_reader(data: &str) -> FastqReader<BufReader<Cursor<&[u8]>>> {
         let reader = Cursor::new(data.as_bytes());
         let bytes_reader = BufReader::new(reader);
-        FastqReader {
-            reader: bytes_reader,
-            offset: 0,
-            leftover: None,
-            label: None,
-        }
+        FastqReader::new(bytes_reader)
     }
 
     #[test]

@@ -228,7 +228,7 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let input1: &Path = input1_path.as_ref();
         let reader1_handle = scope.spawn(move || -> Result<()> {
             let reader = fastq_reader(input1, buffer_size, input1_bar)?;
-            let mut reader = FastqReader::new(BufReader::with_capacity(buffer_size, reader));
+            let mut reader = FastqReader::with_capacity(buffer_size, reader);
             let mut thread_tx = BatchSender::with_capacity(chunk_size, reader1_tx);
             while let Some(record) = reader
                 .read_record()
@@ -250,7 +250,7 @@ pub(crate) fn reader_seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let input2: &Path = input2_path.as_ref();
         let reader2_handle = scope.spawn(move || -> Result<()> {
             let reader = fastq_reader(input2, buffer_size, input2_bar)?;
-            let mut reader = FastqReader::new(BufReader::with_capacity(buffer_size, reader));
+            let mut reader = FastqReader::with_capacity(buffer_size, reader);
             let mut thread_tx = BatchSender::with_capacity(chunk_size, reader2_tx);
             while let Some(record) = reader
                 .read_record()
