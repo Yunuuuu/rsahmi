@@ -67,8 +67,7 @@ environments. This can be highly efficient on some systems, but
 performance gains may vary depending on the operating system and file
 system. Defaults to \code{TRUE}.}
 
-\item{threads}{Integer. Number of threads to use. Default will use all
-available threads.}
+\item{threads}{Integer. Number of threads to use. Default: \code{3}.}
 
 \item{odir}{A string of directory to save the output files. Please see
 \code{Value} section for details.}

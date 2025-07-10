@@ -73,8 +73,7 @@ reading/writing to disk. Default is \code{1 * 1024 * 1024} (1MB).}
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
 amount of in-flight data awaiting writing. Default: \code{3}.}
 
-\item{threads}{Integer. Number of threads to use. Default will use all
-available threads.}
+\item{threads}{Integer. Number of threads to use. Default: \code{3}.}
 
 \item{odir}{A string of directory to save the output files. Please see
 \code{Value} section for details.}
