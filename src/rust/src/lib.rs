@@ -8,8 +8,8 @@ use memmap2::Mmap;
 
 mod batchsender;
 mod bench;
-// mod koutput_reads;
 mod fastq_reader;
+// mod koutput_reads;
 mod kractor;
 mod kreport;
 mod parser;
@@ -18,7 +18,7 @@ mod reader0;
 mod seq_action;
 mod seq_refine;
 
-pub(crate) const BLOCK_SIZE: usize = 4 * 1024 * 1024;
+pub(crate) const BLOCK_SIZE: usize = 8 * 1024 * 1024;
 
 pub(crate) fn new_channel<T>(nqueue: Option<usize>) -> (Sender<T>, Receiver<T>) {
     if let Some(queue) = nqueue {

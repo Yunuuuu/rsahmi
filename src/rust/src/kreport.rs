@@ -167,7 +167,6 @@ fn u8_to_rstr(bytes: Vec<u8>) -> Rstr {
 }
 
 #[extendr]
-#[allow(clippy::too_many_arguments)]
 fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
     let kreports = parse_kreport(kreport)
         .map_err(|e| format!("Failed to parse kraken2 report file {:?}: {:?}", kreport, e))?;
