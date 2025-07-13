@@ -208,9 +208,11 @@ check_extra_actions <- function(actions, arg = caller_arg(actions),
         return(actions)
     }
 
+    # Convert single action to list
     if (is_range(actions)) {
         actions <- list(actions)
     } else if (is.list(actions)) {
+        # Ensure every element in list is a valid range/action object
         if (any(!vapply(actions, is_range, logical(1), USE.NAMES = FALSE))) {
             cli::cli_abort(c(
                 "{.arg {arg}} must be created with {.fn seq_range} or a combination of them using {.fn c}.",
@@ -226,7 +228,17 @@ check_extra_actions <- function(actions, arg = caller_arg(actions),
         ), call = call)
     }
     lapply(actions, function(action) {
-        if (!is_action(action)) action <- trim(action)
+        # Ensure tag is defined for embed actions
+        if (inherits(action, c("rsahmi_embed_trim", "rsahmi_embed"))) {
+            if (is.null(attr(action, "tag", exact = TRUE))) {
+                cli::cli_abort(c(
+                    "Missing {.arg tag} for embed-style action in {.arg {arg}}.",
+                    i = "Use {.fn embed(tag = )} or {.fn embed_trim(tag = )} to define an explicit tag."
+                ), call = call)
+            }
+        } else if (!is_action(action)) {
+            action <- trim(action)
+        }
         action
     })
 }

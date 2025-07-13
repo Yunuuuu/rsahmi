@@ -24,9 +24,8 @@
 #'   to ensure compatibility with downstream processing in the `rsahmi`
 #'   workflow.
 #'
-#'   For other types of actions, it is recommended to explicitly specify a `tag`
-#'   to ensure clarity in the embedded header. Without a clear tag, it may be
-#'   difficult to distinguish different embedded regions later in the analysis.
+#'   For other types of actions, you must explicitly specify a `tag` to ensure
+#'   clarity in the embedded header.
 #'
 #' @return An annotated `rsahmi_seq_range` or `rsahmi_seq_ranges` object. object
 #' with behavior-specific class:

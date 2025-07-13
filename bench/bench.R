@@ -2,6 +2,24 @@
 Sys.setenv(RSAHMI_FEATURES = "bench") # TO use pprof
 # pak::pak("Yunuuuu/rsahmi")
 pak::pak(pkgbuild::build(binary = TRUE))
+system.time(rsahmi:::rust_seq_refine(
+    "/home/yun/SINLGE_CELL/Rawdata/FL/FL-2_S1_L005_R1_001.fastq.gz",
+    "bench/data/FL-2_R1_umi.fastq.gz",
+    "/home/yun/SINLGE_CELL/Rawdata/FL/FL-2_S1_L005_R2_001.fastq.gz",
+    "bench/data/FL-2_R2_umi.fastq.gz",
+    umi_action1 = rsahmi::seq_range(end = 12),
+    barcode_action1 = rsahmi::seq_range(start = 13, end = 15),
+    pprof = "pprof_seq_refine.svg",
+    threads = 3L
+))
+bench::mark(
+    kr <- rsahmi:::kraken_report("bench/data/CNP000460_P01N_report.txt")
+)
+tibble::as_tibble(kr)
+rsahmi:::bench_read("bench/data/CNP000460_P01N_output.txt")
+rsahmi:::bench_read("bench/data/CNP000460_P01N_output.txt", mmap = FALSE)
+rsahmi:::bench_read("bench/data/CNP000460_P01N_read1.fq")
+rsahmi:::bench_read("bench/data/CNP000460_P01N_read1.fq", mmap = FALSE)
 
 # - The CNP000460 dataset is used only for benchmarking purposes.
 # - Actual analysis should verify whether sequencing is
@@ -136,3 +154,18 @@ mmap_bench_reads_10m <- bench::mark(
     iterations = 1, memory = FALSE, check = FALSE
 )
 saveRDS(mmap_bench_reads_10m, "bench/mmap_bench_reads_10m.rds")
+
+system.time(rsahmi:::rust_kractor_reads(
+    "bench/data/classified_kraken_microbiome_output.txt",
+    c(
+        "bench/data/classified_1.fq",
+        "bench/data/classified_1.fq"
+    ),
+    extract_reads = c(
+        "bench/data/classified_microbiome_reads_1.fa",
+        "bench/data/classified_microbiome_reads_2.fa"
+    ),
+    chunk_size = 10 * 1024 * 1024,
+    mmap = FALSE,
+    pprof = "bench/pprof_reader_paired_kractor_reads_10m.svg"
+))

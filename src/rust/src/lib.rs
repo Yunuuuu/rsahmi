@@ -1,54 +1,19 @@
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
-use indicatif::style::TemplateError;
-use indicatif::ProgressStyle;
-#[cfg(unix)]
-use memmap2::Advice;
-use memmap2::Mmap;
 
 mod batchsender;
 mod bench;
 mod fastq_reader;
-// mod koutput_reads;
+mod koutput_reads;
 mod kractor;
 mod kreport;
 mod parser;
 mod reader;
 mod reader0;
 mod seq_action;
+mod seq_range;
 mod seq_refine;
-
-pub(crate) const BLOCK_SIZE: usize = 8 * 1024 * 1024;
-
-pub(crate) fn new_channel<T>(nqueue: Option<usize>) -> (Sender<T>, Receiver<T>) {
-    if let Some(queue) = nqueue {
-        bounded(queue)
-    } else {
-        unbounded()
-    }
-}
-
-pub(crate) fn mmap_advice(map: &Mmap) -> anyhow::Result<()> {
-    #[cfg(unix)]
-    if Advice::WillNeed.is_supported() {
-        map.advise(Advice::WillNeed)?;
-    } else if Advice::Sequential.is_supported() {
-        map.advise(Advice::Sequential)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn progress_reader_style() -> std::result::Result<ProgressStyle, TemplateError> {
-    ProgressStyle::with_template(
-        "{prefix:.bold.cyan/blue} {decimal_bytes}/{decimal_total_bytes} {spinner:.green} [{elapsed_precise}] {decimal_bytes_per_sec} (ETA {eta})",
-    )
-}
-
-pub(crate) fn progress_writer_style() -> std::result::Result<ProgressStyle, TemplateError> {
-    ProgressStyle::with_template(
-        "{prefix:.bold.cyan/blue} {decimal_bytes} {spinner:.green} {decimal_bytes_per_sec}",
-    )
-}
+mod seq_tag;
+pub(crate) mod utils;
 
 // https://extendr.github.io/extendr/extendr_api/#returning-resultt-e-to-r
 // https://github.com/extendr/extendr/blob/master/extendr-api/src/robj/into_robj.rs#L100

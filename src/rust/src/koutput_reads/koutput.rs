@@ -1,25 +1,29 @@
-use std::io::Read;
+use std::fs::File;
+use std::path::Path;
 
 use aho_corasick::AhoCorasick;
 use anyhow::{anyhow, Result};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use crossbeam_channel::{Receiver, Sender};
-use memchr::{memchr, memchr2};
+use memchr::memchr;
 use rustc_hash::FxHashMap as HashMap;
 
 use crate::batchsender::BatchSender;
-use crate::kractor::koutput::io::KoutputBytesChunkReader;
-use crate::kractor::koutput::KOUTPUT_TAXID_PREFIX_FINDER;
-use crate::reader::bytes::BytesProgressBarReader;
+use crate::reader0::LineReader;
+use crate::utils::*;
 
-pub(crate) fn reader_parse_koutput<R: Read + Send>(
-    reader: BytesProgressBarReader<R>,
+pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
+    input_path: &P,
     include_aho: AhoCorasick,
     exclude_aho: Option<AhoCorasick>,
     chunk_size: usize,
-    batch_size: usize,
+    buffer_size: usize,
     nqueue: Option<usize>,
+    threads: usize,
 ) -> Result<HashMap<Bytes, (Bytes, Bytes, Bytes)>> {
+    let input: &Path = input_path.as_ref();
+    let reader =
+        File::open(input).map_err(|e| anyhow!("Failed to open file {}: {}", input.display(), e))?;
     // for kmer, we counts total and unique k-mers per taxon across cell barcodes,
     // using both the cell barcode and unique molecular identifier (UMI) to resolve
     // read identity at the single-cell level. It aggregates k-mer counts for each
@@ -31,91 +35,125 @@ pub(crate) fn reader_parse_koutput<R: Read + Send>(
         let (koutput_tx, koutput_rx): (
             Sender<Vec<(Bytes, (Bytes, Bytes, Bytes))>>,
             Receiver<Vec<(Bytes, (Bytes, Bytes, Bytes))>>,
-        ) = crate::new_channel(nqueue);
+        ) = new_channel(None);
+        let (reader_tx, reader_rx): (Sender<Vec<BytesMut>>, Receiver<Vec<BytesMut>>) =
+            new_channel(nqueue);
 
         // ─── Parser Thread ─────────────────────────────────────
         // Streams Kraken2 output data, filters by ID set
-        let mut reader = KoutputBytesChunkReader::with_capacity(chunk_size, reader);
-        let koutput_handle = scope.spawn(move || -> Result<()> {
-            // will move `reader`, `koutput_tx`, and `matcher`
-            rayon::scope(|s| -> Result<()> {
-                while let Some(chunk) = reader.chunk_reader()? {
-                    s.spawn(|_| {
-                        let mut chunk = chunk; // Move the chunk
-                        let mut thread_tx =
-                            BatchSender::with_capacity(batch_size, koutput_tx.clone());
-                        'chunk_loop: while let Some(line) = chunk.read_line() {
-                            let mut field_start = 0usize;
-                            let mut field_index = 0usize;
-                            let mut sequence_id = None;
-                            let mut taxid = None;
-                            let lca;
-                            while let Some(tab_pos) = memchr(b'\t', &line[field_start ..]) {
-                                let field = &line[field_start .. (field_start + tab_pos)];
-                                if field_index == 0 {
-                                    // Field 0: "C" or "U" — skip unclassified reads
-                                    if field.len() != 1 || field[0] != b'C' {
+        let mut parser_handles = Vec::with_capacity(threads);
+        for _ in 0 .. threads {
+            let rx = reader_rx.clone();
+            let tx = koutput_tx.clone();
+            let include_aho = &include_aho;
+            let exclude_aho = &exclude_aho;
+            let handle = scope.spawn(move || -> Result<()> {
+                let mut thread_tx = BatchSender::with_capacity(chunk_size, tx);
+                // let mut compressor = Compressor::new(compression_level);
+                while let Ok(lines) = rx.recv() {
+                    'chunk_loop: for line in lines {
+                        let line = line.freeze();
+                        let mut field_start = 0usize;
+                        let mut field_index = 0usize;
+                        let mut sequence_id = None;
+                        let mut taxid = None;
+                        let lca;
+                        while let Some(tab_pos) = memchr(b'\t', &line[field_start ..]) {
+                            let field = &line[field_start .. (field_start + tab_pos)];
+                            if field_index == 0 {
+                                // Field 0: "C" or "U" — skip unclassified reads
+                                if field.len() != 1 || field[0] != b'C' {
+                                    continue 'chunk_loop;
+                                }
+                            } else if field_index == 1 {
+                                // Save sequence_id field (field 2)
+                                sequence_id = Some(field);
+                            } else if field_index == 2 {
+                                // Save taxid field (field 3) if it passes filtering
+                                if let Some(start) = KOUTPUT_TAXID_PREFIX_FINDER.find(field) {
+                                    let mut input = aho_corasick::Input::new(field);
+                                    input.set_start(start);
+                                    // Skip this line if taxid is not in `include_aho`
+                                    if include_aho.find(field).is_none() {
                                         continue 'chunk_loop;
-                                    }
-                                } else if field_index == 1 {
-                                    // Save sequence_id field (field 2)
-                                    sequence_id = Some(field);
-                                } else if field_index == 2 {
-                                    // Save taxid field (field 3) if it passes filtering
-                                    if let Some(start) = KOUTPUT_TAXID_PREFIX_FINDER.find(field) {
-                                        let mut input = aho_corasick::Input::new(field);
-                                        input.set_start(start);
-                                        // Skip this line if taxid is not in matcher
-                                        if include_aho.find(field).is_none() {
-                                            continue 'chunk_loop;
-                                        };
-                                        taxid = Some(field);
-                                    } else {
-                                        // Skip line if taxid doesn't contain the prefix
-                                        continue 'chunk_loop;
-                                    }
-                                } else if field_index == 3 {
-                                    // Field 4 (LCA): remainder after the last tab
-                                    field_start += tab_pos + 1;
-                                    // Ignore final \n character
-                                    if let Some(pos) = memchr2(b'\n', b'\t', &line[field_start ..])
-                                    {
-                                        lca = &line[field_start .. (field_start + pos)]
-                                    } else {
-                                        lca = &line[field_start ..]
                                     };
-                                    if let Some(ref exclude_matcher) = exclude_aho {
-                                        if exclude_matcher.find(lca).is_some() {
-                                            continue 'chunk_loop;
-                                        }
+                                    taxid = Some(field);
+                                } else {
+                                    // Skip line if taxid doesn't contain the prefix
+                                    continue 'chunk_loop;
+                                }
+                            } else if field_index == 3 {
+                                // Field 4 (LCA): remainder after the last tab
+                                field_start += tab_pos + 1;
+                                if let Some(pos) = memchr(b'\t', &line[field_start ..]) {
+                                    lca = &line[field_start .. (field_start + pos)]
+                                } else {
+                                    lca = &line[field_start ..]
+                                };
+                                if let Some(ref exclude_matcher) = exclude_aho {
+                                    if exclude_matcher.find(lca).is_some() {
+                                        continue 'chunk_loop;
                                     }
-                                    if let (Some(sequence_id), Some(taxid)) = (sequence_id, taxid) {
-                                        // Just ignore the error message, it won't occur
-                                        let _ = thread_tx.send((
+                                }
+                                if let (Some(sequence_id), Some(taxid)) = (sequence_id, taxid) {
+                                    // Just ignore the error message, it won't occur
+                                    thread_tx
+                                        .send((
                                             line.slice_ref(sequence_id),
                                             (
                                                 line.slice_ref(field), // sequence length
                                                 line.slice_ref(taxid),
                                                 line.slice_ref(lca),
                                             ),
-                                        ));
-                                    };
-                                    continue 'chunk_loop;
-                                }
-                                field_index += 1;
-                                field_start += tab_pos + 1;
+                                        ))
+                                        .map_err(|e| {
+                                            anyhow!("(Parser) Failed to send parsed lines to Writer thread: {}", e)
+                                        })?;
+                                };
+                                continue 'chunk_loop;
                             }
+                            field_index += 1;
+                            field_start += tab_pos + 1;
                         }
-                        // Just ignore the error message, it won't occur
-                        let _ = thread_tx.flush();
-                    });
+                    }
                 }
+                thread_tx.flush().map_err(|e| {
+                    anyhow!("(Parser) Failed to send parsed lines to Writer thread: {}", e)
+                })?;
                 Ok(())
-            })
+            });
+            parser_handles.push(handle);
+        }
+        drop(reader_rx);
+        drop(koutput_tx);
+
+        // ─── reader Thread ─────────────────────────────────────
+        let reader_handle = scope.spawn(move || -> Result<()> {
+            let mut reader = LineReader::with_capacity(buffer_size, reader);
+            let mut reader_tx = BatchSender::with_capacity(chunk_size, reader_tx);
+            while let Some(record) = reader
+                .read_line()
+                .map_err(|e| anyhow!("(Reader) Error while reading line: {}", e))?
+            {
+                reader_tx.send(record).map_err(|e| {
+                    anyhow!("(Reader) Failed to send lines to Parser thread: {}", e)
+                })?;
+            }
+            reader_tx
+                .flush()
+                .map_err(|e| anyhow!("(Reader) Failed to flush lines to Parser thread: {}", e))?;
+            Ok(())
         });
-        koutput_handle
+
+        // ─── Join Threads and Propagate Errors ────────────────
+        for handler in parser_handles {
+            handler
+                .join()
+                .map_err(|e| anyhow!("(Parser) thread panicked: {:?}", e))??;
+        }
+        reader_handle
             .join()
-            .map_err(|e| anyhow!("Parsing Koutput thread panicked: {:?}", e))??;
+            .map_err(|e| anyhow!("(Reader) thread panicked: {:?}", e))??;
         Ok(koutput_rx
             .into_iter()
             .flatten()

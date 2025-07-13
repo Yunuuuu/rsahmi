@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::{BufWriter, Read, Write};
 
 use bytes::BytesMut;
 use indicatif::ProgressBar;
@@ -36,9 +36,9 @@ impl<W> ProgressBarWriter<W> {
 
 impl<W: Write> Write for ProgressBarWriter<W> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let n = self.writer.write(buf)?;
-        self.bar.inc(n as u64);
-        Ok(n)
+        let nbytes = self.writer.write(buf)?;
+        self.bar.inc(nbytes as u64);
+        Ok(nbytes)
     }
     fn flush(&mut self) -> std::io::Result<()> {
         self.writer.flush()

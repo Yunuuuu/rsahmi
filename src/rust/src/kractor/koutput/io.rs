@@ -11,6 +11,7 @@ use memchr::memrchr;
 use super::kractor_match_aho;
 use crate::batchsender::BatchSender;
 use crate::reader::bytes::{BytesLineReader, BytesReader};
+use crate::utils::*;
 
 #[allow(clippy::too_many_arguments)]
 pub fn reader_kractor_koutput<R: Read + Send>(
@@ -29,7 +30,7 @@ pub fn reader_kractor_koutput<R: Read + Send>(
         // Create a channel between the parser and writer threads
         // The channel transmits batches
         let (parser_tx, writer_rx): (Sender<Vec<Bytes>>, Receiver<Vec<Bytes>>) =
-            crate::new_channel(nqueue);
+            new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
         let writer_handle = scope.spawn(move || -> Result<()> {

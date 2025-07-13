@@ -3,7 +3,7 @@ use std::fs::File;
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
 use indicatif::{ProgressBar, ProgressFinish};
-use memchr::{memchr, memchr2, memmem};
+use memchr::{memchr, memmem};
 use memmap2::Mmap;
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
@@ -15,6 +15,7 @@ use mmap::mmap_kractor_koutput;
 
 use crate::reader::bytes::ProgressBarReader;
 use crate::reader::slice::SliceProgressBarReader;
+use crate::utils::*;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn kractor_koutput(
@@ -205,7 +206,7 @@ pub(crate) fn kractor_koutput(
     let file = File::open(koutput)?;
     if mmap {
         let map = unsafe { Mmap::map(&file) }?;
-        crate::mmap_advice(&map)?;
+        mmap_advice(&map)?;
         let reader = SliceProgressBarReader::new(&map);
 
         mmap_kractor_koutput(
@@ -219,7 +220,7 @@ pub(crate) fn kractor_koutput(
             nqueue,
         )
     } else {
-        let style = crate::progress_reader_style()?;
+        let style = progress_reader_style()?;
         let pb =
             ProgressBar::new(file.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon);
         pb.set_prefix("Parsing koutput");
@@ -268,7 +269,7 @@ fn kractor_match_aho(
             // Field 4 (LCA): remainder after the last tab
             field_start += tab_pos + 1;
             let lca;
-            if let Some(pos) = memchr2(b'\n', b'\t', &line[field_start ..]) {
+            if let Some(pos) = memchr(b'\t', &line[field_start ..]) {
                 lca = &line[field_start .. (field_start + pos)]
             } else {
                 lca = &line[field_start ..]
@@ -348,7 +349,7 @@ mod tests {
             .build(patterns)?;
         let file = File::open(input_path).unwrap();
         let map = unsafe { Mmap::map(&file) }?;
-        crate::mmap_advice(&map)?;
+        mmap_advice(&map)?;
         let reader = SliceProgressBarReader::new(&map);
         mmap_kractor_koutput(
             matcher,

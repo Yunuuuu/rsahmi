@@ -12,6 +12,7 @@ use crate::batchsender::BatchSender;
 use crate::parser::fasta::FastaRecord;
 use crate::parser::fastq::{FastqBytesChunkPairedReader, FastqContainer};
 use crate::reader::bytes::BytesReader;
+use crate::utils::*;
 
 pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
     id_sets: HashSet<&[u8]>,
@@ -34,7 +35,7 @@ pub fn reader_kractor_paired_read<R1: Read + Send, R2: Read + Send>(
         let (parser_tx, writer_rx): (
             Sender<Vec<(FastaRecord<Bytes>, FastaRecord<Bytes>)>>,
             Receiver<Vec<(FastaRecord<Bytes>, FastaRecord<Bytes>)>>,
-        ) = crate::new_channel(nqueue);
+        ) = new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file

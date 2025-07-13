@@ -1,30 +1,32 @@
-use std::fs::File;
-
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
+use extendr_api::prelude::*;
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 
 mod koutput;
-// mod reads;
+mod reads;
 
 use crate::kreport::parse_kreport;
-use crate::reader::bytes::BytesProgressBarReader;
 
 fn koutput_reads(
     kreport: &str,
     koutput: &str,
-    fq: &str,
+    fq1: &str,
+    fq2: Option<&str>,
     taxonomy: Option<Vec<&str>>,
-    lca: Option<Vec<&str>>,
+    // lca: Option<Vec<&str>>, // Only build for the specific LCA
+    actions1: Robj,
+    actions2: Robj,
     exclude: Option<Vec<&str>>,
     polyn_threshold: usize,
     phred_threshould: usize,
     ofile: &str,
-    chunk_size: usize,
+    koutput_chunk: usize,
+    fastq_chunk: usize,
     buffer_size: usize,
-    batch_size: usize,
     nqueue: Option<usize>,
+    threads: usize,
 ) -> Result<()> {
     let mut kreports = parse_kreport(kreport)?;
 
@@ -141,15 +143,14 @@ fn koutput_reads(
         .transpose()?;
 
     // Read Kraken2 output and extract matched records
-    let koutput_file = File::open(koutput)?;
-    let reader = BytesProgressBarReader::new(koutput_file);
-    let koutput = koutput::reader_parse_koutput(
-        reader,
+    let koutmap = koutput::parse_koutput(
+        koutput,
         include_aho,
         exclude_aho,
-        chunk_size,
-        batch_size,
+        koutput_chunk,
+        buffer_size,
         nqueue,
+        threads,
     )?;
 
     // For each koutput row, we calculate kmer information

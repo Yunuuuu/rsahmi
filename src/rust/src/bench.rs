@@ -10,6 +10,7 @@ use memchr::memrchr;
 use memmap2::Mmap;
 
 use crate::reader::bytes::{BytesReader, ProgressBarReader};
+use crate::utils::*;
 
 #[extendr]
 fn bench_read(file: &str, chunk_size: usize, mmap: bool) -> std::result::Result<(), String> {
@@ -20,15 +21,15 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
     let path: &Path = file.as_ref();
     let reader = File::open(file)?;
     let size = reader.metadata()?.len();
-    let style = crate::progress_reader_style()?;
+    let style = progress_reader_style()?;
     let pb = ProgressBar::new(size).with_finish(ProgressFinish::Abandon);
     pb.set_prefix(format!("Reading {}", file));
     pb.set_style(style);
     if mmap {
         let map = unsafe { Mmap::map(&reader) }?;
-        crate::mmap_advice(&map)?;
+        mmap_advice(&map)?;
 
-        if crate::fastq_reader::gz_compressed(path) {
+        if gz_compressed(path) {
             let reader = BytesReader::new(MultiGzDecoder::new(ProgressBarReader::new(
                 Cursor::new(map),
                 pb,
@@ -57,7 +58,7 @@ fn read_chunk(file: &str, mut chunk_size: usize, mmap: bool) -> Result<()> {
         }
     } else {
         let reader = ProgressBarReader::new(reader, pb);
-        if crate::fastq_reader::gz_compressed(path) {
+        if gz_compressed(path) {
             let reader = BytesReader::new(MultiGzDecoder::new(reader));
             let mut reader = crate::kractor::koutput::io::KoutputBytesChunkReader::new(reader);
             while let Some(_) = reader.chunk_reader()? {}

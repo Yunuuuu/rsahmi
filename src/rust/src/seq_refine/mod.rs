@@ -6,6 +6,7 @@ mod paired;
 mod single;
 
 use crate::seq_action::*;
+use crate::utils::*;
 
 #[extendr]
 fn seq_refine(
@@ -21,11 +22,11 @@ fn seq_refine(
     nqueue: Option<usize>,
     threads: usize,
 ) -> std::result::Result<(), String> {
-    let actions1 = robj_to_seq_actions(&actions1, "actions1").map_err(|e| format!("{}", e))?;
-    let actions2 = robj_to_seq_actions(&actions2, "actions2").map_err(|e| format!("{}", e))?;
+    let actions1 = robj_to_seq_actions(&actions1).map_err(|e| format!("actions1: {}", e))?;
+    let actions2 = robj_to_seq_actions(&actions2).map_err(|e| format!("actions2: {}", e))?;
     let threads = threads.max(1); // always use at least one thread
     if let Some(fq2) = fq2 {
-        reader_seq_refine_paired_read(
+        seq_refine_paired_read(
             fq1,
             ofile1,
             fq2,
@@ -40,7 +41,7 @@ fn seq_refine(
         )
         .map_err(|e| format!("{}", e))
     } else {
-        reader_seq_refine_single_read(
+        seq_refine_single_read(
             fq1,
             ofile1,
             actions1,
@@ -99,7 +100,7 @@ fn pprof_seq_refine(
     out
 }
 
-fn reader_seq_refine_single_read(
+fn seq_refine_single_read(
     fq1: &str,
     ofile1: Option<&str>,
     actions: Option<SubseqActions>,
@@ -111,8 +112,8 @@ fn reader_seq_refine_single_read(
 ) -> Result<()> {
     let ofile1 = ofile1.ok_or_else(|| anyhow!("No output file specified."))?;
     let actions = actions.ok_or_else(|| anyhow!("No sequence actions were specified."))?;
-    let reader_style = crate::progress_reader_style()?;
-    let writer_style = crate::progress_writer_style()?;
+    let reader_style = progress_reader_style()?;
+    let writer_style = progress_writer_style()?;
     let progress = MultiProgress::new();
     let pb1 = progress.add(
         ProgressBar::new(std::fs::metadata(fq1)?.len() as u64).with_finish(ProgressFinish::Abandon),
@@ -124,7 +125,7 @@ fn reader_seq_refine_single_read(
     pb2.set_prefix("Writing fastq");
     pb2.set_style(writer_style);
 
-    single::reader_seq_refine_single_read(
+    single::seq_refine_single_read(
         &fq1,
         Some(pb1),
         &ofile1,
@@ -138,7 +139,7 @@ fn reader_seq_refine_single_read(
     )
 }
 
-fn reader_seq_refine_paired_read(
+fn seq_refine_paired_read(
     fq1: &str,
     ofile1: Option<&str>,
     fq2: &str,
@@ -160,8 +161,8 @@ fn reader_seq_refine_paired_read(
         ));
     }
 
-    let reader_style = crate::progress_reader_style()?;
-    let writer_style = crate::progress_writer_style()?;
+    let reader_style = progress_reader_style()?;
+    let writer_style = progress_writer_style()?;
     let progress = MultiProgress::new();
     let pb1 = progress.add(
         ProgressBar::new(std::fs::metadata(fq1)?.len() as u64).with_finish(ProgressFinish::Abandon),
@@ -192,7 +193,7 @@ fn reader_seq_refine_paired_read(
     };
 
     let actions = SubseqPairedActions::new(actions1, actions2);
-    paired::reader_seq_refine_paired_read(
+    paired::seq_refine_paired_read(
         fq1,
         Some(pb1),
         fq2,

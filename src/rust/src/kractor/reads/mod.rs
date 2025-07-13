@@ -16,6 +16,7 @@ use mmap::{mmap_kractor_paired_read, mmap_kractor_single_read};
 
 use crate::reader::bytes::ProgressBarReader;
 use crate::reader::slice::SliceProgressBarReader;
+use crate::utils::*;
 
 pub(crate) fn kractor_reads(
     koutput: &str,
@@ -42,7 +43,7 @@ pub(crate) fn kractor_reads(
         fq2.map_or_else(|| String::from(""), |s| format!("and {}", s))
     );
     let file = File::open(fq1)?;
-    let style = crate::progress_reader_style()?;
+    let style = progress_reader_style()?;
 
     if let Some(fq2) = fq2 {
         let ofile2 = ofile2.ok_or(anyhow!(
@@ -53,12 +54,12 @@ pub(crate) fn kractor_reads(
         let progress = MultiProgress::new();
         if mmap {
             let map1 = unsafe { Mmap::map(&file) }?;
-            crate::mmap_advice(&map1)?;
+            mmap_advice(&map1)?;
             let mut reader1 = SliceProgressBarReader::new(&map1);
             reader1.set_label("read1");
 
             let map2 = unsafe { Mmap::map(&file2) }?;
-            crate::mmap_advice(&map2)?;
+            mmap_advice(&map2)?;
             let mut reader2 = SliceProgressBarReader::new(&map2);
             reader2.set_label("read2");
 
@@ -121,7 +122,7 @@ pub(crate) fn kractor_reads(
     } else {
         if mmap {
             let map = unsafe { Mmap::map(&file) }?;
-            crate::mmap_advice(&map)?;
+            mmap_advice(&map)?;
             let mut reader = SliceProgressBarReader::new(&map);
             reader.set_label("reads");
 

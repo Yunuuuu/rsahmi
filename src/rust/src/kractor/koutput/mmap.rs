@@ -9,6 +9,7 @@ use memchr::{memrchr, Memchr};
 use super::kractor_match_aho;
 use crate::batchsender::BatchSender;
 use crate::reader::slice::{SliceLineReader, SliceProgressBarReader};
+use crate::utils::*;
 
 pub fn mmap_kractor_koutput(
     include_aho: AhoCorasick,
@@ -25,7 +26,7 @@ pub fn mmap_kractor_koutput(
     std::thread::scope(|scope| {
         // Create a channel between the parser and writer threads
         // The channel transmits batches
-        let (parser_tx, writer_rx) = crate::new_channel(nqueue);
+        let (parser_tx, writer_rx) = new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
         let writer_handle = scope.spawn(move || -> Result<()> {

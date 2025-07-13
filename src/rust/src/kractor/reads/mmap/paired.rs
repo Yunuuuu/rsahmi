@@ -11,6 +11,7 @@ use crate::batchsender::BatchSender;
 use crate::parser::fasta::FastaRecord;
 use crate::parser::fastq::FastqSliceChunkPairedReader;
 use crate::reader::slice::SliceProgressBarReader;
+use crate::utils::*;
 
 pub fn mmap_kractor_paired_read(
     id_sets: HashSet<&[u8]>,
@@ -33,7 +34,7 @@ pub fn mmap_kractor_paired_read(
         let (parser_tx, writer_rx): (
             Sender<Vec<(FastaRecord<&[u8]>, FastaRecord<&[u8]>)>>,
             Receiver<Vec<(FastaRecord<&[u8]>, FastaRecord<&[u8]>)>>,
-        ) = crate::new_channel(nqueue);
+        ) = new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file

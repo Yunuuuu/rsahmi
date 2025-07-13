@@ -1,4 +1,4 @@
-use std::io::BufReader;
+use std::io::Write;
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
@@ -11,8 +11,9 @@ use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
 use crate::parser::fastq::FastqRecord;
 use crate::seq_action::*;
+use crate::utils::*;
 
-pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
+pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
     input_path: &P,
     input_bar: Option<ProgressBar>,
     output_path: &P,
@@ -26,23 +27,26 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
 ) -> Result<()> {
     let input: &Path = input_path.as_ref();
     let output: &Path = output_path.as_ref();
+
+    // Ensure compression level is validated and converted before entering thread scope.
+    // Doing this outside avoids redundant validation across parser threads.
     let compression_level = CompressionLvl::new(compression_level)
         .map_err(|e| anyhow!("Invalid 'compression_level': {:?}", e))?;
     std::thread::scope(|scope| -> Result<()> {
-        // Create a channel between the parser and writer threads
-        // The channel transmits batches (Vec<FastqRecord>)
-        let (writer_tx, writer_rx): (Sender<Vec<u8>>, Receiver<Vec<u8>>) =
-            crate::new_channel(nqueue);
-
+        // Two communication pipelines are set up to decouple IO and CPU-intensive work:
+        // - reader_tx: transfers raw FASTQ records to parser threads
+        // - writer_tx: receives compressed byte chunks from parser threads
+        let (writer_tx, writer_rx): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = new_channel(nqueue);
         let (reader_tx, reader_rx): (
             Sender<Vec<FastqRecord<Bytes>>>,
             Receiver<Vec<FastqRecord<Bytes>>>,
-        ) = crate::new_channel(nqueue);
+        ) = new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
-        // Consumes batches of records and writes them to file
+        // A single thread handles file output to ensure atomic write order and leverage buffered IO.
+        // This thread consumes compressed chunks, not raw records, for performance.
         let writer_handle = scope.spawn(move || -> Result<()> {
-            let mut writer = fastq_writer(output, output_bar)?;
+            let mut writer = new_writer(output, buffer_size, output_bar)?;
 
             // Iterate over each received batch of records
             for chunk in writer_rx {
@@ -54,32 +58,54 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
         });
 
         // ─── Parser Thread ─────────────────────────────────────
+        // Multiple parser threads are used to exploit CPU parallelism for `transform_fastq` and gzip compression.
+        // Each thread transforms records and buffers them into a local pool,
+        // which is periodically flushed into the writer pipeline.
         let mut parser_handles = Vec::with_capacity(threads);
         let gzip = gz_compressed(output);
         for _ in 0 .. threads {
             let rx = reader_rx.clone();
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut records_pool: Vec<u8> = Vec::with_capacity(crate::BLOCK_SIZE);
+                // Temporary buffer for current output chunk
+                let mut records_pool: Vec<u8> = Vec::with_capacity(BLOCK_SIZE);
                 let mut compressor = Compressor::new(compression_level);
                 while let Ok(records) = rx.recv() {
                     for mut record in records {
-                        actions.transform_fastq_bytes(&mut record)?;
+                        // Apply trimming, tag embedding, and other sequence transformations
+                        actions.transform_fastq(&mut record)?;
+
+                        // Flush when pool is too full to accept the next record.
+                        // This ensures output chunks remain near the target block size.
                         if records_pool.capacity() - records_pool.len() < record.bytes_size() {
-                            let pack = fastq_pack(&records_pool, &mut compressor, gzip)?;
+                            let mut pack = Vec::with_capacity(BLOCK_SIZE);
+                            std::mem::swap(&mut records_pool, &mut pack);
+                            // Compress if gzip file
+                            if gzip {
+                                pack = gzip_pack(&pack, &mut compressor)?
+                            }
+
+                            // Send compressed or raw bytes to writer
                             tx.send(pack).map_err(|e| {
                                 anyhow!(
                                     "(Parser) Failed to send parsed record to Writer thread: {}",
                                     e
                                 )
                             })?;
-                            records_pool.clear();
                         }
+
+                        // Append encoded record to buffer
                         record.extend(&mut records_pool);
                     }
                 }
+
+                // Flush remaining records if any
                 if !records_pool.is_empty() {
-                    let pack = fastq_pack(&records_pool, &mut compressor, gzip)?;
+                    let pack = if gzip {
+                        gzip_pack(&records_pool, &mut compressor)?
+                    } else {
+                        records_pool
+                    };
                     tx.send(pack).map_err(|e| {
                         anyhow!(
                             "(Parser) Failed to send parsed record to Writer thread: {}",
@@ -96,8 +122,8 @@ pub(crate) fn reader_seq_refine_single_read<P: AsRef<Path> + ?Sized>(
 
         // ─── reader Thread ─────────────────────────────────────
         let reader_handle = scope.spawn(move || -> Result<()> {
-            let reader = fastq_reader(input, buffer_size, input_bar)?;
-            let mut reader = FastqReader::with_capacity(buffer_size, reader);
+            let mut reader =
+                FastqReader::with_capacity(buffer_size, new_reader(input, buffer_size, input_bar)?);
             let mut reader_tx = BatchSender::with_capacity(chunk_size, reader_tx);
             while let Some(record) = reader
                 .read_record()
@@ -139,7 +165,8 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use super::*;
-    use crate::seq_action::{SeqAction, SeqRange, SortedSeqRanges, SubseqActions};
+    use crate::seq_action::{SeqAction, SubseqActions};
+    use crate::seq_range::{SeqRange, SeqRanges};
 
     fn dummy_fastq() -> &'static [u8] {
         b"@SEQ_ID\nGATTTGGGG\n+\nIIIIIIIII\n@SEQ_ID2\nTTACAGGGA\n+\nIIIIIIIII\n"
@@ -160,15 +187,20 @@ mod tests {
         let output_path = output_file.path().to_path_buf();
 
         // Define UMI extraction action
-        let ranges: SortedSeqRanges = vec![SeqRange::From(3), SeqRange::To(2)]
+        let ranges: SeqRanges = vec![SeqRange::From(3), SeqRange::To(2)]
             .into_iter()
             .collect();
         let mut builder = SubseqActions::builder();
-        builder.add_action(SeqAction::Embed("UMI".to_string()), ranges);
-        let actions = builder.build();
+        builder
+            .add_action(
+                SeqAction::Embed(Bytes::from_owner("UMI".as_bytes())),
+                ranges,
+            )
+            .unwrap();
+        let actions = builder.build().unwrap();
 
         // Call the function
-        let result = reader_seq_refine_single_read(
+        let result = seq_refine_single_read(
             &input_path,
             None, // No progress bar
             &output_path,

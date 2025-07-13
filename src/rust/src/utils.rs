@@ -1,0 +1,120 @@
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+use std::io::{Read, Write};
+use std::path::Path;
+
+use anyhow::{anyhow, Result};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use indicatif::style::TemplateError;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use isal::read::GzipDecoder;
+use libdeflater::Compressor;
+use memchr::memmem::Finder;
+#[cfg(unix)]
+use memmap2::Advice;
+use memmap2::Mmap;
+
+use crate::reader0::*;
+
+pub(crate) const BLOCK_SIZE: usize = 8 * 1024 * 1024;
+
+pub(crate) const TAG_PREFIX: &'static [u8] = b"RSAHMI{";
+pub(crate) static TAG_PREFIX_FINDER: std::sync::LazyLock<Finder> =
+    std::sync::LazyLock::new(|| Finder::new(TAG_PREFIX));
+
+pub(crate) static KOUTPUT_TAXID_PREFIX_FINDER: std::sync::LazyLock<Finder> =
+    std::sync::LazyLock::new(|| Finder::new("(taxid"));
+
+pub(crate) fn gz_compressed(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map_or(false, |s| s.eq_ignore_ascii_case("gz"))
+}
+
+pub(crate) fn gzip_pack(bytes: &[u8], compressor: &mut Compressor) -> Result<Vec<u8>> {
+    let pack_size = compressor.gzip_compress_bound(bytes.len());
+    let mut pack = Vec::with_capacity(pack_size);
+    pack.resize(pack_size, 0);
+    let size = compressor.gzip_compress(bytes, &mut pack)?;
+    pack.truncate(size);
+    Ok(pack)
+}
+
+pub(crate) fn new_writer<P: AsRef<Path> + ?Sized>(
+    file: &P,
+    buffer_size: usize,
+    progress_bar: Option<ProgressBar>,
+) -> Result<BufWriter<Box<dyn Write>>> {
+    let path: &Path = file.as_ref();
+    let file = File::create(path)
+        .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
+    let writer: Box<dyn Write>;
+    if let Some(bar) = progress_bar {
+        writer = Box::new(ProgressBarWriter::new(file, bar));
+    } else {
+        writer = Box::new(file);
+    }
+    Ok(BufWriter::with_capacity(buffer_size, writer))
+}
+
+pub(crate) fn new_reader<P: AsRef<Path> + ?Sized>(
+    file: &P,
+    buffer_size: usize,
+    progress_bar: Option<ProgressBar>,
+) -> Result<Box<dyn Read>> {
+    let path: &Path = file.as_ref();
+    let file =
+        File::open(path).map_err(|e| anyhow!("Failed to open file {}: {}", path.display(), e))?;
+    let reader: Box<dyn Read>;
+    if gz_compressed(path) {
+        if let Some(bar) = progress_bar {
+            reader = Box::new(GzipDecoder::new(BufReader::with_capacity(
+                buffer_size,
+                ProgressBarReader::new(file, bar),
+            )));
+        } else {
+            reader = Box::new(GzipDecoder::new(BufReader::with_capacity(
+                buffer_size,
+                file,
+            )));
+        }
+    } else {
+        if let Some(bar) = progress_bar {
+            reader = Box::new(ProgressBarReader::new(file, bar));
+        } else {
+            reader = Box::new(file);
+        }
+    }
+    Ok(reader)
+}
+
+pub(crate) fn new_channel<T>(nqueue: Option<usize>) -> (Sender<T>, Receiver<T>) {
+    if let Some(queue) = nqueue {
+        bounded(queue)
+    } else {
+        unbounded()
+    }
+}
+
+pub(crate) fn progress_reader_style() -> std::result::Result<ProgressStyle, TemplateError> {
+    ProgressStyle::with_template(
+        "{prefix:.bold.cyan/blue} {decimal_bytes}/{decimal_total_bytes} {spinner:.green} [{elapsed_precise}] {decimal_bytes_per_sec} (ETA {eta})",
+    )
+}
+
+pub(crate) fn progress_writer_style() -> std::result::Result<ProgressStyle, TemplateError> {
+    ProgressStyle::with_template(
+        "{prefix:.bold.cyan/blue} {decimal_bytes} {spinner:.green} {decimal_bytes_per_sec}",
+    )
+}
+
+pub(crate) fn mmap_advice(map: &Mmap) -> anyhow::Result<()> {
+    #[cfg(unix)]
+    if Advice::WillNeed.is_supported() {
+        map.advise(Advice::WillNeed)?;
+    } else if Advice::Sequential.is_supported() {
+        map.advise(Advice::Sequential)?;
+    }
+    Ok(())
+}

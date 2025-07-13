@@ -13,6 +13,7 @@ use crate::parser::fasta::FastaRecord;
 use crate::parser::fastq::FastqBytesChunkReader;
 use crate::parser::fastq::FastqContainer;
 use crate::reader::bytes::BytesReader;
+use crate::utils::*;
 
 /// Reads a single-end FASTQ file in chunks, filters records by ID set, and writes matching records to output.
 /// This function uses thread + rayon + channel architecture for parallelism.
@@ -34,7 +35,7 @@ pub fn reader_kractor_single_read<R: Read + Send>(
         let (parser_tx, writer_rx): (
             Sender<Vec<FastaRecord<Bytes>>>,
             Receiver<Vec<FastaRecord<Bytes>>>,
-        ) = crate::new_channel(nqueue);
+        ) = new_channel(nqueue);
 
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file
