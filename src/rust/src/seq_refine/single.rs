@@ -55,6 +55,9 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
                     anyhow!("(Writer) Failed to write FastqRecord to output: {}", e)
                 })?;
             }
+            writer
+                .flush()
+                .map_err(|e| anyhow!("(Writer) Failed to flush writer: {}", e))?;
             Ok(())
         });
 

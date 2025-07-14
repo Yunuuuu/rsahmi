@@ -53,6 +53,9 @@ pub(crate) fn parse_single_read<P: AsRef<Path> + ?Sized>(
                     .write_all(&chunk)
                     .map_err(|e| anyhow!("(Writer) Failed to write to output: {}", e))?;
             }
+            writer
+                .flush()
+                .map_err(|e| anyhow!("(Writer) Failed to flush writer: {}", e))?;
             Ok(())
         });
 
