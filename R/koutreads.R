@@ -10,6 +10,13 @@
 #' reads used as input to Kraken2 or the classified output reads (recommended
 #' for efficiency as they are smaller). Accepts one file for single-end or two
 #' files for paired-end.
+#'
+#' **If only one file is used in Kraken2 to generate the koutput file, only the
+#' second read sequence will be extracted to match the koutput's Lowest Common
+#' Ancestor (LCA)**. This is commonly observed in data such as 10x Genomics,
+#' where the first read contains only UMI and barcode information, while the
+#' second read carries the biological sequence. You can always change the input
+#' files to treat the actual biological read as read1 if needed.
 #' @param tag_ranges1,tag_ranges2 A list of sequence ranges for extracting tags
 #'   from the first/second read in single-end/paired-end data. If `NULL`, no
 #'   additional tag extraction occurs for the first/second read. These ranges
