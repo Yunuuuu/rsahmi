@@ -1,6 +1,7 @@
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
 use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
+use libdeflater::CompressionLvl;
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 
@@ -8,28 +9,127 @@ mod koutput;
 mod reads;
 
 use crate::kreport::parse_kreport;
+use crate::seq_tag::robj_to_tag_ranges;
+use crate::utils::*;
 
+#[extendr]
 fn koutput_reads(
     kreport: &str,
     koutput: &str,
     fq1: &str,
     fq2: Option<&str>,
-    taxonomy: Option<Vec<&str>>,
-    // lca: Option<Vec<&str>>, // Only build for the specific LCA
-    actions1: Robj,
-    actions2: Robj,
-    exclude: Option<Vec<&str>>,
-    polyn_threshold: usize,
-    phred_threshould: usize,
     ofile: &str,
-    koutput_chunk: usize,
-    fastq_chunk: usize,
-    buffer_size: usize,
+    taxonomy: Robj,
+    // lca: Option<Vec<&str>>, // Only build for the specific LCA
+    exclude: Robj,
+    ranges1: Robj,
+    ranges2: Robj,
+    // polyn_threshold: usize,
+    // phred_threshould: usize,
+    koutput_batch: usize,
+    fastq_batch: usize,
+    chunk_bytes: usize,
+    compression_level: i32,
+    nqueue: Option<usize>,
+    threads: usize,
+) -> std::result::Result<(), String> {
+    koutput_reads_internal(
+        kreport,
+        koutput,
+        fq1,
+        fq2,
+        ofile,
+        taxonomy,
+        exclude,
+        ranges1,
+        ranges2,
+        koutput_batch,
+        fastq_batch,
+        chunk_bytes,
+        compression_level,
+        nqueue,
+        threads,
+    )
+    .map_err(|e| format!("{}", e))
+}
+
+#[extendr]
+#[cfg(feature = "bench")]
+fn pprof_koutput_reads(
+    kreport: &str,
+    koutput: &str,
+    fq1: &str,
+    fq2: Option<&str>,
+    ofile: &str,
+    taxonomy: Robj,
+    exclude: Robj,
+    ranges1: Robj,
+    ranges2: Robj,
+    koutput_batch: usize,
+    fastq_batch: usize,
+    chunk_bytes: usize,
+    compression_level: i32,
+    nqueue: Option<usize>,
+    threads: usize,
+    pprof_file: &str,
+) -> std::result::Result<(), String> {
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(2000)
+        .build()
+        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+    let out = koutput_reads(
+        kreport,
+        koutput,
+        fq1,
+        fq2,
+        ofile,
+        taxonomy,
+        exclude,
+        ranges1,
+        ranges2,
+        koutput_batch,
+        fastq_batch,
+        chunk_bytes,
+        compression_level,
+        nqueue,
+        threads,
+    );
+    if let Ok(report) = guard.report().build() {
+        let file = std::fs::File::create(pprof_file)
+            .map_err(|e| format!("Failed to create file {}: {}", pprof_file, e))?;
+        let mut options = pprof::flamegraph::Options::default();
+        options.image_width = Some(2500);
+        report
+            .flamegraph_with_options(file, &mut options)
+            .map_err(|e| format!("Failed to write flamegraph to {}: {}", pprof_file, e))?;
+    };
+    out
+}
+
+fn koutput_reads_internal(
+    kreport: &str,
+    koutput: &str,
+    fq1: &str,
+    fq2: Option<&str>,
+    ofile: &str,
+    taxonomy: Robj,
+    exclude: Robj,
+    ranges1: Robj,
+    ranges2: Robj,
+    koutput_batch: usize,
+    fastq_batch: usize,
+    chunk_bytes: usize,
+    compression_level: i32,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
+    let tag_ranges1 = robj_to_tag_ranges(&ranges1)?;
+    let tag_ranges2 = robj_to_tag_ranges(&ranges2)?;
+    let compression_level = CompressionLvl::new(compression_level)
+        .map_err(|e| anyhow!("Invalid 'compression_level': {:?}", e))?;
+    let taxonomy = robj_to_option_str(&taxonomy).map_err(|e| anyhow!("'taxonomy' {}", e))?;
+    let exclude = robj_to_option_str(&exclude).map_err(|e| anyhow!("'exclude' {}", e))?;
     let mut kreports = parse_kreport(kreport)?;
-
     if let Some(taxonomy) = taxonomy {
         // Parse taxon strings like "rank__name" into rank-name pairs
         let rank_taxon_sets = taxonomy
@@ -147,12 +247,37 @@ fn koutput_reads(
         koutput,
         include_aho,
         exclude_aho,
-        koutput_chunk,
-        buffer_size,
+        koutput_batch,
         nqueue,
         threads,
     )?;
 
     // For each koutput row, we calculate kmer information
+    reads::parse_reads(
+        &koutmap,
+        fq1,
+        fq2,
+        ofile,
+        tag_ranges1,
+        tag_ranges2,
+        fastq_batch,
+        chunk_bytes,
+        compression_level,
+        nqueue,
+        threads,
+    )?;
     Ok(())
+}
+
+#[cfg(not(feature = "bench"))]
+extendr_module! {
+    mod koutput_reads;
+    fn koutput_reads;
+}
+
+#[cfg(feature = "bench")]
+extendr_module! {
+    mod koutput_reads;
+    fn koutput_reads;
+    fn pprof_koutput_reads;
 }

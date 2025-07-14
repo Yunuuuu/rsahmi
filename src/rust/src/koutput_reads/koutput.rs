@@ -16,8 +16,7 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
     input_path: &P,
     include_aho: AhoCorasick,
     exclude_aho: Option<AhoCorasick>,
-    chunk_size: usize,
-    buffer_size: usize,
+    batch_size: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<HashMap<Bytes, (Bytes, Bytes, Bytes)>> {
@@ -48,7 +47,7 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
             let include_aho = &include_aho;
             let exclude_aho = &exclude_aho;
             let handle = scope.spawn(move || -> Result<()> {
-                let mut thread_tx = BatchSender::with_capacity(chunk_size, tx);
+                let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
                 // let mut compressor = Compressor::new(compression_level);
                 while let Ok(lines) = rx.recv() {
                     'chunk_loop: for line in lines {
@@ -129,8 +128,8 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
 
         // ─── reader Thread ─────────────────────────────────────
         let reader_handle = scope.spawn(move || -> Result<()> {
-            let mut reader = LineReader::with_capacity(buffer_size, reader);
-            let mut reader_tx = BatchSender::with_capacity(chunk_size, reader_tx);
+            let mut reader = LineReader::with_capacity(BUFFER_SIZE, reader);
+            let mut reader_tx = BatchSender::with_capacity(batch_size, reader_tx);
             while let Some(record) = reader
                 .read_line()
                 .map_err(|e| anyhow!("(Reader) Error while reading line: {}", e))?

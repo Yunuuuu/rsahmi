@@ -82,6 +82,7 @@ impl<T: AsRef<[u8]>> FastqRecord<T> {
         buffer
     }
 
+    #[allow(dead_code)]
     pub(crate) fn write_buf(&self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut pos = 0;
 

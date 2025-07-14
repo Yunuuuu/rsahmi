@@ -30,13 +30,10 @@ original Kraken2 input reads to ensure correct barcode/UMI pairing.}
 specifying the output FASTQ file(s) where the matching reads will be saved.
 Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
 
-\item{chunk_size}{Integer. Number of FASTQ records to accumulate before
+\item{batch_size}{Integer. Number of FASTQ records to accumulate before
 dispatching a chunk to worker threads for processing. This controls the
 granularity of parallel work and affects memory usage and performance.
 Default is \code{256}.}
-
-\item{buffer_size}{Integer specifying the buffer size in bytes used for
-reading/writing to disk. Default is \code{1 * 1024 * 1024} (1MB).}
 
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
 amount of in-flight data awaiting writing. Default: \code{3}.}

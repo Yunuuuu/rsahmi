@@ -14,18 +14,17 @@
 #' Each function wraps the input range object in a new class to indicate its
 #' behavior downstream.
 #'
-#' @param ranges A range or a list of ranges specifying the subsequence(s) to
-#' process. Must be created using the [`seq_range()`] function.
-#' @param tag An optional character label used when embedding sequence content
+#' @param tag An character label used when embedding sequence content
 #'   into the FASTQ header (used with `embed()` and `embed_trim()`).
 #'
 #'   For UMI and barcode actions, the tag will be assigned automatically as
-#'   `"UMI"` and `"BARCODE"` respectively, and should be left as the default
-#'   to ensure compatibility with downstream processing in the `rsahmi`
-#'   workflow.
+#'   `"UMI"` and `"BARCODE"` respectively.
 #'
 #'   For other types of actions, you must explicitly specify a `tag` to ensure
 #'   clarity in the embedded header.
+#'
+#' @param ranges A range or a list of ranges specifying the subsequence(s) to
+#' process. Must be created using the [`seq_range()`] function.
 #'
 #' @return An annotated `rsahmi_seq_range` or `rsahmi_seq_ranges` object. object
 #' with behavior-specific class:
@@ -36,13 +35,13 @@
 #' }
 #' @name subseq_actions
 #' @export
-embed <- function(ranges, tag = NULL) {
-    assert_string(tag, allow_empty = FALSE, allow_null = TRUE)
+embed <- function(tag, ranges) {
+    assert_string(tag, allow_empty = FALSE, allow_null = FALSE)
     UseMethod("embed")
 }
 
 #' @export
-embed.rsahmi_seq_range <- function(ranges, tag = NULL) {
+embed.rsahmi_seq_range <- function(tag, ranges) {
     structure(
         ranges,
         tag = tag,
@@ -51,7 +50,7 @@ embed.rsahmi_seq_range <- function(ranges, tag = NULL) {
 }
 
 #' @export
-embed.rsahmi_seq_ranges <- function(ranges, tag = NULL) {
+embed.rsahmi_seq_ranges <- function(tag, ranges) {
     structure(
         ranges,
         tag = tag,
@@ -81,13 +80,13 @@ trim.rsahmi_seq_ranges <- function(ranges) {
 
 #' @rdname subseq_actions
 #' @export
-embed_trim <- function(ranges, tag = NULL) {
-    assert_string(tag, allow_empty = FALSE, allow_null = TRUE)
+embed_trim <- function(tag, ranges) {
+    assert_string(tag, allow_empty = FALSE, allow_null = FALSE)
     UseMethod("embed_trim")
 }
 
 #' @export
-embed_trim.rsahmi_seq_range <- function(ranges, tag = NULL) {
+embed_trim.rsahmi_seq_range <- function(tag, ranges) {
     structure(
         ranges,
         tag = tag,
@@ -96,7 +95,7 @@ embed_trim.rsahmi_seq_range <- function(ranges, tag = NULL) {
 }
 
 #' @export
-embed_trim.rsahmi_seq_ranges <- function(ranges, tag = NULL) {
+embed_trim.rsahmi_seq_ranges <- function(tag, ranges) {
     structure(
         ranges,
         tag = tag,
@@ -113,3 +112,6 @@ c.rsahmi_seq_action <- function(...) {
 }
 
 is_action <- function(action) inherits(action, "rsahmi_seq_action")
+need_embed <- function(action) {
+    inherits(action, c("rsahmi_embed_trim", "rsahmi_embed"))
+}

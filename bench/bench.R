@@ -3,9 +3,11 @@ Sys.setenv(RSAHMI_FEATURES = "bench") # TO use pprof
 # pak::pak("Yunuuuu/rsahmi")
 pak::pak(pkgbuild::build(binary = TRUE))
 system.time(rsahmi:::rust_seq_refine(
-    "/home/yun/SINLGE_CELL/Rawdata/FL/FL-2_S1_L005_R1_001.fastq.gz",
+    c(
+        "/home/yun/SINLGE_CELL/Rawdata/FL/FL-2_S1_L005_R1_001.fastq.gz",
+        "/home/yun/SINLGE_CELL/Rawdata/FL/FL-2_S1_L005_R2_001.fastq.gz"
+    ),
     "bench/data/FL-2_R1_umi.fastq.gz",
-    "/home/yun/SINLGE_CELL/Rawdata/FL/FL-2_S1_L005_R2_001.fastq.gz",
     "bench/data/FL-2_R2_umi.fastq.gz",
     umi_action1 = rsahmi::seq_range(end = 12),
     barcode_action1 = rsahmi::seq_range(start = 13, end = 15),

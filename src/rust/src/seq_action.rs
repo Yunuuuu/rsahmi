@@ -186,11 +186,11 @@ impl SubseqPairedActions {
                 let tag_map2 = actions2.embed.tags.map_sequences(&record2.seq)?;
 
                 // Merge tag→sequence entries
-                for (tag, sequence) in tag_map2 {
+                for (tag, sequences) in tag_map2 {
                     if let Some(v) = tag_map.get_mut(&tag) {
-                        v.extend(sequence); // read1 first, read2 second
+                        v.extend(sequences); // read1 first, read2 second
                     } else {
-                        tag_map.insert(tag, sequence);
+                        tag_map.insert(tag, sequences);
                     }
                 }
                 tag_map

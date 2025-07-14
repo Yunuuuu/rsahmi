@@ -25,8 +25,8 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
     output2_bar: Option<ProgressBar>,
     actions: &SubseqPairedActions,
     compression_level: i32,
-    chunk_size: usize,
-    buffer_size: usize,
+    batch_size: usize,
+    chunk_bytes: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -59,7 +59,7 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let (writer1_handle, gzip1) = if let Some(output_path) = output1_path {
             let output: &Path = output_path.as_ref();
             let handle = Some(scope.spawn(move || -> Result<()> {
-                let mut writer = new_writer(output, buffer_size, output1_bar)?;
+                let mut writer = new_writer(output, output1_bar)?;
                 for chunk in writer1_rx {
                     writer.write_all(&chunk).map_err(|e| {
                         anyhow!("(Writer1) Failed to write FastqRecord to output: {}", e)
@@ -79,7 +79,7 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let (writer2_handle, gzip2) = if let Some(output_path) = output2_path {
             let output: &Path = output_path.as_ref();
             let handle = Some(scope.spawn(move || -> Result<()> {
-                let mut writer = new_writer(output, buffer_size, output2_bar)?;
+                let mut writer = new_writer(output, output2_bar)?;
                 for chunk in writer2_rx {
                     writer.write_all(&chunk).map_err(|e| {
                         anyhow!("(Writer2) Failed to write FastqRecord to output: {}", e)
@@ -128,8 +128,8 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             let rx = reader_rx.clone();
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
-                let mut records1_pool: Vec<u8> = Vec::with_capacity(BLOCK_SIZE);
-                let mut records2_pool: Vec<u8> = Vec::with_capacity(BLOCK_SIZE);
+                let mut records1_pool: Vec<u8> = Vec::with_capacity(chunk_bytes);
+                let mut records2_pool: Vec<u8> = Vec::with_capacity(chunk_bytes);
                 let mut compressor = Compressor::new(compression_level);
                 while let Ok((records1, records2)) = rx.recv() {
                     // Initialize a thread-local batch sender for matching records
@@ -145,7 +145,7 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                         if records1_pool.capacity() - records1_pool.len() < record1.bytes_size() ||
                             records2_pool.capacity() - records2_pool.len() < record2.bytes_size() {
                             let pack1 = if has_writer1 {
-                                let mut pack = Vec::with_capacity(BLOCK_SIZE);
+                                let mut pack = Vec::with_capacity(chunk_bytes);
                                 std::mem::swap(&mut records1_pool, &mut pack);
                                 if gzip1 {
                                     pack = gzip_pack(&pack, &mut compressor)?
@@ -155,7 +155,7 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                                 None
                             };
                             let pack2 = if has_writer2 {
-                                let mut pack = Vec::with_capacity(BLOCK_SIZE);
+                                let mut pack = Vec::with_capacity(chunk_bytes);
                                 std::mem::swap(&mut records2_pool, &mut pack);
                                 if gzip2 {
                                     pack = gzip_pack(&pack, &mut compressor)?
@@ -245,10 +245,10 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let input1: &Path = input1_path.as_ref();
         let reader1_handle = scope.spawn(move || -> Result<()> {
             let mut reader = FastqReader::with_capacity(
-                buffer_size,
-                new_reader(input1, buffer_size, input1_bar)?,
+                BUFFER_SIZE,
+                new_reader(input1, BUFFER_SIZE, input1_bar)?,
             );
-            let mut thread_tx = BatchSender::with_capacity(chunk_size, reader1_tx);
+            let mut thread_tx = BatchSender::with_capacity(batch_size, reader1_tx);
             while let Some(record) = reader
                 .read_record()
                 .map_err(|e| anyhow!("(Reader1) Error while reading FASTQ record: {}", e))?
@@ -272,10 +272,10 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let input2: &Path = input2_path.as_ref();
         let reader2_handle = scope.spawn(move || -> Result<()> {
             let mut reader = FastqReader::with_capacity(
-                buffer_size,
-                new_reader(input2, buffer_size, input2_bar)?,
+                BUFFER_SIZE,
+                new_reader(input2, BUFFER_SIZE, input2_bar)?,
             );
-            let mut thread_tx = BatchSender::with_capacity(chunk_size, reader2_tx);
+            let mut thread_tx = BatchSender::with_capacity(batch_size, reader2_tx);
             while let Some(record) = reader
                 .read_record()
                 .map_err(|e| anyhow!("(Reader2) Error while reading FASTQ record: {}", e))?

@@ -1,18 +1,9 @@
-use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
+
+use crate::utils::*;
 
 pub(crate) mod koutput;
 pub(crate) mod reads;
-
-fn robj_to_option_str(robj: &Robj) -> Result<Option<Vec<&str>>> {
-    if robj.is_null() {
-        Ok(None)
-    } else {
-        robj.as_str_vector()
-            .map(|s| Some(s))
-            .ok_or(anyhow!("must be a character"))
-    }
-}
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]

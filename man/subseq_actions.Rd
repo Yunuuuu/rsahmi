@@ -7,27 +7,24 @@
 \alias{embed_trim}
 \title{Define sequence range behavior: embed, trim, or both}
 \usage{
-embed(ranges, tag = NULL)
+embed(tag, ranges)
 
 trim(ranges)
 
-embed_trim(ranges, tag = NULL)
+embed_trim(tag, ranges)
 }
 \arguments{
-\item{ranges}{A range or a list of ranges specifying the subsequence(s) to
-process. Must be created using the \code{\link[=seq_range]{seq_range()}} function.}
-
-\item{tag}{An optional character label used when embedding sequence content
+\item{tag}{An character label used when embedding sequence content
 into the FASTQ header (used with \code{embed()} and \code{embed_trim()}).
 
 For UMI and barcode actions, the tag will be assigned automatically as
-\code{"UMI"} and \code{"BARCODE"} respectively, and should be left as the default
-to ensure compatibility with downstream processing in the \code{rsahmi}
-workflow.
+\code{"UMI"} and \code{"BARCODE"} respectively.
 
-For other types of actions, it is recommended to explicitly specify a \code{tag}
-to ensure clarity in the embedded header. Without a clear tag, it may be
-difficult to distinguish different embedded regions later in the analysis.}
+For other types of actions, you must explicitly specify a \code{tag} to ensure
+clarity in the embedded header.}
+
+\item{ranges}{A range or a list of ranges specifying the subsequence(s) to
+process. Must be created using the \code{\link[=seq_range]{seq_range()}} function.}
 }
 \value{
 An annotated \code{rsahmi_seq_range} or \code{rsahmi_seq_ranges} object. object

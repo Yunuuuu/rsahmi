@@ -1,4 +1,4 @@
-use std::io::{BufWriter, Read, Write};
+use std::io::{Read, Write};
 
 use bytes::BytesMut;
 use indicatif::ProgressBar;

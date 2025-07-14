@@ -3,10 +3,10 @@ use std::fs::File;
 use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
 
-use crate::reader0::LineReader;
+use crate::{reader0::LineReader, utils::BUFFER_SIZE};
 
 pub(crate) fn parse_kreport(kreport: &str) -> Result<Vec<Kreport>> {
-    let mut reader = LineReader::with_capacity(126 * 1024, File::open(kreport)?);
+    let mut reader = LineReader::with_capacity(BUFFER_SIZE, File::open(kreport)?);
     let mut kreports: Vec<Kreport> = Vec::with_capacity(10);
     let mut ancestors = Vec::with_capacity(10);
     let mut pos = 0; // The line offset of the ancestors

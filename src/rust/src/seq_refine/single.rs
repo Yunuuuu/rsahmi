@@ -20,8 +20,8 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
     output_bar: Option<ProgressBar>,
     actions: &SubseqActions,
     compression_level: i32,
-    chunk_size: usize,
-    buffer_size: usize,
+    batch_size: usize,
+    chunk_bytes: usize,
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
@@ -46,7 +46,7 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
         // A single thread handles file output to ensure atomic write order and leverage buffered IO.
         // This thread consumes compressed chunks, not raw records, for performance.
         let writer_handle = scope.spawn(move || -> Result<()> {
-            let mut writer = new_writer(output, buffer_size, output_bar)?;
+            let mut writer = new_writer(output, output_bar)?;
 
             // Iterate over each received batch of records
             for chunk in writer_rx {
@@ -68,7 +68,7 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
             let tx = writer_tx.clone();
             let handle = scope.spawn(move || -> Result<()> {
                 // Temporary buffer for current output chunk
-                let mut records_pool: Vec<u8> = Vec::with_capacity(BLOCK_SIZE);
+                let mut records_pool: Vec<u8> = Vec::with_capacity(chunk_bytes);
                 let mut compressor = Compressor::new(compression_level);
                 while let Ok(records) = rx.recv() {
                     for mut record in records {
@@ -78,7 +78,7 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
                         // Flush when pool is too full to accept the next record.
                         // This ensures output chunks remain near the target block size.
                         if records_pool.capacity() - records_pool.len() < record.bytes_size() {
-                            let mut pack = Vec::with_capacity(BLOCK_SIZE);
+                            let mut pack = Vec::with_capacity(chunk_bytes);
                             std::mem::swap(&mut records_pool, &mut pack);
                             // Compress if gzip file
                             if gzip {
@@ -123,8 +123,8 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
         // ─── reader Thread ─────────────────────────────────────
         let reader_handle = scope.spawn(move || -> Result<()> {
             let mut reader =
-                FastqReader::with_capacity(buffer_size, new_reader(input, buffer_size, input_bar)?);
-            let mut reader_tx = BatchSender::with_capacity(chunk_size, reader_tx);
+                FastqReader::with_capacity(BUFFER_SIZE, new_reader(input, BUFFER_SIZE, input_bar)?);
+            let mut reader_tx = BatchSender::with_capacity(batch_size, reader_tx);
             while let Some(record) = reader
                 .read_record()
                 .map_err(|e| anyhow!("(Reader) Error while reading FASTQ record: {}", e))?

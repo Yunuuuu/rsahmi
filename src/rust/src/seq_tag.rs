@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use bytes::Bytes;
 use extendr_api::prelude::*;
 use rustc_hash::FxHashMap as HashMap;
@@ -17,9 +17,8 @@ pub(crate) struct TagRanges {
 ///
 /// # Errors
 /// Returns an error if the `"tag"` attribute is missing or not a string.
-pub(crate) fn extract_tag_name(action: &Robj) -> Result<Bytes> {
-    action
-        .get_attrib("tag")
+pub(crate) fn extract_tag_name(robj: &Robj) -> Result<Bytes> {
+    robj.get_attrib("tag")
         .and_then(|t| t.as_str())
         .ok_or(anyhow!("'tag' attribute must be provided"))
         .map(|t| Bytes::copy_from_slice(t.as_bytes()))
@@ -90,5 +89,35 @@ impl<'a> IntoIterator for &'a TagRanges {
 
     fn into_iter(self) -> Self::IntoIter {
         (&self.map).into_iter()
+    }
+}
+
+// Create object from R
+pub(crate) fn robj_to_tag_ranges<'r>(ranges: &Robj) -> Result<Option<TagRanges>> {
+    if ranges.is_null() {
+        return Ok(None);
+    }
+    Ok(Some(TagRanges::try_from(ranges)?))
+}
+
+impl TryFrom<&Robj> for TagRanges {
+    type Error = Error;
+    fn try_from(value: &Robj) -> Result<Self> {
+        let list = value
+            .as_list()
+            .ok_or(anyhow!("Expected a list of sequence range objects."))?;
+        list.values()
+            .into_iter()
+            .map(|robj| -> Result<(Bytes, SeqRanges)> {
+                if !value.inherits("rsahmi_tag") {
+                    return Err(anyhow!(
+                        "The object does not inherit a valid tag class (expected 'rsahmi_tag')."
+                    ));
+                }
+                let tag = extract_tag_name(&robj)?;
+                let ranges = SeqRanges::try_from(&robj)?;
+                Ok((tag, ranges))
+            })
+            .collect()
     }
 }

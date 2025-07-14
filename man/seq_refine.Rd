@@ -5,9 +5,8 @@
 \title{Refine Sequences from FASTQ Files with UMI/Barcode Actions}
 \usage{
 seq_refine(
-  fq1,
+  reads,
   ofile1 = NULL,
-  fq2 = NULL,
   ofile2 = NULL,
   umi_action1 = NULL,
   umi_action2 = NULL,
@@ -15,8 +14,8 @@ seq_refine(
   barcode_action2 = NULL,
   extra_actions1 = NULL,
   extra_actions2 = NULL,
-  chunk_size = NULL,
-  buffer_size = NULL,
+  batch_size = NULL,
+  chunk_bytes = NULL,
   compression_level = 4L,
   nqueue = NULL,
   threads = NULL,
@@ -24,13 +23,12 @@ seq_refine(
 )
 }
 \arguments{
-\item{fq1}{Path to the first FASTQ file (required).}
+\item{reads}{A character vector of FASTQ file paths. Accepts one file for
+single-end or two files for paired-end.}
 
-\item{ofile1}{Path to the output FASTQ file for \code{fq1} (required).}
-
-\item{fq2}{Optional path to the second (paired-end) FASTQ file. If you want
-to operate only on the second read, you may supply that file path via \code{fq1}
-instead.}
+\item{ofile1}{Output FASTQ file path for the first read (\code{fq1}). Required
+when only one input file is given (i.e., single-end mode). Optional when two
+input files are used.}
 
 \item{ofile2}{Optional path to the output FASTQ file for \code{fq2}.}
 
@@ -54,13 +52,14 @@ Specify ranges as with UMI actions, and customize using \code{\link[=embed]{embe
 can be a single one or a list of them. By default, these actions
 perform trimming of sequences and qualities unless otherwise specified.}
 
-\item{chunk_size}{Integer. Number of FASTQ records to accumulate before
+\item{batch_size}{Integer. Number of FASTQ records to accumulate before
 dispatching a chunk to worker threads for processing. This controls the
 granularity of parallel work and affects memory usage and performance.
 Default is \code{256}.}
 
-\item{buffer_size}{Integer specifying the buffer size in bytes used for
-reading/writing to disk. Default is \code{1 * 1024 * 1024} (1MB).}
+\item{chunk_bytes}{Integer specifying the size in bytes used for compressing
+and writing records in batches to disk. Default is \code{10 * 1024 * 1024}
+(10MB).}
 
 \item{compression_level}{Integer from 1 to 12 (default: \code{4}). This sets the
 gzip compression level when writing output files. A higher value increases

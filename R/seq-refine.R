@@ -5,11 +5,11 @@
 #' [`trim()`], or [`embed_trim()`]. It supports single-end and paired-end reads,
 #' processes data in chunks, and uses multithreading for performance.
 #'
-#' @param fq1 Path to the first FASTQ file (required).
-#' @param ofile1 Path to the output FASTQ file for `fq1` (required).
-#' @param fq2 Optional path to the second (paired-end) FASTQ file. If you want
-#'   to operate only on the second read, you may supply that file path via `fq1`
-#'   instead.
+#' @param reads A character vector of FASTQ file paths. Accepts one file for
+#' single-end or two files for paired-end.
+#' @param ofile1 Output FASTQ file path for the first read (`fq1`). Required
+#' when only one input file is given (i.e., single-end mode). Optional when two
+#' input files are used.
 #' @param ofile2 Optional path to the output FASTQ file for `fq2`.
 #' @param umi_action1,umi_action2 Sequence action for extracting or trimming UMI
 #' from `fq1`/`fq2`. `umi_action2` is only allowed if `fq2` is provided.
@@ -28,12 +28,13 @@
 #'   `fq1`/`fq2`. `extra_actions2` is only allowed if `fq2` is provided. These
 #'   can be a single one or a list of them. By default, these actions
 #'   perform trimming of sequences and qualities unless otherwise specified.
-#' @param chunk_size Integer. Number of FASTQ records to accumulate before
+#' @param batch_size Integer. Number of FASTQ records to accumulate before
 #'   dispatching a chunk to worker threads for processing. This controls the
 #'   granularity of parallel work and affects memory usage and performance.
-#'   Default is `r code_quote(FASTQ_CHUNK, quote = FALSE)`.
-#' @param buffer_size Integer specifying the buffer size in bytes used for
-#' reading/writing to disk. Default is `1 * 1024 * 1024` (1MB).
+#'   Default is `r code_quote(FASTQ_BATCH, quote = FALSE)`.
+#' @param chunk_bytes Integer specifying the size in bytes used for compressing
+#' and writing records in batches to disk. Default is `10 * 1024 * 1024`
+#' (10MB).
 #' @param compression_level Integer from 1 to 12 (default: `4`). This sets the
 #' gzip compression level when writing output files. A higher value increases
 #' compression ratio but may slow down writing. Only applies when output
@@ -57,17 +58,16 @@
 #' - Use [`embed()`], [`trim()`], or [`embed_trim()`] to specify the behavior.
 #'
 #' @export
-seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
+seq_refine <- function(reads, ofile1 = NULL, ofile2 = NULL,
                        umi_action1 = NULL, umi_action2 = NULL,
                        barcode_action1 = NULL, barcode_action2 = NULL,
                        extra_actions1 = NULL, extra_actions2 = NULL,
-                       chunk_size = NULL, buffer_size = NULL,
+                       batch_size = NULL, chunk_bytes = NULL,
                        compression_level = 4L,
                        nqueue = NULL, threads = NULL, odir = NULL) {
     rust_seq_refine(
-        fq1 = fq1,
+        reads = reads,
         ofile1 = ofile1,
-        fq2 = fq2,
         ofile2 = ofile2,
         umi_action1 = umi_action1,
         umi_action2 = umi_action2,
@@ -75,8 +75,8 @@ seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
         barcode_action2 = barcode_action2,
         extra_actions1 = extra_actions1,
         extra_actions2 = extra_actions2,
-        chunk_size = chunk_size,
-        buffer_size = buffer_size,
+        batch_size = batch_size,
+        chunk_bytes = chunk_bytes,
         compression_level = compression_level,
         nqueue = nqueue,
         threads = threads,
@@ -84,17 +84,19 @@ seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
     )
 }
 
-rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
+rust_seq_refine <- function(reads, ofile1 = NULL, ofile2 = NULL,
                             umi_action1 = NULL, umi_action2 = NULL,
                             barcode_action1 = NULL, barcode_action2 = NULL,
                             extra_actions1 = NULL, extra_actions2 = NULL,
-                            chunk_size = NULL, buffer_size = NULL,
+                            batch_size = NULL, chunk_bytes = NULL,
                             compression_level = 4L,
                             nqueue = NULL, threads = NULL, odir = NULL,
                             pprof = NULL) {
-    assert_string(fq1, allow_empty = FALSE)
+    reads <- as.character(reads)
+    if (length(reads) < 1L || length(reads) > 2L) {
+        cli::cli_abort("{.arg reads} must be of length 1 or 2")
+    }
     assert_string(ofile1, allow_empty = FALSE, allow_null = TRUE)
-    assert_string(fq2, allow_empty = FALSE, allow_null = TRUE)
     assert_string(ofile2, allow_empty = FALSE, allow_null = TRUE)
     umi_action1 <- check_ub_action(umi_action1, "UMI")
     barcode_action1 <- check_ub_action(barcode_action1, "BARCODE")
@@ -103,6 +105,13 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
     umi_action2 <- check_ub_action(umi_action2, "UMI")
     barcode_action2 <- check_ub_action(barcode_action2, "BARCODE")
     extra_actions2 <- check_extra_actions(extra_actions2)
+    if (is_scalar(reads)) {
+        fq1 <- reads[[1L]]
+        fq2 <- NULL
+    } else {
+        fq1 <- reads[[1L]]
+        fq2 <- reads[[2L]]
+    }
     if (is.null(fq2) &&
         (!is.null(ofile2) || !is.null(umi_action2) ||
             !is.null(barcode_action2) || !is.null(extra_actions2))) {
@@ -124,8 +133,8 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
         ))
     }
 
-    assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
-    assert_number_whole(buffer_size, min = 1, allow_null = TRUE)
+    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
+    assert_number_whole(chunk_bytes, min = 1, allow_null = TRUE)
     assert_number_whole(compression_level, min = 1, max = 12)
     assert_number_whole(threads,
         min = 1, max = as.double(parallel::detectCores()),
@@ -137,8 +146,8 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     odir <- odir %||% getwd()
     dir_create(odir)
-    chunk_size <- chunk_size %||% FASTQ_CHUNK
-    buffer_size <- buffer_size %||% BUFFER_SIZE
+    batch_size <- batch_size %||% FASTQ_BATCH
+    chunk_bytes <- chunk_bytes %||% CHUNK_BYTES
     actions1 <- c(list(umi_action1, barcode_action1), extra_actions1)
     actions1 <- actions1[
         !vapply(actions1, is.null, logical(1L), USE.NAMES = FALSE)
@@ -159,11 +168,11 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
     if (is.null(pprof)) {
         rust_call(
             "seq_refine",
-            fq1 = fq1, ofile1 = ofile1,
-            fq2 = fq2, ofile2 = ofile2,
+            fq1 = fq1, ofile1 = file.path(odir, ofile1),
+            fq2 = fq2, ofile2 = file.path(odir, ofile2),
             actions1 = actions1, actions2 = actions2,
-            chunk_size = chunk_size,
-            buffer_size = buffer_size,
+            batch_size = batch_size,
+            chunk_bytes = chunk_bytes,
             compression_level = compression_level,
             nqueue = nqueue,
             threads = threads
@@ -171,11 +180,11 @@ rust_seq_refine <- function(fq1, ofile1 = NULL, fq2 = NULL, ofile2 = NULL,
     } else {
         rust_call(
             "pprof_seq_refine",
-            fq1 = fq1, ofile1 = ofile1,
-            fq2 = fq2, ofile2 = ofile2,
+            fq1 = fq1, ofile1 = file.path(odir, ofile1),
+            fq2 = fq2, ofile2 = file.path(odir, ofile2),
             actions1 = actions1, actions2 = actions2,
-            chunk_size = chunk_size,
-            buffer_size = buffer_size,
+            batch_size = batch_size,
+            chunk_bytes = chunk_bytes,
             compression_level = compression_level,
             nqueue = nqueue,
             threads = threads,
@@ -190,10 +199,9 @@ check_ub_action <- function(action, tag, arg = caller_arg(action),
     if (is.null(action)) {
         action
     } else if (is_action(action)) {
-        attr(action, "tag") <- attr(action, "tag", exact = TRUE) %||% tag
         action
     } else if (is_range(action)) {
-        embed_trim(action, tag)
+        embed_trim(tag, action)
     } else {
         cli::cli_abort(c(
             "{.arg barcode_action2} must be created with {.fn seq_range} or a combination of them using {.fn c}.",
@@ -229,14 +237,7 @@ check_extra_actions <- function(actions, arg = caller_arg(actions),
     }
     lapply(actions, function(action) {
         # Ensure tag is defined for embed actions
-        if (inherits(action, c("rsahmi_embed_trim", "rsahmi_embed"))) {
-            if (is.null(attr(action, "tag", exact = TRUE))) {
-                cli::cli_abort(c(
-                    "Missing {.arg tag} for embed-style action in {.arg {arg}}.",
-                    i = "Use {.fn embed(tag = )} or {.fn embed_trim(tag = )} to define an explicit tag."
-                ), call = call)
-            }
-        } else if (!is_action(action)) {
+        if (!is_action(action)) {
             action <- trim(action)
         }
         action
