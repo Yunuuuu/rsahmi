@@ -40,7 +40,8 @@
 #' compression ratio but may slow down writing. Only applies when output
 #' filenames end with `.gz`.
 #' @param nqueue Integer. Maximum number of buffers per thread, controlling the
-#'   amount of in-flight data awaiting writing. Default: `3`.
+#'   amount of in-flight data awaiting writing. Default: `3`. Setting this too
+#'   high may increase memory consumption without performance gain.
 #' @param threads Integer. Number of threads to use. Default: `3`.
 #' @param odir A string of directory to save the output files. Please see
 #' `Value` section for details.

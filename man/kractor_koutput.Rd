@@ -55,7 +55,8 @@ granularity of parallel work and affects memory usage and performance.
 Default is \code{256}.}
 
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
-amount of in-flight data awaiting writing. Default: \code{3}.}
+amount of in-flight data awaiting writing. Default: \code{3}. Setting this too
+high may increase memory consumption without performance gain.}
 
 \item{mmap}{Logical. Whether to enable memory-mapped file access for reading
 input Kraken2 output. When set to \code{TRUE}, the function uses memory mapping
