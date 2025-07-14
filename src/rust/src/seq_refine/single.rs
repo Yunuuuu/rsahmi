@@ -1,3 +1,4 @@
+use std::io::BufWriter;
 use std::io::Write;
 use std::path::Path;
 
@@ -46,7 +47,7 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
         // A single thread handles file output to ensure atomic write order and leverage buffered IO.
         // This thread consumes compressed chunks, not raw records, for performance.
         let writer_handle = scope.spawn(move || -> Result<()> {
-            let mut writer = new_writer(output, output_bar)?;
+            let mut writer = BufWriter::with_capacity(chunk_bytes, new_writer(output, output_bar)?);
 
             // Iterate over each received batch of records
             for chunk in writer_rx {
