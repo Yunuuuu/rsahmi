@@ -37,7 +37,7 @@
 #' @export
 embed <- function(tag, ranges) {
     assert_string(tag, allow_empty = FALSE, allow_null = FALSE)
-    UseMethod("embed")
+    UseMethod("embed", ranges)
 }
 
 #' @export
@@ -60,7 +60,7 @@ embed.rsahmi_seq_ranges <- function(tag, ranges) {
 
 #' @rdname subseq_actions
 #' @export
-trim <- function(ranges) UseMethod("trim")
+trim <- function(ranges) UseMethod("trim", ranges)
 
 #' @export
 trim.rsahmi_seq_range <- function(ranges) {
@@ -82,7 +82,7 @@ trim.rsahmi_seq_ranges <- function(ranges) {
 #' @export
 embed_trim <- function(tag, ranges) {
     assert_string(tag, allow_empty = FALSE, allow_null = FALSE)
-    UseMethod("embed_trim")
+    UseMethod("embed_trim", ranges)
 }
 
 #' @export
