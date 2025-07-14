@@ -116,7 +116,7 @@ kractor <- function(kreport, koutput, reads,
 BATCH_SIZE <- 500L
 FASTQ_BATCH <- 256
 KOUTPUT_BATCH <- 1000
-CHUNK_BYTES <- 10L * 1024L * 1024L
+CHUNK_BYTES <- 8L * 1024L * 1024L
 
 #' Filter Kraken2 Output by Taxon
 #'

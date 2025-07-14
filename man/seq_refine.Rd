@@ -58,8 +58,8 @@ granularity of parallel work and affects memory usage and performance.
 Default is \code{256}.}
 
 \item{chunk_bytes}{Integer specifying the size in bytes used for compressing
-and writing records in batches to disk. Default is \code{10 * 1024 * 1024}
-(10MB).}
+and writing records in batches to disk. Default is \code{8 * 1024 * 1024}
+(8MB).}
 
 \item{compression_level}{Integer from 1 to 12 (default: \code{4}). This sets the
 gzip compression level when writing output files. A higher value increases

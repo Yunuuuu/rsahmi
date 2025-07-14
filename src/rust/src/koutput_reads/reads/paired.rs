@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::iter::zip;
 use std::path::Path;
 
@@ -58,7 +58,7 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file
         let writer_handle = scope.spawn(move || -> Result<()> {
-            let mut writer = new_writer(output, output_bar)?;
+            let mut writer = BufWriter::with_capacity(chunk_bytes, new_writer(output, output_bar)?);
 
             // Iterate over each received batch of records
             for chunk in writer_rx {

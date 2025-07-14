@@ -1,3 +1,4 @@
+use std::io::BufWriter;
 use std::io::Write;
 use std::iter::zip;
 use std::path::Path;
@@ -59,7 +60,8 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let (writer1_handle, gzip1) = if let Some(output_path) = output1_path {
             let output: &Path = output_path.as_ref();
             let handle = Some(scope.spawn(move || -> Result<()> {
-                let mut writer = new_writer(output, output1_bar)?;
+                let mut writer =
+                    BufWriter::with_capacity(chunk_bytes, new_writer(output, output1_bar)?);
                 for chunk in writer1_rx {
                     writer.write_all(&chunk).map_err(|e| {
                         anyhow!("(Writer1) Failed to write FastqRecord to output: {}", e)
@@ -79,7 +81,8 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
         let (writer2_handle, gzip2) = if let Some(output_path) = output2_path {
             let output: &Path = output_path.as_ref();
             let handle = Some(scope.spawn(move || -> Result<()> {
-                let mut writer = new_writer(output, output2_bar)?;
+                let mut writer =
+                    BufWriter::with_capacity(chunk_bytes, new_writer(output, output2_bar)?);
                 for chunk in writer2_rx {
                     writer.write_all(&chunk).map_err(|e| {
                         anyhow!("(Writer2) Failed to write FastqRecord to output: {}", e)

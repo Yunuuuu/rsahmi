@@ -33,8 +33,8 @@
 #'   granularity of parallel work and affects memory usage and performance.
 #'   Default is `r code_quote(FASTQ_BATCH, quote = FALSE)`.
 #' @param chunk_bytes Integer specifying the size in bytes used for compressing
-#' and writing records in batches to disk. Default is `10 * 1024 * 1024`
-#' (10MB).
+#' and writing records in batches to disk. Default is `8 * 1024 * 1024`
+#' (8MB).
 #' @param compression_level Integer from 1 to 12 (default: `4`). This sets the
 #' gzip compression level when writing output files. A higher value increases
 #' compression ratio but may slow down writing. Only applies when output
