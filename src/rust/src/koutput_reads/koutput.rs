@@ -77,8 +77,9 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                                 // with the scientific name and the taxonomy ID in 
                                 // parenthesis (e.g., "Bacteria (taxid 2)" instead of "2") 
                                 if let Some(start) = KOUTPUT_TAXID_PREFIX_FINDER.find(field) {
+                                    let start = start + KOUTPUT_TAXID_PREFIX.len();
                                     if let Some(end) = memchr(KOUTPUT_TAXID_SUFFIX, &field[start ..]) {
-                                        let id = &field[start + KOUTPUT_TAXID_PREFIX.len() .. end];
+                                        let id = &field[start .. start + end];
                                         // Skip this line if taxid is not in `include_aho`
                                         if include_aho.find(id).is_none() {
                                             continue 'chunk_loop;
