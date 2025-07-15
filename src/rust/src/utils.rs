@@ -13,7 +13,7 @@ use isal::read::GzipDecoder;
 use libdeflater::Compressor;
 use memchr::memmem::Finder;
 
-use crate::reader0::*;
+use crate::reader::*;
 
 pub(crate) const BLOCK_SIZE: usize = 8 * 1024 * 1024;
 pub(crate) const BUFFER_SIZE: usize = 4 * 1024 * 1024;

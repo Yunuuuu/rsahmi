@@ -10,7 +10,7 @@ use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 
 use crate::batchsender::BatchSender;
-use crate::reader0::LineReader;
+use crate::reader::LineReader;
 use crate::utils::*;
 
 pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(

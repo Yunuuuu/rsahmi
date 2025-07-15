@@ -6,7 +6,7 @@ use memchr::memchr2;
 
 use crate::fastq_record::FastqParseError;
 use crate::fastq_record::FastqRecord;
-use crate::reader0::*;
+use crate::reader::*;
 
 pub(crate) struct FastqReader<R> {
     reader: LineReader<R>,

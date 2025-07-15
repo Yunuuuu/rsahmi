@@ -6,7 +6,7 @@ mod fastq_record;
 mod koutput_reads;
 mod kractor;
 mod kreport;
-mod reader0;
+mod reader;
 mod seq_action;
 mod seq_range;
 mod seq_refine;

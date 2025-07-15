@@ -3,7 +3,7 @@ use std::{fs::File, path::Path};
 use anyhow::{anyhow, Context, Result};
 use extendr_api::prelude::*;
 
-use crate::{reader0::LineReader, utils::BUFFER_SIZE};
+use crate::{reader::LineReader, utils::BUFFER_SIZE};
 
 pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<Kreport>> {
     let path: &Path = kreport.as_ref();
