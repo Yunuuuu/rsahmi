@@ -49,7 +49,7 @@ pub(crate) fn new_writer<P: AsRef<Path> + ?Sized>(
 ) -> Result<Box<dyn Write>> {
     let path: &Path = file.as_ref();
     let file = File::create(path)
-        .with_context(|| anyhow!("Failed to create output file {}", path.display()))?;
+        .with_context(|| format!("Failed to create output file {}", path.display()))?;
     let writer: Box<dyn Write>;
     if let Some(bar) = progress_bar {
         writer = Box::new(ProgressBarWriter::new(file, bar));
