@@ -1,8 +1,7 @@
-use std::io::BufWriter;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
@@ -51,13 +50,13 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
 
             // Iterate over each received batch of records
             for chunk in writer_rx {
-                writer.write_all(&chunk).map_err(|e| {
-                    anyhow!("(Writer) Failed to write FastqRecord to output: {}", e)
-                })?;
+                writer
+                    .write_all(&chunk)
+                    .with_context(|| format!("(Writer) Failed to write FastqRecord to output"))?;
             }
             writer
                 .flush()
-                .map_err(|e| anyhow!("(Writer) Failed to flush writer: {}", e))?;
+                .with_context(|| format!("(Writer) Failed to flush writer"))?;
             Ok(())
         });
 
@@ -90,11 +89,8 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
                             }
 
                             // Send compressed or raw bytes to writer
-                            tx.send(pack).map_err(|e| {
-                                anyhow!(
-                                    "(Parser) Failed to send parsed record to Writer thread: {}",
-                                    e
-                                )
+                            tx.send(pack).with_context(|| {
+                                format!("(Parser) Failed to send parsed record to Writer thread")
                             })?;
                         }
 
@@ -110,11 +106,8 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
                     } else {
                         records_pool
                     };
-                    tx.send(pack).map_err(|e| {
-                        anyhow!(
-                            "(Parser) Failed to send parsed record to Writer thread: {}",
-                            e
-                        )
+                    tx.send(pack).with_context(|| {
+                        format!("(Parser) Failed to send parsed record to Writer thread")
                     })?;
                 }
                 Ok(())
@@ -131,18 +124,15 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
             let mut reader_tx = BatchSender::with_capacity(batch_size, reader_tx);
             while let Some(record) = reader
                 .read_record()
-                .map_err(|e| anyhow!("(Reader) Error while reading FASTQ record: {}", e))?
+                .with_context(|| format!("(Reader) Failed to read FASTQ record"))?
             {
-                reader_tx.send(record).map_err(|e| {
-                    anyhow!(
-                        "(Reader) Failed to send FASTQ record to Parser thread: {}",
-                        e
-                    )
+                reader_tx.send(record).with_context(|| {
+                    format!("(Reader) Failed to send FASTQ records to Parser thread")
                 })?;
             }
-            reader_tx
-                .flush()
-                .map_err(|e| anyhow!("(Reader) Failed to flush records to Parser thread: {}", e))?;
+            reader_tx.flush().with_context(|| {
+                format!("(Reader) Failed to flush FASTQ records to Parser thread")
+            })?;
             Ok(())
         });
 

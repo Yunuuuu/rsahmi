@@ -1,40 +1,40 @@
-use std::fs::File;
-
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
-use anyhow::{anyhow, Result};
-use indicatif::{ProgressBar, ProgressFinish};
-use memchr::{memchr, memmem};
-use memmap2::Mmap;
+use anyhow::{anyhow, Context, Result};
+use extendr_api::prelude::*;
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 
-pub(crate) mod io;
-pub(crate) mod mmap;
-use io::reader_kractor_koutput;
-use mmap::mmap_kractor_koutput;
-
-use crate::reader::bytes::ProgressBarReader;
-use crate::reader::slice::SliceProgressBarReader;
 use crate::utils::*;
 
-#[allow(clippy::too_many_arguments)]
+mod parse;
+
 pub(crate) fn kractor_koutput(
     kreport: &str,
     koutput: &str,
-    taxonomy: Option<Vec<&str>>,
-    ranks: Option<Vec<&str>>,
-    taxa: Option<Vec<&str>>,
-    taxids: Option<Vec<&str>>,
-    exclude: Option<Vec<&str>>,
-    descendants: bool,
     ofile: &str,
-    chunk_size: usize,
-    buffer_size: usize,
+    taxonomy: Robj,
+    ranks: Robj,
+    taxa: Robj,
+    taxids: Robj,
+    exclude: Robj,
+    descendants: bool,
+    compression_level: i32,
     batch_size: usize,
+    chunk_bytes: usize,
     nqueue: Option<usize>,
-    mmap: bool,
+    threads: usize,
 ) -> Result<()> {
     let mut kreports = crate::kreport::parse_kreport(kreport)?;
+
+    let taxonomy =
+        robj_to_option_str(&taxonomy).with_context(|| format!("Failed to parse 'taxonomy'"))?;
+    let ranks = robj_to_option_str(&ranks).with_context(|| format!("Failed to parse 'ranks'"))?;
+    let taxa = robj_to_option_str(&taxa).with_context(|| format!("Failed to parse 'taxa'"))?;
+    let taxids =
+        robj_to_option_str(&taxids).with_context(|| format!("Failed to parse 'taxids'"))?;
+    let exclude =
+        robj_to_option_str(&exclude).with_context(|| format!("Failed to parse 'exclude'"))?;
 
     if taxonomy.is_none()
         && ranks.is_none()
@@ -76,6 +76,12 @@ pub(crate) fn kractor_koutput(
                     .any(|(rank, taxa)| rank_taxon_sets.contains(&(rank, taxa)))
             })
             .collect();
+        if kreports.is_empty() {
+            return Err(anyhow!(
+                "No taxonomic matches found in the kreport file for {:?}.",
+                taxonomy
+            ));
+        }
     }
 
     let mut targeted_taxids: Vec<&[u8]>;
@@ -163,20 +169,7 @@ pub(crate) fn kractor_koutput(
             .collect()
     }
 
-    let patterns = targeted_taxids
-        .into_iter()
-        .map(|taxid| {
-            let mut v = Vec::with_capacity(b"(taxid ".len() + taxid.len() + 1); // estimated capacity
-            v.extend_from_slice(b"(taxid ");
-            v.extend_from_slice(taxid);
-            v.push(b')');
-            v
-        })
-        .collect::<Vec<_>>();
-
-    let include_aho = AhoCorasick::builder()
-        .kind(Some(AhoCorasickKind::DFA))
-        .build(patterns)?;
+    let include_sets = targeted_taxids.into_iter().collect::<HashSet<&[u8]>>();
 
     // A space-delimited list indicating the LCA mapping of each
     // k-mer in the sequence(s). For example, "562:13 561:4 A:31 0:1 562:3" would indicate that:
@@ -202,170 +195,31 @@ pub(crate) fn kractor_koutput(
                 .build(patterns)
         })
         .transpose()?;
+    let reader_style = progress_reader_style()?;
+    let writer_style = progress_writer_style()?;
+    let progress = MultiProgress::new();
+    let pb1 = progress.add(
+        ProgressBar::new(std::fs::metadata(koutput)?.len() as u64)
+            .with_finish(ProgressFinish::Abandon),
+    );
+    pb1.set_prefix("Reading koutput");
+    pb1.set_style(reader_style);
 
-    let file = File::open(koutput)?;
-    if mmap {
-        let map = unsafe { Mmap::map(&file) }?;
-        mmap_advice(&map)?;
-        let reader = SliceProgressBarReader::new(&map);
+    let pb2 = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
+    pb2.set_prefix("Writing koutput");
+    pb2.set_style(writer_style);
 
-        mmap_kractor_koutput(
-            include_aho,
-            exclude_aho,
-            reader,
-            ofile,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-        )
-    } else {
-        let style = progress_reader_style()?;
-        let pb =
-            ProgressBar::new(file.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon);
-        pb.set_prefix("Parsing koutput");
-        pb.set_style(style);
-        reader_kractor_koutput(
-            include_aho,
-            exclude_aho,
-            ProgressBarReader::new(&file, pb),
-            ofile,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-        )
-    }
-}
-
-pub(crate) static KOUTPUT_TAXID_PREFIX_FINDER: std::sync::LazyLock<memmem::Finder> =
-    std::sync::LazyLock::new(|| memmem::Finder::new("(taxid"));
-
-fn kractor_match_aho(
-    include_aho: &AhoCorasick,
-    exclude_aho: &Option<AhoCorasick>,
-    line: &[u8],
-) -> bool {
-    // println!("Matching line: {:?}", String::from_utf8_lossy(line));
-    // Efficient 3rd column parsing
-    let mut field_start = 0usize;
-    let mut field_index = 0usize;
-    while let Some(tab_pos) = memchr(b'\t', &line[field_start ..]) {
-        if field_index == 2 {
-            // we don't include the last `\t`
-            let taxid = &line[field_start .. (field_start + tab_pos)];
-            if let Some(start) = KOUTPUT_TAXID_PREFIX_FINDER.find(taxid) {
-                let mut input = aho_corasick::Input::new(taxid);
-                input.set_start(start);
-                if include_aho.find(input).is_none() {
-                    return false;
-                } else if exclude_aho.is_none() {
-                    return true;
-                }
-            } else {
-                return false;
-            }
-        } else if field_index == 3 {
-            // Field 4 (LCA): remainder after the last tab
-            field_start += tab_pos + 1;
-            let lca;
-            if let Some(pos) = memchr(b'\t', &line[field_start ..]) {
-                lca = &line[field_start .. (field_start + pos)]
-            } else {
-                lca = &line[field_start ..]
-            };
-            if let Some(ref exclude_matcher) = exclude_aho {
-                return exclude_matcher.find(lca).is_none();
-            }
-        }
-        field_index += 1;
-        field_start += tab_pos + 1;
-    }
-    false
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs::{read_to_string, File};
-    use std::io::Write;
-
-    use anyhow::Result;
-    use tempfile::tempdir;
-
-    use super::*;
-
-    fn write_sample_koutput(path: &std::path::Path) -> Result<()> {
-        let mut file = File::create(path)?;
-        writeln!(file, "read1\tumi1\t(taxid12345)\tother")?;
-        writeln!(file, "read2\tumi2\t(taxid54321)\tother")?;
-        writeln!(file, "read3\tumi3\t(no_taxid)\tother")?;
-        writeln!(file, "read4\tumi4\t(taxid99999)\tother")?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_reader_kractor_koutput() -> Result<()> {
-        let dir = tempdir()?;
-        let input_path = dir.path().join("input.txt");
-        let output_path = dir.path().join("output.txt");
-
-        write_sample_koutput(&input_path)?;
-
-        let patterns = &["taxid12345", "taxid99999"];
-        let matcher = AhoCorasick::builder()
-            .kind(Some(AhoCorasickKind::DFA))
-            .build(patterns)?;
-        let file = File::open(input_path).unwrap();
-        reader_kractor_koutput(
-            matcher,
-            None,
-            file,
-            output_path.to_str().unwrap(),
-            2,
-            64,
-            64,
-            Some(10),
-        )?;
-
-        let output = read_to_string(output_path)?;
-        assert!(output.contains("taxid12345"));
-        assert!(output.contains("taxid99999"));
-        assert!(!output.contains("taxid54321"));
-        assert!(!output.contains("no_taxid"));
-        Ok(())
-    }
-
-    #[test]
-    fn test_mmap_kractor_koutput() -> Result<()> {
-        let dir = tempdir()?;
-        let input_path = dir.path().join("input.txt");
-        let output_path = dir.path().join("output.txt");
-
-        write_sample_koutput(&input_path)?;
-
-        let patterns = &["taxid54321"];
-        let matcher = AhoCorasick::builder()
-            .kind(Some(AhoCorasickKind::DFA))
-            .build(patterns)?;
-        let file = File::open(input_path).unwrap();
-        let map = unsafe { Mmap::map(&file) }?;
-        mmap_advice(&map)?;
-        let reader = SliceProgressBarReader::new(&map);
-        mmap_kractor_koutput(
-            matcher,
-            None,
-            reader,
-            output_path.to_str().unwrap(),
-            2,
-            64,
-            10,
-            Some(10),
-        )?;
-
-        let output = read_to_string(output_path)?;
-        assert!(output.contains("taxid54321"));
-        assert!(!output.contains("taxid12345"));
-        assert!(!output.contains("taxid99999"));
-        Ok(())
-    }
+    parse::parse_koutput(
+        koutput,
+        Some(pb1),
+        ofile,
+        Some(pb2),
+        include_sets,
+        exclude_aho,
+        compression_level,
+        batch_size,
+        chunk_bytes,
+        nqueue,
+        threads,
+    )
 }

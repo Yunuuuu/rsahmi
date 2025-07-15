@@ -1,7 +1,6 @@
 use extendr_api::prelude::*;
 
 mod batchsender;
-mod bench;
 mod fastq_reader;
 mod koutput_reads;
 mod kractor;
@@ -36,5 +35,4 @@ extendr_module! {
     use seq_refine;
     use koutput_reads;
     use kractor;
-    use bench;
 }
