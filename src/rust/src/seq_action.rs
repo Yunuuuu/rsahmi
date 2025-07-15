@@ -339,7 +339,6 @@ impl TryFrom<&Robj> for SeqAction {
 
 fn make_description(tag_map: &HashMap<Bytes, Vec<&[u8]>>, desc: &Option<&[u8]>) -> Bytes {
     // add prefix, tag and seprator
-    let suffix = b'}';
     let mut out = BytesMut::with_capacity(
         // original description length
         desc.map_or(0, |d| d.len() + 1)
@@ -367,6 +366,6 @@ fn make_description(tag_map: &HashMap<Bytes, Vec<&[u8]>>, desc: &Option<&[u8]>) 
             out.extend_from_slice(seq);
         }
     }
-    out.put_u8(suffix);
+    out.put_u8(TAG_SUFFIX);
     out.freeze()
 }

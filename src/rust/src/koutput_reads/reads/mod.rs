@@ -33,6 +33,10 @@ pub(super) fn parse_reads(
     reader_pb1.set_prefix("Reading fq1");
     reader_pb1.set_style(reader_style.clone());
 
+    let writer_pb = ProgressBar::no_length().with_finish(ProgressFinish::Abandon);
+    writer_pb.set_prefix("Writing");
+    writer_pb.set_style(writer_style);
+
     let threads = threads.max(1); // always use at least one thread
     if let Some(fq2) = fq2 {
         let reader_pb2 = progress.add(
@@ -41,10 +45,7 @@ pub(super) fn parse_reads(
         );
         reader_pb2.set_prefix("Reading fq2");
         reader_pb2.set_style(reader_style);
-
-        let writer_pb = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
-        writer_pb.set_prefix("Writing");
-        writer_pb.set_style(writer_style);
+        let writer_pb = progress.add(writer_pb);
         paired::parse_paired_read(
             koutmap,
             fq1,
@@ -62,9 +63,7 @@ pub(super) fn parse_reads(
             threads,
         )
     } else {
-        let writer_pb = progress.add(ProgressBar::no_length().with_finish(ProgressFinish::Abandon));
-        writer_pb.set_prefix("Writing");
-        writer_pb.set_style(writer_style);
+        let writer_pb = progress.add(writer_pb);
         single::parse_single_read(
             koutmap,
             fq1,

@@ -213,7 +213,7 @@ fn koutput_reads_internal(
             let mut v = Vec::with_capacity(KOUTPUT_TAXID_PREFIX.len() + taxid.len() + 1); // estimated capacity
             v.extend_from_slice(KOUTPUT_TAXID_PREFIX);
             v.extend_from_slice(taxid);
-            v.push(b')');
+            v.push(KOUTPUT_TAXID_SUFFIX);
             v
         })
         .collect::<Vec<_>>();

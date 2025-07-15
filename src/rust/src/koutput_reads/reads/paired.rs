@@ -58,6 +58,9 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file
         let writer_handle = scope.spawn(move || -> Result<()> {
+            if let Some(bar) = &output_bar {
+                bar.tick();
+            }
             let mut writer = BufWriter::with_capacity(chunk_bytes, new_writer(output, output_bar)?);
 
             // Iterate over each received batch of records
