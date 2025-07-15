@@ -33,10 +33,8 @@ pub(super) fn parse_reads(
     reader_pb1.set_style(reader_style.clone());
 
     let matching_pb = ProgressBar::no_length().with_finish(ProgressFinish::Abandon);
-    matching_pb.set_prefix("Matching");
-    matching_pb.set_message("reads");
     matching_pb.set_style(ProgressStyle::with_template(
-        "{prefix:.bold.cyan/blue} {human_len} {msg} {spinner:.green}",
+        "Matching {human_len.bold.cyan/blue} reads {spinner:.green}",
     )?);
 
     let threads = threads.max(1); // always use at least one thread
