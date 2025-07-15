@@ -54,7 +54,7 @@ fn koutput_reads(
 }
 
 #[extendr]
-#[cfg(any(feature = "bench", feature = "bench-isal"))]
+#[cfg(feature = "bench")]
 fn pprof_koutput_reads(
     kreport: &str,
     koutput: &str,
@@ -281,13 +281,13 @@ fn koutput_reads_internal(
     Ok(())
 }
 
-#[cfg(not(any(feature = "bench", feature = "bench-isal")))]
+#[cfg(not(feature = "bench"))]
 extendr_module! {
     mod koutput_reads;
     fn koutput_reads;
 }
 
-#[cfg(any(feature = "bench", feature = "bench-isal"))]
+#[cfg(feature = "bench")]
 extendr_module! {
     mod koutput_reads;
     fn koutput_reads;

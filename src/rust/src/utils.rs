@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::{anyhow, Context, Result};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
-#[cfg(feature = "flate2")]
+#[cfg(not(feature = "isal"))]
 use flate2::bufread::GzDecoder;
 use indicatif::style::TemplateError;
 use indicatif::ProgressBar;
@@ -93,7 +93,7 @@ pub(crate) fn new_reader<P: AsRef<Path> + ?Sized>(
     Ok(reader)
 }
 
-#[cfg(feature = "flate2")]
+#[cfg(not(feature = "isal"))]
 pub(crate) fn new_reader<P: AsRef<Path> + ?Sized>(
     file: &P,
     buffer_size: usize,

@@ -55,9 +55,10 @@ if (!is_not_cran) {
 }
 
 if (nzchar(input_features)) {
-  .features <- unique(strsplit(input_features, ",")[[1L]])
+  .features <- unique(strsplit(input_features, "[, ]")[[1L]])
   .features <- .features[nzchar(.features)]
   if (length(.features)) {
+    # Space or comma separated list of features to activate
     .features <- paste(.features, collapse = ",")
     message("Using input features: ", .features)
     .features <- sprintf("--features %s", .features)

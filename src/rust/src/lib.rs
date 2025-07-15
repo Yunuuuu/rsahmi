@@ -1,9 +1,3 @@
-#[cfg(all(not(feature = "isal"), not(feature = "flate2")))]
-compile_error!("At least one compression backend 'flate2' (default) or 'isal' must be enabled.");
-
-#[cfg(all(feature = "isal", feature = "flate2"))]
-compile_error!("Feature 'flate2' and 'isal' cannot be enabled at the same time");
-
 use extendr_api::prelude::*;
 
 mod batchsender;

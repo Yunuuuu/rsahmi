@@ -60,7 +60,7 @@ fn seq_refine(
 }
 
 #[extendr]
-#[cfg(any(feature = "bench", feature = "bench-isal"))]
+#[cfg(feature = "bench")]
 fn pprof_seq_refine(
     fq1: &str,
     ofile1: Option<&str>,
@@ -218,13 +218,13 @@ fn seq_refine_paired_read(
     )
 }
 
-#[cfg(not(any(feature = "bench", feature = "bench-isal")))]
+#[cfg(not(feature = "bench"))]
 extendr_module! {
     mod seq_refine;
     fn seq_refine;
 }
 
-#[cfg(any(feature = "bench", feature = "bench-isal"))]
+#[cfg(feature = "bench")]
 extendr_module! {
     mod seq_refine;
     fn seq_refine;

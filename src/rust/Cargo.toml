@@ -19,7 +19,7 @@ crossbeam-channel = { version = "*" }
 memchr = { version = "*" }
 aho-corasick = { version = "*" }
 rustc-hash = { version = "*" }
-flate2 = { version = "*", optional = true, features = ["zlib-rs"]}
+flate2 = { version = "*", features = ["zlib-rs"]}
 isal-rs = { version = "*", optional = true }
 libdeflater = { version = "*" }
 pprof = { version = "0.14", optional = true, features = ["flamegraph"] }
@@ -29,11 +29,8 @@ tempfile = '*'
 rand = "0.8"
 
 [features]
-default = ["flate2"]
-flate2 = ["dep:flate2"]
 isal = ["dep:isal-rs"]
-bench = ["dep:pprof", "flate2"]
-bench-isal = ["dep:pprof", "isal"]
+bench = ["dep:pprof"]
 
 [lints.clippy]
 needless_late_init = "allow"
