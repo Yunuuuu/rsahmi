@@ -4,8 +4,8 @@ use anyhow::Result;
 use bytes::{Bytes, BytesMut};
 use memchr::memchr2;
 
-use crate::parser::fastq::FastqParseError;
-use crate::parser::fastq::FastqRecord;
+use crate::fastq_record::FastqParseError;
+use crate::fastq_record::FastqRecord;
 use crate::reader0::*;
 
 pub(crate) struct FastqReader<R> {

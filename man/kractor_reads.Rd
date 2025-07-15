@@ -7,33 +7,41 @@
 kractor_reads(
   koutput,
   reads,
-  extract_reads = NULL,
-  chunk_size = NULL,
-  buffer_size = NULL,
+  ofile1 = NULL,
+  ofile2 = NULL,
   batch_size = NULL,
+  chunk_bytes = NULL,
+  compression_level = 4L,
   nqueue = NULL,
   threads = NULL,
-  odir = NULL,
-  mmap = TRUE
+  odir = NULL
 )
 }
 \arguments{
 \item{koutput}{Path to the Kraken2 output file.}
 
-\item{reads}{A character vector of FASTQ file paths, either the original
-reads used as input to Kraken2 or the classified output reads (recommended
-for efficiency as they are smaller). Accepts one file for single-end or two
-files for paired-end. Note: if \code{ubread} is specified, \code{reads} must be the
-original Kraken2 input reads to ensure correct barcode/UMI pairing.}
+\item{reads}{A character vector of FASTQ file paths. Accepts one file for
+single-end or two files for paired-end.}
 
-\item{extract_reads}{A character vector of the same length as \code{reads},
-specifying the output FASTQ file(s) where the matching reads will be saved.
-Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
+\item{ofile1}{Output FASTQ file path for the first read (\code{fq1}). Required
+when only one input file is given (i.e., single-end mode). Optional when two
+input files are used.}
+
+\item{ofile2}{Optional path to the output FASTQ file for \code{fq2}.}
 
 \item{batch_size}{Integer. Number of FASTQ records to accumulate before
 dispatching a chunk to worker threads for processing. This controls the
 granularity of parallel work and affects memory usage and performance.
 Default is \code{256}.}
+
+\item{chunk_bytes}{Integer specifying the size in bytes used for compressing
+and writing records in batches to disk. Default is \code{8 * 1024 * 1024}
+(8MB).}
+
+\item{compression_level}{Integer from 1 to 12 (default: \code{4}). This sets the
+gzip compression level when writing output files. A higher value increases
+compression ratio but may slow down writing. Only applies when output
+filenames end with \code{.gz}.}
 
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
 amount of in-flight data awaiting writing. Default: \code{3}. Setting this too
@@ -43,13 +51,6 @@ high may increase memory consumption without performance gain.}
 
 \item{odir}{A string of directory to save the output files. Please see
 \code{Value} section for details.}
-
-\item{mmap}{Logical. Whether to enable memory-mapped file access for reading
-input sequence files. When set to \code{TRUE}, the function uses memory mapping
-to reduce data copying and improve performance in multi-threaded
-environments. This can be highly efficient on some systems, but
-performance gains may vary depending on the operating system and file
-system. Defaults to \code{TRUE}.}
 }
 \description{
 This function extracts reads corresponding to selected classifications from a

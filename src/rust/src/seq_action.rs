@@ -3,7 +3,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use extendr_api::prelude::*;
 use rustc_hash::FxHashMap as HashMap;
 
-use crate::parser::fastq::FastqRecord;
+use crate::fastq_record::FastqRecord;
 use crate::seq_range::{check_overlap, SeqRange, SeqRanges};
 use crate::seq_tag::*;
 use crate::utils::*;

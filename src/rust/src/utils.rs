@@ -12,9 +12,6 @@ use indicatif::ProgressStyle;
 use isal::read::GzipDecoder;
 use libdeflater::Compressor;
 use memchr::memmem::Finder;
-#[cfg(unix)]
-use memmap2::Advice;
-use memmap2::Mmap;
 
 use crate::reader0::*;
 
@@ -120,14 +117,4 @@ pub(crate) fn progress_writer_style() -> std::result::Result<ProgressStyle, Temp
     ProgressStyle::with_template(
         "{prefix:.bold.cyan/blue} {decimal_bytes} {spinner:.green} {decimal_bytes_per_sec}",
     )
-}
-
-pub(crate) fn mmap_advice(map: &Mmap) -> anyhow::Result<()> {
-    #[cfg(unix)]
-    if Advice::WillNeed.is_supported() {
-        map.advise(Advice::WillNeed)?;
-    } else if Advice::Sequential.is_supported() {
-        map.advise(Advice::Sequential)?;
-    }
-    Ok(())
 }

@@ -44,35 +44,28 @@ fn kractor_koutput(
 fn kractor_reads(
     koutput: &str,
     fq1: &str,
-    ofile1: &str,
+    ofile1: Option<&str>,
     fq2: Option<&str>,
     ofile2: Option<&str>,
-    chunk_size: usize,
-    buffer_size: usize,
+    compression_level: i32,
     batch_size: usize,
+    chunk_bytes: usize,
     nqueue: Option<usize>,
-    mmap: bool,
     threads: usize,
 ) -> std::result::Result<(), String> {
-    let rayon_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(threads)
-        .build()
-        .map_err(|e| format!("Failed to initialize rayon thread pool: {:?}", e))?;
-    rayon_pool.install(|| {
-        reads::kractor_reads(
-            koutput,
-            fq1,
-            ofile1,
-            fq2,
-            ofile2,
-            chunk_size,
-            buffer_size,
-            batch_size,
-            nqueue,
-            mmap,
-        )
-        .map_err(|e| format!("{}", e))
-    })
+    reads::kractor_reads(
+        koutput,
+        fq1,
+        ofile1,
+        fq2,
+        ofile2,
+        compression_level,
+        batch_size,
+        chunk_bytes,
+        nqueue,
+        threads,
+    )
+    .map_err(|e| format!("{}", e))
 }
 
 #[extendr]
@@ -135,42 +128,43 @@ fn pprof_kractor_koutput(
 fn pprof_kractor_reads(
     koutput: &str,
     fq1: &str,
-    ofile1: &str,
+    ofile1: Option<&str>,
     fq2: Option<&str>,
     ofile2: Option<&str>,
-    chunk_size: usize,
-    buffer_size: usize,
+    compression_level: i32,
     batch_size: usize,
+    chunk_bytes: usize,
     nqueue: Option<usize>,
-    mmap: bool,
     threads: usize,
     pprof_file: &str,
 ) -> std::result::Result<(), String> {
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(2000)
         .build()
-        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+        .with_context(|| format!("cannot create profile guard"))
+        .map_err(|e| format!("{:?}", e))?;
     let out = kractor_reads(
         koutput,
         fq1,
         ofile1,
         fq2,
         ofile2,
-        chunk_size,
-        buffer_size,
+        compression_level,
         batch_size,
+        chunk_bytes,
         nqueue,
-        mmap,
         threads,
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file)
-            .map_err(|e| format!("Failed to create file {}: {}", pprof_file, e))?;
+            .with_context(|| format!("Failed to create file {}", pprof_file))
+            .map_err(|e| format!("{:?}", e))?;
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
         report
             .flamegraph_with_options(file, &mut options)
-            .map_err(|e| format!("Failed to write flamegraph to {}: {}", pprof_file, e))?;
+            .with_context(|| format!("Failed to write flamegraph to {}", pprof_file))
+            .map_err(|e| format!("{:?}", e))?;
     };
     out
 }

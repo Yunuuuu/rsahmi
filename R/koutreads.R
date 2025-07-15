@@ -90,6 +90,15 @@ rust_koutreads <- function(kreport, koutput, reads, ofile,
     assert_string(ofile, allow_empty = FALSE, allow_null = FALSE)
     tag_ranges1 <- check_tag_ranges(tag_ranges1)
     tag_ranges2 <- check_tag_ranges(tag_ranges2)
+    if (!is.null(taxonomy)) {
+        taxonomy <- as.character(taxonomy)
+        taxonomy <- taxonomy[!is.na(taxonomy)]
+        if (length(taxonomy) == 0L) taxonomy <- NULL
+    }
+    if (!is.null(exclude)) {
+        exclude <- as.character(exclude)
+        if (length(exclude) == 0L) exclude <- NULL
+    }
     assert_number_whole(koutput_batch, min = 1, allow_null = TRUE)
     assert_number_whole(fastq_batch, min = 1, allow_null = TRUE)
     assert_number_whole(chunk_bytes, min = 1, allow_null = TRUE)

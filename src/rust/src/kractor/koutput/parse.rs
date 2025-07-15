@@ -197,3 +197,80 @@ fn kractor_match_aho(
     }
     false
 }
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+    use std::fs;
+
+    use aho_corasick::AhoCorasick;
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_koutput_basic_gzip() -> Result<()> {
+        let temp = tempdir()?;
+        let input_path = temp.path().join("kout.txt");
+        let output_path = temp.path().join("out.gz");
+
+        // Sample kraken2 output line (tab-separated)
+        let sample = "\
+C\tread1\tkraken:(taxid 123)\t123\tBacteria
+C\tread2\t456\t456\tFungi
+";
+        fs::write(&input_path, sample)?;
+
+        let mut include = HashSet::default();
+        include.insert(b"123".as_ref());
+
+        let exclude = None; // No exclusion
+
+        parse_koutput(
+            &input_path,
+            None,
+            &output_path,
+            None,
+            include,
+            exclude,
+            3,          // compression level
+            10,         // batch size
+            512 * 1024, // chunk_bytes
+            Some(2),    // nqueue
+            2,          // threads
+        )?;
+
+        // Verify output file exists and is non-empty
+        let out_content = fs::read(&output_path)?;
+        assert!(!out_content.is_empty(), "Output gzip is empty");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_kractor_match_aho() {
+        let mut include = HashSet::default();
+        include.insert(b"999".as_ref());
+
+        let exclude = Some(AhoCorasick::new(["Fungi", "Viruses"]).unwrap());
+
+        // Simulate a Kraken output line matching taxid 999 and LCA "Bacteria"
+        let line = b"C\tid\tkraken:(taxid 999)\t999\tBacteria";
+
+        assert!(kractor_match_aho(&include, &exclude, line));
+        let line = b"C\tid\t999\t999\tBacteria";
+
+        assert!(kractor_match_aho(&include, &exclude, line));
+    }
+
+    #[test]
+    fn test_exclude_match_should_fail() {
+        let mut include = HashSet::default();
+        include.insert(b"456".as_ref());
+
+        let exclude = Some(AhoCorasick::new(["Fungi"]).unwrap());
+
+        // LCA is "Fungi", should be excluded
+        let line = b"C\tid\tkraken:taxid|456\t456\tFungi";
+        assert!(!kractor_match_aho(&include, &exclude, line));
+    }
+}

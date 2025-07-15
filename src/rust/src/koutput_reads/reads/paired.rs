@@ -15,7 +15,7 @@ use super::stream::RecordHandler;
 use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
 use crate::koutput_reads::reads::stream::KoutreadStream;
-use crate::parser::fastq::FastqRecord;
+use crate::fastq_record::FastqRecord;
 use crate::seq_tag::*;
 use crate::utils::*;
 

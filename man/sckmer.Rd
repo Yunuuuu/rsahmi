@@ -22,8 +22,6 @@ sckmer(
 )
 }
 \arguments{
-\item{kreport}{Path to the Kraken2 report file.}
-
 \item{koutput}{Path to the extracted Kraken2 output file, typically
 filtered using \code{\link[=kractor]{kractor()}}.}
 
@@ -60,9 +58,6 @@ Reads with any k-mers mapped to the \code{exclude} are discarded.}
 
 \item{threads}{Integer. Number of threads to use. Default to all
 available threads.}
-
-\item{odir}{A string of directory to save the output files. Please see
-\code{Value} section for details.}
 }
 \value{
 None. This function generates the following files:

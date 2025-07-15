@@ -1,20 +1,6 @@
-#' Benchmark File Reading with Optional Memory Mapping
-#'
-#' This function benchmarks the reading performance of a file by processing it
-#' in chunks. It allows for optional memory-mapped file access, which can
-#' improve performance in multi-threaded environments by reducing memory
-#' copying.
-#'
-#' @inheritParams kractor
-#' @export
-bench_read <- function(file, chunk_size = NULL, mmap = TRUE) {
-    assert_string(file, allow_empty = FALSE, allow_null = FALSE)
-    assert_number_whole(chunk_size, min = 1, allow_null = TRUE)
-    assert_bool(mmap)
-    chunk_size <- chunk_size %||% CHUNK_SIZE
-    rust_call("bench_read", file = file, chunk_size = chunk_size, mmap = mmap)
-    cli::cli_inform(c("v" = "Finished"))
-}
+FASTQ_BATCH <- 256
+KOUTPUT_BATCH <- 1000
+CHUNK_BYTES <- 8L * 1024L * 1024L
 
 # mimic polars str methods ---------------------------
 # https://rpolars.github.io/man/ExprStr_contains_any.html

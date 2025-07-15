@@ -6,19 +6,19 @@ use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
 use libdeflater::{CompressionLvl, Compressor};
+use rustc_hash::FxHashSet as HashSet;
 
 use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
 use crate::fastq_record::FastqRecord;
-use crate::seq_action::*;
 use crate::utils::*;
 
-pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
+pub(super) fn parse_single<P: AsRef<Path> + ?Sized>(
+    id_sets: &HashSet<&[u8]>,
     input_path: &P,
     input_bar: Option<ProgressBar>,
     output_path: &P,
     output_bar: Option<ProgressBar>,
-    actions: &SubseqActions,
     compression_level: i32,
     batch_size: usize,
     chunk_bytes: usize,
@@ -74,26 +74,26 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
                 let mut records_pool: Vec<u8> = Vec::with_capacity(chunk_bytes);
                 let mut compressor = Compressor::new(compression_level);
                 while let Ok(records) = rx.recv() {
-                    for mut record in records {
-                        // Apply trimming, tag embedding, and other sequence transformations
-                        actions.transform_fastq(&mut record)?;
+                    for record in records {
+                        if id_sets.contains(record.id.as_ref()) {
+                            // Flush when pool is too full to accept the next record.
+                            // This ensures output chunks remain near the target block size.
+                            if records_pool.capacity() - records_pool.len() < record.bytes_size() {
+                                let mut pack = Vec::with_capacity(chunk_bytes);
+                                std::mem::swap(&mut records_pool, &mut pack);
+                                // Compress if gzip file
+                                if gzip {
+                                    pack = gzip_pack(&pack, &mut compressor)?
+                                }
 
-                        // Flush when pool is too full to accept the next record.
-                        // This ensures output chunks remain near the target block size.
-                        if records_pool.capacity() - records_pool.len() < record.bytes_size() {
-                            let mut pack = Vec::with_capacity(chunk_bytes);
-                            std::mem::swap(&mut records_pool, &mut pack);
-                            // Compress if gzip file
-                            if gzip {
-                                pack = gzip_pack(&pack, &mut compressor)?
+                                // Send compressed or raw bytes to writer
+                                tx.send(pack).with_context(|| {
+                                    format!(
+                                        "(Parser) Failed to send parsed record to Writer thread"
+                                    )
+                                })?;
                             }
-
-                            // Send compressed or raw bytes to writer
-                            tx.send(pack).with_context(|| {
-                                format!("(Parser) Failed to send parsed record to Writer thread")
-                            })?;
                         }
-
                         // Append encoded record to buffer
                         record.extend(&mut records_pool);
                     }
@@ -150,80 +150,4 @@ pub(crate) fn seq_refine_single_read<P: AsRef<Path> + ?Sized>(
             .map_err(|e| anyhow!("(Reader) thread panicked: {:?}", e))??;
         Ok(())
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io::Write;
-
-    use tempfile::NamedTempFile;
-
-    use super::*;
-    use crate::seq_action::{SeqAction, SubseqActions};
-    use crate::seq_range::{SeqRange, SeqRanges};
-
-    fn dummy_fastq() -> &'static [u8] {
-        b"@SEQ_ID\nGATTTGGGG\n+\nIIIIIIIII\n@SEQ_ID2\nTTACAGGGA\n+\nIIIIIIIII\n"
-    }
-
-    #[test]
-    fn test_reader_seq_refine_single_read() {
-        // Write dummy FASTQ to temp input file
-        let mut input_file = NamedTempFile::new().expect("failed to create temp input file");
-        input_file
-            .write_all(dummy_fastq())
-            .expect("failed to write FASTQ");
-
-        let input_path = input_file.path().to_path_buf();
-
-        // Prepare temp output file
-        let output_file = NamedTempFile::new().expect("failed to create temp output file");
-        let output_path = output_file.path().to_path_buf();
-
-        // Define UMI extraction action
-        let ranges: SeqRanges = vec![SeqRange::From(3), SeqRange::To(2)]
-            .into_iter()
-            .collect();
-        let mut builder = SubseqActions::builder();
-        builder
-            .add_action(
-                SeqAction::Embed(Bytes::from_owner("UMI".as_bytes())),
-                ranges,
-            )
-            .unwrap();
-        let actions = builder.build().unwrap();
-
-        // Call the function
-        let result = seq_refine_single_read(
-            &input_path,
-            None, // No progress bar
-            &output_path,
-            None, // No progress bar
-            &actions,
-            1,       // No compression
-            1,       // chunk size
-            8192,    // buffer size
-            Some(2), // queue size
-            2,       // threads
-        );
-
-        assert!(
-            result.is_ok(),
-            "reader_seq_refine_single_read failed: {:?}",
-            result
-        );
-
-        // Check output contents
-        let output_contents = std::fs::read_to_string(output_path).expect("failed to read output");
-        assert!(
-            output_contents.contains("@SEQ_ID RSAHMI{UMI:GATTGGGG}"),
-            "Unexpected output: {}",
-            output_contents
-        );
-        assert!(
-            output_contents.contains("@SEQ_ID2 RSAHMI{UMI:TTCAGGGA}"),
-            "Unexpected output: {}",
-            output_contents
-        );
-    }
 }

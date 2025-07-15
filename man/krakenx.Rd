@@ -58,23 +58,14 @@ from \url{https://benlangmead.github.io/aws-indexes/k2}, or build your own by
 following the instructions at
 \url{https://github.com/DerrickWood/kraken2/wiki/Manual#kraken-2-databases}.}
 
-\item{kreport}{Path to the Kraken2 report file.}
-
-\item{koutput}{Path to the Kraken2 output file.}
+\item{koutput}{Path to the extracted Kraken2 output file, typically
+filtered using \code{\link[=kractor]{kractor()}}.}
 
 \item{classified_out}{A string of path to save classified sequences, which
 should be a fastq file.}
 
 \item{unclassified_out}{A string of path to save unclassified sequences,
 which should be a fastq file.}
-
-\item{extract_koutput}{Path to the file where the extracted Kraken2 output
-matching the specified \code{taxon} will be saved. Defaults to
-\code{"kraken_microbiome_output.txt"}.}
-
-\item{extract_reads}{A character vector of the same length as \code{reads},
-specifying the output FASTQ file(s) where the matching reads will be saved.
-Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
 
 \item{extract_kreport}{Path to the file where the extracted Kraken2 report,
 matched to \code{koutput}, will be saved. Defaults to
@@ -88,17 +79,7 @@ derived from \code{koutput}, will be saved. Defaults to
 derived from \code{koutput}, will be saved. Defaults to
 \code{"kraken_microbiome_umi.txt"}.}
 
-\item{ranks}{Character vector. The taxonomic ranks to filter by. Default:
-\code{c("G", "S")} (optional).}
-
-\item{batch_size}{Integer. Number of FASTQ records to accumulate before
-dispatching a chunk to worker threads for processing. This controls the
-granularity of parallel work and affects memory usage and performance.
-Default is \code{256}.}
-
-\item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
-amount of in-flight data awaiting writing. Default: \code{3}. Setting this too
-high may increase memory consumption without performance gain.}
+\item{ranks}{Taxa ranks to analyze.}
 
 \item{kmer_len}{Kraken kmer length. Default: \code{35L}, which is the default kmer
 size of kraken2.}
@@ -109,13 +90,6 @@ are also discarded.}
 
 \item{exclude}{A character of taxid to exclude, for \code{SAHMI}, the host taxid.
 Reads with any k-mers mapped to the \code{exclude} are discarded.}
-
-\item{mmap_koutput, mmap_reads}{Logical. Whether to enable memory-mapped file
-access for reading input FASTQ reads (\code{mmap_reads}) or Kraken2 output
-(\code{mmap_koutput}). When set to \code{TRUE}, the function uses memory mapping to
-reduce data copying and improve performance in multi-threaded environments.
-This can be highly efficient on some systems, but performance gains may
-vary depending on the operating system and file system. Defaults to \code{TRUE}.}
 
 \item{kraken2_threads}{Integer. Number of threads to use. Default to all
 available threads.}

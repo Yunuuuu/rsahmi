@@ -7,17 +7,17 @@
 kractor_koutput(
   kreport,
   koutput,
-  extract_koutput = NULL,
+  ofile = NULL,
   taxonomy = c("D__Bacteria", "D__Fungi", "D__Viruses"),
-  ranks = c("G", "S"),
+  ranks = NULL,
   taxa = NULL,
   taxids = NULL,
+  exclude = NULL,
   descendants = TRUE,
-  chunk_size = NULL,
-  buffer_size = NULL,
   batch_size = NULL,
+  chunk_bytes = NULL,
+  compression_level = 4L,
   nqueue = NULL,
-  mmap = TRUE,
   threads = NULL,
   odir = NULL
 )
@@ -27,10 +27,6 @@ kractor_koutput(
 
 \item{koutput}{Path to the Kraken2 output file.}
 
-\item{extract_koutput}{Path to the file where the extracted Kraken2 output
-matching the specified \code{taxon} will be saved. Defaults to
-\code{"kraken_microbiome_output.txt"}.}
-
 \item{taxonomy}{Character vector. The set of taxonomic groups to include
 (default: \code{c("D__Bacteria", "D__Fungi", "D__Viruses")}). This defines the
 global taxa to consider. If \code{NULL}, all taxa will be used. If \code{descendants = TRUE}, only the descendants within these groups will be considered. The
@@ -38,32 +34,30 @@ selection of taxa can be further refined using the \code{ranks}, \code{taxa}, an
 \code{taxids} parameters. One of \code{taxonomy}, \code{ranks}, \code{taxa}, or \code{taxids} must be
 provided.}
 
-\item{ranks}{Character vector. The taxonomic ranks to filter by. Default:
-\code{c("G", "S")} (optional).}
+\item{ranks}{Character vector. The taxonomic ranks to filter by (optional).}
 
 \item{taxa}{Character vector. Specific taxa to include (optional).}
 
 \item{taxids}{Character vector. A list of taxid values to filter by
 (optional).}
 
+\item{exclude}{A character vector of taxids to exclude sequences from usage.}
+
 \item{descendants}{Logical. Whether to include descendants of the selected
 taxa (default: \code{TRUE}).}
 
-\item{batch_size}{Integer. Number of FASTQ records to accumulate before
-dispatching a chunk to worker threads for processing. This controls the
-granularity of parallel work and affects memory usage and performance.
-Default is \code{256}.}
+\item{chunk_bytes}{Integer specifying the size in bytes used for compressing
+and writing records in batches to disk. Default is \code{8 * 1024 * 1024}
+(8MB).}
+
+\item{compression_level}{Integer from 1 to 12 (default: \code{4}). This sets the
+gzip compression level when writing output files. A higher value increases
+compression ratio but may slow down writing. Only applies when output
+filenames end with \code{.gz}.}
 
 \item{nqueue}{Integer. Maximum number of buffers per thread, controlling the
 amount of in-flight data awaiting writing. Default: \code{3}. Setting this too
 high may increase memory consumption without performance gain.}
-
-\item{mmap}{Logical. Whether to enable memory-mapped file access for reading
-input Kraken2 output. When set to \code{TRUE}, the function uses memory mapping
-to reduce data copying and improve performance in multi-threaded
-environments. This can be highly efficient on some systems, but
-performance gains may vary depending on the operating system and file
-system. Defaults to \code{TRUE}.}
 
 \item{threads}{Integer. Number of threads to use. Default: \code{3}.}
 

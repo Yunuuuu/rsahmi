@@ -2,11 +2,10 @@ use extendr_api::prelude::*;
 
 mod batchsender;
 mod fastq_reader;
+mod fastq_record;
 mod koutput_reads;
 mod kractor;
 mod kreport;
-mod parser;
-mod reader;
 mod reader0;
 mod seq_action;
 mod seq_range;

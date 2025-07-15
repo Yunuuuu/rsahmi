@@ -8,14 +8,15 @@ use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
 use libdeflater::{CompressionLvl, Compressor};
+use rustc_hash::FxHashSet as HashSet;
 
 use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
 use crate::fastq_record::FastqRecord;
-use crate::seq_action::*;
 use crate::utils::*;
 
-pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
+pub(super) fn parse_paired<P: AsRef<Path> + ?Sized>(
+    id_sets: &HashSet<&[u8]>,
     input1_path: &P,
     input1_bar: Option<ProgressBar>,
     input2_path: &P,
@@ -24,7 +25,6 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
     output1_bar: Option<ProgressBar>,
     output2_path: Option<&P>,
     output2_bar: Option<ProgressBar>,
-    actions: &SubseqPairedActions,
     compression_level: i32,
     batch_size: usize,
     chunk_bytes: usize,
@@ -130,7 +130,7 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                 let mut compressor = Compressor::new(compression_level);
                 while let Ok((records1, records2)) = rx.recv() {
                     // Initialize a thread-local batch sender for matching records
-                    for (mut record1, mut record2) in zip(records1, records2) {
+                    for (record1, record2) in zip(records1, records2) {
                         if record1.id != record2.id {
                             return Err(anyhow!(
                                 "FASTQ pairing error: record1 ID = {}, record2 ID = {}. These records do not match and cannot be paired.",
@@ -138,7 +138,7 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                                 String::from_utf8_lossy(&record2.id)
                             ));
                         }
-                        actions.transform_fastq(&mut record1, &mut record2)?;
+                        if id_sets.contains(record1.id.as_ref()) {
                         if records1_pool.capacity() - records1_pool.len() < record1.bytes_size() ||
                             records2_pool.capacity() - records2_pool.len() < record2.bytes_size() {
                             let pack1 = if has_writer1 {
@@ -169,6 +169,7 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                         }
                         record1.extend(&mut records1_pool);
                         record2.extend(&mut records2_pool);
+                    }
                     }
                 }
                 if !records1_pool.is_empty() {
@@ -309,84 +310,4 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             .map_err(|e| anyhow!("(Reader2) thread panicked: {:?}", e))??;
         Ok(())
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs::File;
-    use std::io::Read;
-
-    use isal::read::GzipDecoder;
-
-    use super::*;
-    use crate::seq_action::{SeqAction, SubseqActions};
-    use crate::seq_range::{SeqRange, SeqRanges};
-
-    #[test]
-    fn test_reader_seq_refine_paired_read_passthrough() -> Result<()> {
-        use std::fs::write;
-
-        // Sample paired-end FASTQ records (matching IDs)
-        let read1 = b"@SEQ_ID1\nACGT\n+\n!!!!\n@SEQ_ID2\nTGCA\n+\n####\n";
-        let read2 = b"@SEQ_ID1\nTTAA\n+\n$$$$\n@SEQ_ID2\nAATT\n+\n%%%%\n";
-
-        // Create temp directory and files
-        let tmp = tempfile::tempdir()?;
-        let in1_path = tmp.path().join("read1.fq");
-        let in2_path = tmp.path().join("read2.fq");
-        let out1_path = tmp.path().join("out1.fq.gz");
-        let out2_path = tmp.path().join("out2.fq.gz");
-
-        write(&in1_path, read1)?;
-        write(&in2_path, read2)?;
-
-        // UMI extraction rule
-        let ranges: SeqRanges = vec![SeqRange::From(3), SeqRange::To(2)]
-            .into_iter()
-            .collect();
-        let mut actions = SubseqActions::builder();
-        actions
-            .add_action(
-                SeqAction::Embed(Bytes::from_owner("UMI".as_bytes())),
-                ranges,
-            )
-            .unwrap();
-        let paired_actions = SubseqPairedActions::new(Some(actions.build().unwrap()), None);
-
-        // Run paired reader pipeline
-        seq_refine_paired_read(
-            &in1_path,
-            None,
-            &in2_path,
-            None,
-            Some(&out1_path),
-            None,
-            Some(&out2_path),
-            None,
-            &paired_actions,
-            4,         // compression
-            1,         // chunk size
-            64 * 1024, // buffer size
-            Some(2),   // queue size
-            1,         // threads
-        )?;
-
-        // Decompress and read output
-        let mut buf1 = String::new();
-        GzipDecoder::new(File::open(out1_path)?).read_to_string(&mut buf1)?;
-        let mut buf2 = String::new();
-        GzipDecoder::new(File::open(out2_path)?).read_to_string(&mut buf2)?;
-
-        // Check contents
-        assert_eq!(
-            buf1.as_bytes(),
-            b"@SEQ_ID1 RSAHMI{UMI:ACT}\nACGT\n+\n!!!!\n@SEQ_ID2 RSAHMI{UMI:TGA}\nTGCA\n+\n####\n"
-        );
-        assert_eq!(
-            buf2.as_bytes(),
-            b"@SEQ_ID1 RSAHMI{UMI:ACT}\nTTAA\n+\n$$$$\n@SEQ_ID2 RSAHMI{UMI:TGA}\nAATT\n+\n%%%%\n"
-        );
-
-        Ok(())
-    }
 }
