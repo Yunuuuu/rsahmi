@@ -15,14 +15,20 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
     let mut ancestors = Vec::with_capacity(10);
     let mut pos = 0; // The line offset of the ancestors
     while let Some(line) = reader.read_line()? {
+        if line.iter().all(|b| b.is_ascii_whitespace()) {
+            continue;
+        }
         let line = line.freeze();
         let fields: Vec<&[u8]> = line.split(|b| *b == b'\t').collect();
         // Parse fixed columns
         let percents = parse_f64(fields[0])
+            .with_context(|| format!("Failed to parse kraken report: {}", path.display()))
             .with_context(|| format!("Failed to parse line: {}", String::from_utf8_lossy(&line)))?;
         let total_reads = parse_usize(fields[1])
+            .with_context(|| format!("Failed to parse kraken report: {}", path.display()))
             .with_context(|| format!("Failed to parse line: {}", String::from_utf8_lossy(&line)))?;
         let reads = parse_usize(fields[2])
+            .with_context(|| format!("Failed to parse kraken report: {}", path.display()))
             .with_context(|| format!("Failed to parse line: {}", String::from_utf8_lossy(&line)))?;
         let minimizer_len;
         let minimizer_n_unique;
@@ -73,6 +79,7 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
                 fields.len(),
                 String::from_utf8_lossy(&line)
             ))
+            .with_context(|| format!("Failed to parse kraken report: {}", path.display()))
             .with_context(|| {
                 format!("Failed to parse line: {}", String::from_utf8_lossy(&line))
             })?;
