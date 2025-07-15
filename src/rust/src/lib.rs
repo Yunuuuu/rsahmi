@@ -34,6 +34,7 @@ extendr_module! {
     mod rsahmi;
     use kreport;
     use seq_refine;
+    use koutput_reads;
     use kractor;
     use bench;
 }
