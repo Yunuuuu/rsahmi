@@ -3,7 +3,7 @@ use bytes::Bytes;
 use extendr_api::prelude::*;
 use rustc_hash::FxHashMap as HashMap;
 
-use crate::seq_range::SeqRanges;
+use crate::seq_range::{check_overlap, SeqRanges};
 
 /// A collection of (tag name → sequence ranges) mappings.
 /// Each tag (as `Bytes`) maps to a `SeqRanges` defining subsequence locations to extract.
@@ -115,7 +115,9 @@ impl TryFrom<&Robj> for TagRanges {
                     ));
                 }
                 let tag = extract_tag_name(&robj)?;
-                let ranges = SeqRanges::try_from(&robj)?;
+                let mut ranges = SeqRanges::try_from(&robj)?;
+                ranges.sort();
+                check_overlap(&ranges)?;
                 Ok((tag, ranges))
             })
             .collect()
