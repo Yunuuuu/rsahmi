@@ -269,7 +269,11 @@ impl SubseqActionsBuilder {
     /// Sorting at build time ensures that the full set of ranges is globally ordered and
     /// ready for efficient trimming operations.
     pub(crate) fn build(self) -> Result<SubseqActions> {
-        let tags = self.embed_list.into_iter().collect::<TagRanges>();
+        let tag_ranges = self
+            .embed_list
+            .into_iter()
+            .collect::<HashMap<Bytes, SeqRanges>>();
+        let tags = TagRanges::new(tag_ranges);
         let embed_actions = SubseqEmbedActions::new(tags);
 
         // Flatten all trim ranges into a single sorted list

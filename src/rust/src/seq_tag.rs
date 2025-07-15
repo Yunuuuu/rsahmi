@@ -8,6 +8,12 @@ use crate::seq_range::{check_overlap, SeqRanges};
 /// A collection of (tag name → sequence ranges) mappings.
 /// Each tag (as `Bytes`) maps to a `SeqRanges` defining subsequence locations to extract.
 /// Internally stored in a HashMap, and tag order is not guaranteed unless you use an ordered map.
+///
+/// ## ⚠️ Important:
+/// - Each `SeqRanges` **must be sorted and non-overlapping**.
+/// - This is **automatically enforced** in the `TryFrom<Robj>` constructor (used in R bindings).
+/// - If constructed manually via `TagRanges::new()`, it is the **caller’s responsibility**
+///   to ensure `SeqRanges` are **sorted** (`ranges.sort()`) and **non-overlapping** (`check_overlap(&ranges)`).
 pub(crate) struct TagRanges {
     map: HashMap<Bytes, SeqRanges>,
 }
@@ -25,6 +31,17 @@ pub(crate) fn extract_tag_name(robj: &Robj) -> Result<Bytes> {
 }
 
 impl TagRanges {
+    /// Creates a new `TagRanges` from an existing `HashMap`.
+    ///
+    /// ⚠️ **Important**: The caller must ensure that all `SeqRanges`:
+    /// - Are **sorted** (use `.sort()`).
+    /// - Are **non-overlapping** (use `check_overlap(&ranges)`).
+    ///
+    /// This method does **not** enforce the invariants.
+    pub(crate) fn new(tag_ranges: HashMap<Bytes, SeqRanges>) -> Self {
+        Self { map: tag_ranges }
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.map.len()
     }
@@ -66,14 +83,6 @@ impl TagRanges {
     }
 }
 
-impl FromIterator<(Bytes, SeqRanges)> for TagRanges {
-    fn from_iter<T: IntoIterator<Item = (Bytes, SeqRanges)>>(iter: T) -> Self {
-        Self {
-            map: iter.into_iter().collect::<HashMap<Bytes, SeqRanges>>(),
-        }
-    }
-}
-
 impl IntoIterator for TagRanges {
     type IntoIter = std::collections::hash_map::IntoIter<Bytes, SeqRanges>;
     type Item = (Bytes, SeqRanges);
@@ -106,7 +115,8 @@ impl TryFrom<&Robj> for TagRanges {
         let list = value
             .as_list()
             .ok_or(anyhow!("Expected a list of sequence range objects."))?;
-        list.values()
+        let tag_ranges = list
+            .values()
             .into_iter()
             .map(|robj| -> Result<(Bytes, SeqRanges)> {
                 if !value.inherits("rsahmi_tag") {
@@ -120,6 +130,7 @@ impl TryFrom<&Robj> for TagRanges {
                 check_overlap(&ranges)?;
                 Ok((tag, ranges))
             })
-            .collect()
+            .collect::<Result<HashMap<Bytes, SeqRanges>>>()?;
+        Ok(Self::new(tag_ranges))
     }
 }
