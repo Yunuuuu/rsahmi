@@ -5,7 +5,10 @@ use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 mod paired;
 mod single;
 
-use crate::seq_action::*;
+mod seq_action;
+
+use seq_action::*;
+
 use crate::utils::*;
 
 #[extendr]

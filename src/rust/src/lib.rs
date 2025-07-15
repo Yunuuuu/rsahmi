@@ -7,7 +7,6 @@ mod koutput_reads;
 mod kractor;
 mod kreport;
 mod reader;
-mod seq_action;
 mod seq_range;
 mod seq_refine;
 mod seq_tag;

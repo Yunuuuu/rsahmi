@@ -8,7 +8,7 @@ use crate::seq_range::{check_overlap, SeqRange, SeqRanges};
 use crate::seq_tag::*;
 use crate::utils::*;
 
-pub(crate) struct SubseqEmbedActions {
+pub(in crate::seq_refine) struct SubseqEmbedActions {
     tags: TagRanges,
 }
 
@@ -111,21 +111,21 @@ impl SubseqTrimActions {
     }
 }
 
-pub(crate) struct SubseqActions {
+pub(in crate::seq_refine) struct SubseqActions {
     embed: SubseqEmbedActions,
     trim: SubseqTrimActions,
 }
 
 impl SubseqActions {
     #[allow(dead_code)]
-    pub(crate) fn builder() -> SubseqActionsBuilder {
+    pub(in crate::seq_refine) fn builder() -> SubseqActionsBuilder {
         SubseqActionsBuilder {
             embed_list: Vec::new(),
             trim_list: Vec::new(),
         }
     }
 
-    pub(crate) fn transform_fastq(&self, record: &mut FastqRecord<Bytes>) -> Result<()> {
+    pub(in crate::seq_refine) fn transform_fastq(&self, record: &mut FastqRecord<Bytes>) -> Result<()> {
         self.embed.embed(record)?;
         self.trim.trim(record)?;
 
@@ -135,17 +135,17 @@ impl SubseqActions {
 
 /// Paired-end FASTQ transformation logic using optional tag embedding and trimming.
 /// Each read end (read1 or read2) can have its own independent action configuration.
-pub(crate) struct SubseqPairedActions {
+pub(in crate::seq_refine) struct SubseqPairedActions {
     actions1: Option<SubseqActions>,
     actions2: Option<SubseqActions>,
 }
 
 impl SubseqPairedActions {
-    pub(crate) fn new(actions1: Option<SubseqActions>, actions2: Option<SubseqActions>) -> Self {
+    pub(in crate::seq_refine) fn new(actions1: Option<SubseqActions>, actions2: Option<SubseqActions>) -> Self {
         Self { actions1, actions2 }
     }
 
-    pub(crate) fn transform_fastq(
+    pub(in crate::seq_refine) fn transform_fastq(
         &self,
         record1: &mut FastqRecord<Bytes>,
         record2: &mut FastqRecord<Bytes>,
@@ -216,7 +216,7 @@ impl SubseqPairedActions {
 /// Builder pattern for constructing `SubseqActions` step-by-step.
 /// Allows the user to accumulate multiple `embed` and `trim` operations,
 /// validating them before finalizing into a concrete `SubseqActions` instance.
-pub(crate) struct SubseqActionsBuilder {
+pub(in crate::seq_refine) struct SubseqActionsBuilder {
     embed_list: Vec<(Bytes, SeqRanges)>,
     trim_list: Vec<SeqRanges>,
 }
@@ -246,7 +246,7 @@ impl SubseqActionsBuilder {
 
     /// Adds a compound action to the builder.
     /// Dispatches to `embed`, `trim`, or both depending on action variant.
-    pub(crate) fn add_action(&mut self, action: SeqAction, ranges: SeqRanges) -> Result<()> {
+    pub(in crate::seq_refine) fn add_action(&mut self, action: SeqAction, ranges: SeqRanges) -> Result<()> {
         match action {
             SeqAction::Embed(tag) => {
                 self.add_embed(tag, ranges)?;
@@ -268,7 +268,7 @@ impl SubseqActionsBuilder {
     /// Trimming ranges from multiple calls may arrive unsorted and overlapping across entries.
     /// Sorting at build time ensures that the full set of ranges is globally ordered and
     /// ready for efficient trimming operations.
-    pub(crate) fn build(self) -> Result<SubseqActions> {
+    pub(in crate::seq_refine) fn build(self) -> Result<SubseqActions> {
         let tag_ranges = self
             .embed_list
             .into_iter()
@@ -288,14 +288,14 @@ impl SubseqActionsBuilder {
     }
 }
 
-pub(crate) enum SeqAction {
+pub(in crate::seq_refine) enum SeqAction {
     Embed(Bytes),
     Trim,
     EmbedTrim(Bytes),
 }
 
 // Create object from R
-pub(crate) fn robj_to_seq_actions<'r>(ranges: &Robj) -> Result<Option<SubseqActions>> {
+pub(in crate::seq_refine) fn robj_to_seq_actions<'r>(ranges: &Robj) -> Result<Option<SubseqActions>> {
     if ranges.is_null() {
         return Ok(None);
     }

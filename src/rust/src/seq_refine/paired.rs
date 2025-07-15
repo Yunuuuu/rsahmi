@@ -9,10 +9,10 @@ use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
 use libdeflater::{CompressionLvl, Compressor};
 
+use super::seq_action::*;
 use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
 use crate::fastq_record::{FastqParseError, FastqRecord};
-use crate::seq_action::*;
 use crate::utils::*;
 
 pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
@@ -317,7 +317,7 @@ mod tests {
     use flate2::read::GzDecoder;
 
     use super::*;
-    use crate::seq_action::{SeqAction, SubseqActions};
+    use super::{SeqAction, SubseqActions};
     use crate::seq_range::{SeqRange, SeqRanges};
 
     #[test]
