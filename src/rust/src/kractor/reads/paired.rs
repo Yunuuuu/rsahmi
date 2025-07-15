@@ -12,7 +12,7 @@ use rustc_hash::FxHashSet as HashSet;
 
 use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
-use crate::fastq_record::FastqRecord;
+use crate::fastq_record::{FastqParseError, FastqRecord};
 use crate::utils::*;
 
 pub(super) fn parse_paired<P: AsRef<Path> + ?Sized>(
@@ -132,10 +132,8 @@ pub(super) fn parse_paired<P: AsRef<Path> + ?Sized>(
                     // Initialize a thread-local batch sender for matching records
                     for (record1, record2) in zip(records1, records2) {
                         if record1.id != record2.id {
-                            return Err(anyhow!(
-                                "FASTQ pairing error: record1 ID = {}, record2 ID = {}. These records do not match and cannot be paired.",
-                                String::from_utf8_lossy(&record1.id),
-                                String::from_utf8_lossy(&record2.id)
+                            return Err(
+                                anyhow!("{}", FastqParseError::FastqPairError { read1_id: String::from_utf8_lossy(&record1.id).to_string(), read2_id: String::from_utf8_lossy(&record2.id).to_string(), read1_pos: None, read2_pos: None }
                             ));
                         }
                         if id_sets.contains(record1.id.as_ref()) {

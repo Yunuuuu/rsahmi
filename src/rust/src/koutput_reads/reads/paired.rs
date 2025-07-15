@@ -15,7 +15,7 @@ use super::stream::RecordHandler;
 use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
 use crate::koutput_reads::reads::stream::KoutreadStream;
-use crate::fastq_record::FastqRecord;
+use crate::fastq_record::{FastqRecord, FastqParseError};
 use crate::seq_tag::*;
 use crate::utils::*;
 
@@ -89,10 +89,8 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
                     // Initialize a thread-local batch sender for matching records
                     for (record1, record2) in zip(records1, records2) {
                         if record1.id != record2.id {
-                            return Err(anyhow!(
-                                "FASTQ pairing error: record1 ID = {}, record2 ID = {}. These records do not match and cannot be paired.",
-                                String::from_utf8_lossy(&record1.id),
-                                String::from_utf8_lossy(&record2.id)
+                            return Err(
+                                anyhow!("{}", FastqParseError::FastqPairError { read1_id: String::from_utf8_lossy(&record1.id).to_string(), read2_id: String::from_utf8_lossy(&record2.id).to_string(), read1_pos: None, read2_pos: None }
                             ));
                         }
                         if let Some((length, taxid, lca)) = koutmap.get(&record1.id) {

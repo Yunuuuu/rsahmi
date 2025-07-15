@@ -1,3 +1,5 @@
+#[cfg(any(feature = "bench", feature = "bench-isal"))]
+use anyhow::Context;
 use extendr_api::prelude::*;
 
 mod koutput;
@@ -40,7 +42,6 @@ fn kractor_koutput(
 }
 
 #[extendr]
-#[allow(clippy::too_many_arguments)]
 fn kractor_reads(
     koutput: &str,
     fq1: &str,
@@ -69,7 +70,7 @@ fn kractor_reads(
 }
 
 #[extendr]
-#[cfg(feature = "bench")]
+#[cfg(any(feature = "bench", feature = "bench-isal"))]
 fn pprof_kractor_koutput(
     kreport: &str,
     koutput: &str,
@@ -124,7 +125,7 @@ fn pprof_kractor_koutput(
 
 #[extendr]
 #[allow(clippy::too_many_arguments)]
-#[cfg(feature = "bench")]
+#[cfg(any(feature = "bench", feature = "bench-isal"))]
 fn pprof_kractor_reads(
     koutput: &str,
     fq1: &str,
@@ -169,14 +170,14 @@ fn pprof_kractor_reads(
     out
 }
 
-#[cfg(not(feature = "bench"))]
+#[cfg(not(any(feature = "bench", feature = "bench-isal")))]
 extendr_module! {
     mod kractor;
     fn kractor_koutput;
     fn kractor_reads;
 }
 
-#[cfg(feature = "bench")]
+#[cfg(any(feature = "bench", feature = "bench-isal"))]
 extendr_module! {
     mod kractor;
     fn kractor_koutput;

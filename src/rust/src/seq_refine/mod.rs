@@ -1,5 +1,4 @@
-use anyhow::Context;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use extendr_api::prelude::*;
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 
@@ -61,7 +60,7 @@ fn seq_refine(
 }
 
 #[extendr]
-#[cfg(feature = "bench")]
+#[cfg(any(feature = "bench", feature = "bench-isal"))]
 fn pprof_seq_refine(
     fq1: &str,
     ofile1: Option<&str>,
@@ -219,13 +218,13 @@ fn seq_refine_paired_read(
     )
 }
 
-#[cfg(not(feature = "bench"))]
+#[cfg(not(any(feature = "bench", feature = "bench-isal")))]
 extendr_module! {
     mod seq_refine;
     fn seq_refine;
 }
 
-#[cfg(feature = "bench")]
+#[cfg(any(feature = "bench", feature = "bench-isal"))]
 extendr_module! {
     mod seq_refine;
     fn seq_refine;

@@ -52,7 +52,6 @@ impl<R: Read> FastqReader<R> {
         // SAFETY: we must ensure line is not empty, this is ensured by the caller function
         if header.is_empty() || unsafe { *header.get_unchecked(0) } != b'@' {
             Err(FastqParseError::InvalidHead {
-                label: None,
                 record: format!("{}", String::from_utf8_lossy(&header)),
                 pos: self.offset(),
             })?;
@@ -79,7 +78,6 @@ impl<R: Read> FastqReader<R> {
             Ok(line.freeze())
         } else {
             Err(FastqParseError::IncompleteRecord {
-                label: None,
                 record: format!(
                     "{}{}",
                     String::from_utf8_lossy(&id),
@@ -97,7 +95,6 @@ impl<R: Read> FastqReader<R> {
             // Separator: begins with a '+' character and is optionally followed by the same sequence identifier
             if line.is_empty() || unsafe { *line.get_unchecked(0) } != b'+' {
                 Err(FastqParseError::InvalidSep {
-                    label: None,
                     record: format!(
                         "{}{}\n{}\n{}",
                         String::from_utf8_lossy(&id),
@@ -115,7 +112,6 @@ impl<R: Read> FastqReader<R> {
             }
         } else {
             Err(FastqParseError::IncompleteRecord {
-                label: None,
                 record: format!(
                     "{}{}\n{}",
                     String::from_utf8_lossy(&id),
@@ -133,7 +129,6 @@ impl<R: Read> FastqReader<R> {
         let qual = if let Some(line) = self.read_line()? {
             if seq.len() != line.len() {
                 Err(FastqParseError::UnequalLength {
-                    label: None,
                     seq: seq.len(),
                     qual: line.len(),
                     record: format!(
@@ -154,7 +149,6 @@ impl<R: Read> FastqReader<R> {
             }
         } else {
             Err(FastqParseError::IncompleteRecord {
-                label: None,
                 record: format!(
                     "{}\n{}\n{}",
                     String::from_utf8_lossy(
