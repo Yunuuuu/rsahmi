@@ -24,9 +24,9 @@ pub(crate) const BUFFER_SIZE: usize = 4 * 1024 * 1024;
 pub(crate) const TAG_PREFIX: &'static [u8] = b"RSAHMI{";
 pub(crate) static TAG_PREFIX_FINDER: std::sync::LazyLock<Finder> =
     std::sync::LazyLock::new(|| Finder::new(TAG_PREFIX));
-
+pub(crate) const KOUTPUT_TAXID_PREFIX: &'static [u8] = b"(taxid ";
 pub(crate) static KOUTPUT_TAXID_PREFIX_FINDER: std::sync::LazyLock<Finder> =
-    std::sync::LazyLock::new(|| Finder::new("(taxid"));
+    std::sync::LazyLock::new(|| Finder::new(KOUTPUT_TAXID_PREFIX));
 
 pub(crate) fn gz_compressed(path: &Path) -> bool {
     path.extension()

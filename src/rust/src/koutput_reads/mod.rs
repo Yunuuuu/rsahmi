@@ -1,5 +1,5 @@
 use aho_corasick::{AhoCorasick, AhoCorasickKind};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use extendr_api::prelude::*;
 use libdeflater::CompressionLvl;
 use rustc_hash::FxHashMap as HashMap;
@@ -50,7 +50,7 @@ fn koutput_reads(
         nqueue,
         threads,
     )
-    .map_err(|e| format!("{}", e))
+    .map_err(|e| format!("{:?}", e))
 }
 
 #[extendr]
@@ -76,7 +76,8 @@ fn pprof_koutput_reads(
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(2000)
         .build()
-        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+        .with_context(|| format!("cannot create profile guard"))
+        .map_err(|e| format!("{:?}", e))?;
     let out = koutput_reads(
         kreport,
         koutput,
@@ -96,12 +97,14 @@ fn pprof_koutput_reads(
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file)
-            .map_err(|e| format!("Failed to create file {}: {}", pprof_file, e))?;
+            .with_context(|| format!("Failed to create file {}", pprof_file))
+            .map_err(|e| format!("{:?}", e))?;
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
         report
             .flamegraph_with_options(file, &mut options)
-            .map_err(|e| format!("Failed to write flamegraph to {}: {}", pprof_file, e))?;
+            .with_context(|| format!("Failed to write flamegraph to {}", pprof_file))
+            .map_err(|e| format!("{:?}", e))?;
     };
     out
 }
@@ -127,8 +130,10 @@ fn koutput_reads_internal(
     let tag_ranges2 = robj_to_tag_ranges(&ranges2)?;
     let compression_level = CompressionLvl::new(compression_level)
         .map_err(|e| anyhow!("Invalid 'compression_level': {:?}", e))?;
-    let taxonomy = robj_to_option_str(&taxonomy).map_err(|e| anyhow!("'taxonomy' {}", e))?;
-    let exclude = robj_to_option_str(&exclude).map_err(|e| anyhow!("'exclude' {}", e))?;
+    let taxonomy =
+        robj_to_option_str(&taxonomy).with_context(|| format!("Failed to parse 'taxonomy'"))?;
+    let exclude =
+        robj_to_option_str(&exclude).with_context(|| format!("Failed to parse 'exclude'"))?;
     let mut kreports = parse_kreport(kreport)?;
     if let Some(taxonomy) = taxonomy {
         // Parse taxon strings like "rank__name" into rank-name pairs
@@ -205,8 +210,8 @@ fn koutput_reads_internal(
         .filter_map(|kr| taxid_to_descendants.get(kr.taxid.as_slice()))
         .flatten()
         .map(|taxid| {
-            let mut v = Vec::with_capacity(b"(taxid ".len() + taxid.len() + 1); // estimated capacity
-            v.extend_from_slice(b"(taxid ");
+            let mut v = Vec::with_capacity(KOUTPUT_TAXID_PREFIX.len() + taxid.len() + 1); // estimated capacity
+            v.extend_from_slice(KOUTPUT_TAXID_PREFIX);
             v.extend_from_slice(taxid);
             v.push(b')');
             v

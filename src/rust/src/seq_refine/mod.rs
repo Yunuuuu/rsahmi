@@ -1,3 +1,4 @@
+use anyhow::Context;
 use anyhow::{anyhow, Result};
 use extendr_api::prelude::*;
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
@@ -22,8 +23,12 @@ fn seq_refine(
     nqueue: Option<usize>,
     threads: usize,
 ) -> std::result::Result<(), String> {
-    let actions1 = robj_to_seq_actions(&actions1).map_err(|e| format!("actions1: {}", e))?;
-    let actions2 = robj_to_seq_actions(&actions2).map_err(|e| format!("actions2: {}", e))?;
+    let actions1 = robj_to_seq_actions(&actions1)
+        .with_context(|| format!("Failed to parse actions1"))
+        .map_err(|e| format!("{:?}", e))?;
+    let actions2 = robj_to_seq_actions(&actions2)
+        .with_context(|| format!("Failed to parse actions2"))
+        .map_err(|e| format!("{:?}", e))?;
     let threads = threads.max(1); // always use at least one thread
     if let Some(fq2) = fq2 {
         seq_refine_paired_read(
@@ -39,7 +44,7 @@ fn seq_refine(
             nqueue,
             threads,
         )
-        .map_err(|e| format!("{}", e))
+        .map_err(|e| format!("{:?}", e))
     } else {
         seq_refine_single_read(
             fq1,
@@ -51,7 +56,7 @@ fn seq_refine(
             nqueue,
             threads,
         )
-        .map_err(|e| format!("{}", e))
+        .map_err(|e| format!("{:?}", e))
     }
 }
 
@@ -74,7 +79,8 @@ fn pprof_seq_refine(
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(2000)
         .build()
-        .map_err(|e| format!("cannot create profile guard {:?}", e))?;
+        .with_context(|| format!("cannot create profile guard"))
+        .map_err(|e| format!("{:?}", e))?;
     let out = seq_refine(
         fq1,
         ofile1,
@@ -90,12 +96,14 @@ fn pprof_seq_refine(
     );
     if let Ok(report) = guard.report().build() {
         let file = std::fs::File::create(pprof_file)
-            .map_err(|e| format!("Failed to create file {}: {}", pprof_file, e))?;
+            .with_context(|| format!("Failed to create file {}", pprof_file))
+            .map_err(|e| format!("{:?}", e))?;
         let mut options = pprof::flamegraph::Options::default();
         options.image_width = Some(2500);
         report
             .flamegraph_with_options(file, &mut options)
-            .map_err(|e| format!("Failed to write flamegraph to {}: {}", pprof_file, e))?;
+            .with_context(|| format!("Failed to write flamegraph to {}", pprof_file))
+            .map_err(|e| format!("{:?}", e))?;
     };
     out
 }

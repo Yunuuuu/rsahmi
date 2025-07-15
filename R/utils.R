@@ -60,12 +60,14 @@ rust_method <- function(class, method, ...) {
 }
 
 #' @keywords internal
-rust_call <- function(.NAME, ...) {
+rust_call <- function(.NAME, ..., call = caller_env()) {
     # call the function
     out <- RUST_CALL(sprintf("wrap__%s", .NAME), ...)
 
     # propagate error from rust --------------------
     if (!inherits(out, "extendr_result")) return(out) # styler: off
-    if (!is.null(.subset2(out, "err"))) cli::cli_abort(.subset2(out, "err"))
+    if (!is.null(err <- .subset2(out, "err"))) {
+        rlang::abort(err, call = call)
+    }
     .subset2(out, "ok")
 }

@@ -1,12 +1,16 @@
-use std::fs::File;
+use std::{fs::File, path::Path};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use extendr_api::prelude::*;
 
 use crate::{reader0::LineReader, utils::BUFFER_SIZE};
 
-pub(crate) fn parse_kreport(kreport: &str) -> Result<Vec<Kreport>> {
-    let mut reader = LineReader::with_capacity(BUFFER_SIZE, File::open(kreport)?);
+pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<Kreport>> {
+    let path: &Path = kreport.as_ref();
+    let mut reader = LineReader::with_capacity(
+        BUFFER_SIZE,
+        File::open(path).with_context(|| format!("Failed to open file: {}", path.display()))?,
+    );
     let mut kreports: Vec<Kreport> = Vec::with_capacity(10);
     let mut ancestors = Vec::with_capacity(10);
     let mut pos = 0; // The line offset of the ancestors
@@ -65,7 +69,8 @@ pub(crate) fn parse_kreport(kreport: &str) -> Result<Vec<Kreport>> {
                 "Invalid line with {} fields: {:?}",
                 fields.len(),
                 String::from_utf8_lossy(&line)
-            ));
+            ))
+            .with_context(|| format!("Failed to parse kraken report from {}", path.display()));
         };
         let mut n = 0;
         while let Some(byte) = taxon_field.peek() {
@@ -144,18 +149,18 @@ pub(crate) struct Kreport {
 
 // Parse &[u8] slice to f64 assuming ASCII decimal representation
 fn parse_f64(bytes: &[u8]) -> Result<f64> {
-    let s = str::from_utf8(bytes).map_err(|e| anyhow!("Invalid UTF-8 in float: {:?}", e))?;
+    let s = str::from_utf8(bytes).with_context(|| format!("Invalid UTF-8: {:?}", bytes))?;
     s.trim()
         .parse::<f64>()
-        .map_err(|e| anyhow!("Failed to parse float '{}': {}", s.trim(), e))
+        .with_context(|| format!("Failed to parse float '{}'", s))
 }
 
 // Parse &[u8] slice to usize assuming ASCII decimal representation
 fn parse_usize(bytes: &[u8]) -> Result<usize> {
-    let s = str::from_utf8(bytes).map_err(|e| anyhow!("Invalid UTF-8 in integer: {:?}", e))?;
+    let s = str::from_utf8(bytes).with_context(|| format!("Invalid UTF-8: {:?}", bytes))?;
     s.trim()
         .parse::<usize>()
-        .map_err(|e| anyhow!("Failed to parse integer '{}': {}", s.trim(), e))
+        .with_context(|| format!("Failed to parse integer '{}'", s))
 }
 
 fn u8_to_list_rstr(vv: Vec<Vec<u8>>) -> Vec<Rstr> {
@@ -168,8 +173,8 @@ fn u8_to_rstr(bytes: Vec<u8>) -> Rstr {
 
 #[extendr]
 fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
-    let kreports = parse_kreport(kreport)
-        .map_err(|e| format!("Failed to parse kraken2 report file {:?}: {:?}", kreport, e))?;
+    let kreports = parse_kreport(kreport).map_err(|e| format!("{:?}", e))?;
+
     let mut percents = Vec::with_capacity(kreports.len());
     let mut total_reads = Vec::with_capacity(kreports.len());
     let mut reads = Vec::with_capacity(kreports.len());
