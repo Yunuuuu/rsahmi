@@ -3,7 +3,7 @@ use std::io::Write;
 use std::iter::zip;
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::ProgressBar;
@@ -63,13 +63,13 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                 let mut writer =
                     BufWriter::with_capacity(chunk_bytes, new_writer(output, output1_bar)?);
                 for chunk in writer1_rx {
-                    writer.write_all(&chunk).map_err(|e| {
-                        anyhow!("(Writer1) Failed to write FastqRecord to output: {}", e)
+                    writer.write_all(&chunk).with_context(|| {
+                        format!("(Writer1) Failed to write Fastq records to output")
                     })?;
                 }
                 writer
                     .flush()
-                    .map_err(|e| anyhow!("(Writer1) Failed to flush writer:  {}", e))?;
+                    .with_context(|| format!("(Writer1) Failed to flush writer"))?;
                 Ok(())
             }));
             let gzip = gz_compressed(output);
@@ -84,13 +84,13 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                 let mut writer =
                     BufWriter::with_capacity(chunk_bytes, new_writer(output, output2_bar)?);
                 for chunk in writer2_rx {
-                    writer.write_all(&chunk).map_err(|e| {
-                        anyhow!("(Writer2) Failed to write FastqRecord to output: {}", e)
+                    writer.write_all(&chunk).with_context(|| {
+                        format!("(Writer2) Failed to write Fastq records to output")
                     })?;
                 }
                 writer
                     .flush()
-                    .map_err(|e| anyhow!("(Writer2) Failed to flush writer: {}", e))?;
+                    .with_context(|| format!("(Writer2) Failed to flush writer"))?;
                 Ok(())
             }));
             let gzip = gz_compressed(output);
@@ -104,19 +104,13 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             // Iterate over each received batch of records
             for (records1, records2) in writer_rx {
                 if let Some(records1) = records1 {
-                    writer1_tx.send(records1).map_err(|e| {
-                        anyhow!(
-                            "(Writer dispatch) Failed to send read1 batch to Writer1 thread: {}",
-                            e
-                        )
+                    writer1_tx.send(records1).with_context(|| {
+                        format!("(Writer dispatch) Failed to send read1 batch to Writer1 thread")
                     })?;
                 }
                 if let Some(records2) = records2 {
-                    writer2_tx.send(records2).map_err(|e| {
-                        anyhow!(
-                            "(Writer dispatch) Failed to send read2 batch to Writer2 thread: {}",
-                            e
-                        )
+                    writer2_tx.send(records2).with_context(|| {
+                        format!("(Writer dispatch) Failed to send read2 batch to Writer2 thread")
                     })?;
                 }
             }
@@ -167,10 +161,9 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                             } else {
                                 None
                             };
-                            tx.send((pack1, pack2)).map_err(|e| {
-                                anyhow!(
-                                    "(Parser) Failed to send send parsed record pair to Writer thread: {}",
-                                    e
+                            tx.send((pack1, pack2)).with_context(|| {
+                                format!(
+                                    "(Parser) Failed to send send parsed record pair to Writer thread"
                                 )
                             })?;
                         }
@@ -199,10 +192,9 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                     } else {
                         None
                     };
-                    tx.send((pack1, pack2)).map_err(|e| {
-                        anyhow!(
-                            "(Parser) Failed to send send parsed record pair to Writer thread: {}",
-                            e
+                    tx.send((pack1, pack2)).with_context(|| {
+                        format!(
+                            "(Parser) Failed to send send parsed record pair to Writer thread"
                         )
                     })?;
                 }
@@ -235,10 +227,9 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
                 if records1.len() != records2.len() {
                     return Err(anyhow!("(Reader collect) FASTQ pairing error: record count mismatch (read1: {}, read2: {})", records1.len(), records2.len()));
                 }
-                reader_tx.send((records1, records2)).map_err(|e| {
-                    anyhow!(
-                        "(Reader collect) Failed to send send parsed record pair to Parser thread: {}",
-                        e
+                reader_tx.send((records1, records2)).with_context(|| {
+                    format!(
+                        "(Reader collect) Failed to send send parsed record pair to Parser thread"
                     )
                 })?;
             }
@@ -254,20 +245,14 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             let mut thread_tx = BatchSender::with_capacity(batch_size, reader1_tx);
             while let Some(record) = reader
                 .read_record()
-                .map_err(|e| anyhow!("(Reader1) Error while reading FASTQ record: {}", e))?
+                .with_context(|| format!("(Reader1) Failed to read FASTQ record"))?
             {
-                thread_tx.send(record).map_err(|e| {
-                    anyhow!(
-                        "(Reader1) Failed to send FASTQ record to reader collect thread: {}",
-                        e
-                    )
+                thread_tx.send(record).with_context(|| {
+                    format!("(Reader1) Failed to send FASTQ record to reader collect thread")
                 })?;
             }
-            thread_tx.flush().map_err(|e| {
-                anyhow!(
-                    "(Reader1) Failed to flush records to reader collect thread: {}",
-                    e
-                )
+            thread_tx.flush().with_context(|| {
+                format!("(Reader1) Failed to flush records to reader collect thread")
             })?;
             Ok(())
         });
@@ -281,20 +266,14 @@ pub(crate) fn seq_refine_paired_read<P: AsRef<Path> + ?Sized>(
             let mut thread_tx = BatchSender::with_capacity(batch_size, reader2_tx);
             while let Some(record) = reader
                 .read_record()
-                .map_err(|e| anyhow!("(Reader2) Error while reading FASTQ record: {}", e))?
+                .with_context(|| format!("(Reader2) Failed to read FASTQ record"))?
             {
-                thread_tx.send(record).map_err(|e| {
-                    anyhow!(
-                        "(Reader2) Failed to send FASTQ record to reader collect thread: {}",
-                        e
-                    )
+                thread_tx.send(record).with_context(|| {
+                    format!("(Reader2) Failed to send FASTQ record to reader collect thread")
                 })?;
             }
-            thread_tx.flush().map_err(|e| {
-                anyhow!(
-                    "(Reader2) Failed to flush records to reader collect thread: {}",
-                    e
-                )
+            thread_tx.flush().with_context(|| {
+                format!("(Reader2) Failed to flush records to reader collect thread")
             })?;
             Ok(())
         });
