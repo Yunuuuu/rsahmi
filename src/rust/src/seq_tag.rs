@@ -119,7 +119,7 @@ impl TryFrom<&Robj> for TagRanges {
             .values()
             .into_iter()
             .map(|robj| -> Result<(Bytes, SeqRanges)> {
-                if !value.inherits("rsahmi_tag") {
+                if !robj.inherits("rsahmi_tag") {
                     return Err(anyhow!(
                         "The object does not inherit a valid tag class (expected 'rsahmi_tag')."
                     ));
