@@ -1,10 +1,10 @@
-use std::fs::File;
 use std::path::Path;
 
 use aho_corasick::AhoCorasick;
 use anyhow::{anyhow, Result};
 use bytes::{Bytes, BytesMut};
 use crossbeam_channel::{Receiver, Sender};
+use indicatif::{ProgressBar, ProgressFinish};
 use memchr::memchr;
 use rustc_hash::FxHashMap as HashMap;
 
@@ -21,8 +21,11 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
     threads: usize,
 ) -> Result<HashMap<Bytes, (Bytes, Bytes, Bytes)>> {
     let input: &Path = input_path.as_ref();
-    let reader =
-        File::open(input).map_err(|e| anyhow!("Failed to open file {}: {}", input.display(), e))?;
+    let style = progress_reader_style()?;
+    let pb = ProgressBar::new(input.metadata()?.len() as u64).with_finish(ProgressFinish::Abandon);
+    pb.set_prefix("Parsing koutput");
+    pb.set_style(style);
+
     // for kmer, we counts total and unique k-mers per taxon across cell barcodes,
     // using both the cell barcode and unique molecular identifier (UMI) to resolve
     // read identity at the single-cell level. It aggregates k-mer counts for each
@@ -128,7 +131,8 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
 
         // ─── reader Thread ─────────────────────────────────────
         let reader_handle = scope.spawn(move || -> Result<()> {
-            let mut reader = LineReader::with_capacity(BUFFER_SIZE, reader);
+            let mut reader =
+                LineReader::with_capacity(BUFFER_SIZE, new_reader(input, BUFFER_SIZE, Some(pb))?);
             let mut reader_tx = BatchSender::with_capacity(batch_size, reader_tx);
             while let Some(record) = reader
                 .read_line()

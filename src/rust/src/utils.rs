@@ -3,7 +3,7 @@ use std::io::BufReader;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
 use indicatif::style::TemplateError;
@@ -49,7 +49,7 @@ pub(crate) fn new_writer<P: AsRef<Path> + ?Sized>(
 ) -> Result<Box<dyn Write>> {
     let path: &Path = file.as_ref();
     let file = File::create(path)
-        .map_err(|e| anyhow!("Failed to create output file {}: {}", path.display(), e))?;
+        .with_context(|| anyhow!("Failed to create output file {}", path.display()))?;
     let writer: Box<dyn Write>;
     if let Some(bar) = progress_bar {
         writer = Box::new(ProgressBarWriter::new(file, bar));
@@ -66,7 +66,7 @@ pub(crate) fn new_reader<P: AsRef<Path> + ?Sized>(
 ) -> Result<Box<dyn Read>> {
     let path: &Path = file.as_ref();
     let file =
-        File::open(path).map_err(|e| anyhow!("Failed to open file {}: {}", path.display(), e))?;
+        File::open(path).with_context(|| format!("Failed to open file: {}", path.display()))?;
     let reader: Box<dyn Read>;
     if gz_compressed(path) {
         if let Some(bar) = progress_bar {
