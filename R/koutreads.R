@@ -24,6 +24,13 @@
 #'   object (in which case it will be automatically wrapped by `tag()`). Note
 #'   that the tag embedded by [`seq_refine()`] in the description header will
 #'   always be extracted.
+#' @param ofile Optional character string. Path to the output file that will
+#'   store the matched reads extracted based on Kraken2 classification. If
+#'   `NULL`, a default filename (`"kraken_micriobiome_output_reads.txt"`) will
+#'   be used. The output is compressed if the extension is `.gz`. This file
+#'   contains only reads whose taxonomic assignments match the filtering
+#'   criteria, such as `taxonomy` inclusion and `exclude` filters. Useful for
+#'   downstream analysis like quantification of taxon-specific reads.
 #' @param taxonomy A character vector. The set of taxonomic groups to include
 #'   (default: `c("D__Bacteria", "D__Fungi", "D__Viruses")`). This defines the
 #'   global taxa to consider. Only the descendants within these groups will be

@@ -50,6 +50,14 @@ object (in which case it will be automatically wrapped by \code{tag()}). Note
 that the tag embedded by \code{\link[=seq_refine]{seq_refine()}} in the description header will
 always be extracted.}
 
+\item{ofile}{Optional character string. Path to the output file that will
+store the matched reads extracted based on Kraken2 classification. If
+\code{NULL}, a default filename (\code{"kraken_micriobiome_output_reads.txt"}) will
+be used. The output is compressed if the extension is \code{.gz}. This file
+contains only reads whose taxonomic assignments match the filtering
+criteria, such as \code{taxonomy} inclusion and \code{exclude} filters. Useful for
+downstream analysis like quantification of taxon-specific reads.}
+
 \item{taxonomy}{A character vector. The set of taxonomic groups to include
 (default: \code{c("D__Bacteria", "D__Fungi", "D__Viruses")}). This defines the
 global taxa to consider. Only the descendants within these groups will be

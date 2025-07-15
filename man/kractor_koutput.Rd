@@ -27,6 +27,12 @@ kractor_koutput(
 
 \item{koutput}{Path to the Kraken2 output file.}
 
+\item{ofile}{Optional path to the output file storing the filtered Kraken2
+output lines that pass taxonomic and exclusion filters. If \code{NULL}, a
+default filename \code{"kraken_microbiome_output.txt"} will be used. If the
+filename ends with \code{.gz}, output will be automatically compressed using
+gzip.}
+
 \item{taxonomy}{Character vector. The set of taxonomic groups to include
 (default: \code{c("D__Bacteria", "D__Fungi", "D__Viruses")}). This defines the
 global taxa to consider. If \code{NULL}, all taxa will be used. If \code{descendants = TRUE}, only the descendants within these groups will be considered. The

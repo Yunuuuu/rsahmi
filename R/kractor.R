@@ -5,6 +5,11 @@
 #' matching the desired `taxonomy`, `ranks`, `taxa`, `taxids`, and `descendants`
 #' and writes the filtered results to an output file.
 #'
+#' @param ofile Optional path to the output file storing the filtered Kraken2
+#'   output lines that pass taxonomic and exclusion filters. If `NULL`, a
+#'   default filename `"kraken_microbiome_output.txt"` will be used. If the
+#'   filename ends with `.gz`, output will be automatically compressed using
+#'   gzip.
 #' @param taxonomy Character vector. The set of taxonomic groups to include
 #' (default: `c("D__Bacteria", "D__Fungi", "D__Viruses")`). This defines the
 #' global taxa to consider. If `NULL`, all taxa will be used. If `descendants =
