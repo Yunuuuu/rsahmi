@@ -264,9 +264,6 @@ fn koutput_reads_internal(
         return Ok(());
     }
 
-    // Print a newline to avoid progress bar being on the same line
-    println!("\n");
-
     // For each koutput row, we calculate kmer information
     reads::parse_reads(
         &koutmap,
