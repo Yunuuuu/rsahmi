@@ -221,13 +221,6 @@ fn koutput_reads_internal(
         // Always include the descendants
         .filter_map(|kr| taxid_to_descendants.get(kr.taxid.as_slice()))
         .flatten()
-        .map(|taxid| {
-            let mut v = Vec::with_capacity(KOUTPUT_TAXID_PREFIX.len() + taxid.len() + 1); // estimated capacity
-            v.extend_from_slice(KOUTPUT_TAXID_PREFIX);
-            v.extend_from_slice(taxid);
-            v.push(KOUTPUT_TAXID_SUFFIX);
-            v
-        })
         .collect::<Vec<_>>();
 
     let include_aho = AhoCorasick::builder()

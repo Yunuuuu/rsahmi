@@ -73,12 +73,17 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                             } else if field_index == 2 {
                                 // Save taxid field (field 3) if it passes filtering
                                 if let Some(start) = KOUTPUT_TAXID_PREFIX_FINDER.find(field) {
-                                    let mut input = aho_corasick::Input::new(field);
-                                    input.set_start(start);
-                                    // Skip this line if taxid is not in `include_aho`
-                                    if include_aho.find(input).is_none() {
+                                    if let Some(end) = memchr(KOUTPUT_TAXID_SUFFIX, &field[start ..]) {
+                                        let id = &field[start + KOUTPUT_TAXID_PREFIX.len() .. end];
+                                        // Skip this line if taxid is not in `include_aho`
+                                        if include_aho.find(id).is_none() {
+                                            continue 'chunk_loop;
+                                        };
+                                        taxid = Some(id);
+                                    } else {
                                         continue 'chunk_loop;
-                                    };
+                                    }; 
+                                } else if include_aho.find(field).is_some() {
                                     taxid = Some(field);
                                 } else {
                                     // Skip line if taxid doesn't contain the prefix
