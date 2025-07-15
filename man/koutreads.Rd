@@ -12,7 +12,7 @@ koutreads(
   tag_ranges1 = NULL,
   tag_ranges2 = NULL,
   ofile = NULL,
-  taxonomy = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+  taxonomy = c("D__Bacteria", "D__Fungi", "D__Viruses"),
   exclude = c("9606"),
   koutput_batch = NULL,
   fastq_batch = NULL,
@@ -49,7 +49,7 @@ must be created by the \code{tag()} function. Note that the tag embedded by
 \code{\link[=seq_refine]{seq_refine()}} in the description header will always be extracted.}
 
 \item{taxonomy}{A character vector. The set of taxonomic groups to include
-(default: \code{c("d__Bacteria", "d__Fungi", "d__Viruses")}). This defines the
+(default: \code{c("D__Bacteria", "D__Fungi", "D__Viruses")}). This defines the
 global taxa to consider. Only the descendants within these groups will be
 considered. If \code{NULL}, all taxa will be used.}
 

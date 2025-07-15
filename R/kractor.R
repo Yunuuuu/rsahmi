@@ -17,7 +17,7 @@
 #' specifying the output FASTQ file(s) where the matching reads will be saved.
 #' Defaults to `"kraken_microbiome_reads(_1|2).txt"`.
 #' @param taxonomy Character vector. The set of taxonomic groups to include
-#' (default: `c("d__Bacteria", "d__Fungi", "d__Viruses")`). This defines the
+#' (default: `c("D__Bacteria", "D__Fungi", "D__Viruses")`). This defines the
 #' global taxa to consider. If `NULL`, all taxa will be used. If `descendants =
 #' TRUE`, only the descendants within these groups will be considered. The
 #' selection of taxa can be further refined using the `ranks`, `taxa`, and
@@ -69,7 +69,7 @@
 #' @export
 kractor <- function(kreport, koutput, reads,
                     extract_koutput = NULL, extract_reads = NULL,
-                    taxonomy = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+                    taxonomy = c("D__Bacteria", "D__Fungi", "D__Viruses"),
                     ranks = c("G", "S"),
                     taxa = NULL,
                     taxids = NULL,
@@ -138,8 +138,7 @@ CHUNK_BYTES <- 8L * 1024L * 1024L
 #' @export
 kractor_koutput <- function(kreport, koutput, extract_koutput = NULL,
                             taxonomy = c(
-                                "d__Bacteria", "d__Fungi",
-                                "d__Viruses"
+                                "D__Bacteria", "D__Fungi", "D__Viruses"
                             ),
                             ranks = c("G", "S"),
                             taxa = NULL,

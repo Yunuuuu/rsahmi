@@ -10,7 +10,7 @@ kractor(
   reads,
   extract_koutput = NULL,
   extract_reads = NULL,
-  taxonomy = c("d__Bacteria", "d__Fungi", "d__Viruses"),
+  taxonomy = c("D__Bacteria", "D__Fungi", "D__Viruses"),
   ranks = c("G", "S"),
   taxa = NULL,
   taxids = NULL,
@@ -45,7 +45,7 @@ specifying the output FASTQ file(s) where the matching reads will be saved.
 Defaults to \code{"kraken_microbiome_reads(_1|2).txt"}.}
 
 \item{taxonomy}{Character vector. The set of taxonomic groups to include
-(default: \code{c("d__Bacteria", "d__Fungi", "d__Viruses")}). This defines the
+(default: \code{c("D__Bacteria", "D__Fungi", "D__Viruses")}). This defines the
 global taxa to consider. If \code{NULL}, all taxa will be used. If \code{descendants = TRUE}, only the descendants within these groups will be considered. The
 selection of taxa can be further refined using the \code{ranks}, \code{taxa}, and
 \code{taxids} parameters. One of \code{taxonomy}, \code{ranks}, \code{taxa}, or \code{taxids} must be

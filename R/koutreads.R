@@ -23,7 +23,7 @@
 #'   must be created by the `tag()` function. Note that the tag embedded by
 #'   [`seq_refine()`] in the description header will always be extracted.
 #' @param taxonomy A character vector. The set of taxonomic groups to include
-#'   (default: `c("d__Bacteria", "d__Fungi", "d__Viruses")`). This defines the
+#'   (default: `c("D__Bacteria", "D__Fungi", "D__Viruses")`). This defines the
 #'   global taxa to consider. Only the descendants within these groups will be
 #'   considered. If `NULL`, all taxa will be used.
 #' @param exclude A character vector of taxids to exclude sequences from usage.
@@ -39,9 +39,7 @@
 #' @export
 koutreads <- function(kreport, koutput, reads,
                       tag_ranges1 = NULL, tag_ranges2 = NULL, ofile = NULL,
-                      taxonomy = c(
-                          "d__Bacteria", "d__Fungi", "d__Viruses"
-                      ),
+                      taxonomy = c("D__Bacteria", "D__Fungi", "D__Viruses"),
                       exclude = c("9606"),
                       koutput_batch = NULL, fastq_batch = NULL,
                       chunk_bytes = NULL,
@@ -66,7 +64,7 @@ koutreads <- function(kreport, koutput, reads,
 rust_koutreads <- function(kreport, koutput, reads, ofile,
                            tag_ranges1 = NULL, tag_ranges2 = NULL,
                            taxonomy = c(
-                               "d__Bacteria", "d__Fungi", "d__Viruses"
+                               "D__Bacteria", "D__Fungi", "D__Viruses"
                            ),
                            exclude = c("9606"),
                            koutput_batch = NULL,
