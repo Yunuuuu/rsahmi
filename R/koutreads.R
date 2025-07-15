@@ -48,7 +48,8 @@ koutreads <- function(kreport, koutput, reads,
                       compression_level = 4L,
                       nqueue = NULL, threads = NULL, odir = NULL) {
     rust_koutreads(
-        kreport = kreport, koutput = koutput, reads = reads, ofile = ofile,
+        kreport = kreport, koutput = koutput, reads = reads,
+        ofile = ofile %||% "kraken_micriobiome_output_reads.txt",
         tag_ranges1 = tag_ranges1, tag_ranges2 = tag_ranges2,
         taxonomy = taxonomy,
         exclude = exclude,
@@ -86,9 +87,9 @@ rust_koutreads <- function(kreport, koutput, reads, ofile,
         fq1 <- reads[[1L]]
         fq2 <- reads[[2L]]
     }
-    assert_tag_ranges(tag_ranges1)
-    assert_tag_ranges(tag_ranges2)
     assert_string(ofile, allow_empty = FALSE, allow_null = FALSE)
+    if (!is.null(tag_ranges1)) assert_tag_ranges(tag_ranges1)
+    if (!is.null(tag_ranges2)) assert_tag_ranges(tag_ranges2)
     assert_number_whole(koutput_batch, min = 1, allow_null = TRUE)
     assert_number_whole(fastq_batch, min = 1, allow_null = TRUE)
     assert_number_whole(chunk_bytes, min = 1, allow_null = TRUE)
@@ -145,7 +146,7 @@ rust_koutreads <- function(kreport, koutput, reads, ofile,
 #' @rdname koutreads
 tag <- function(tag, ranges) {
     assert_string(tag, allow_empty = FALSE, allow_null = FALSE)
-    UseMethod("tag")
+    UseMethod("tag", ranges)
 }
 
 #' @export
@@ -168,7 +169,7 @@ tag.rsahmi_seq_ranges <- function(tag, ranges) {
 
 assert_tag_ranges <- function(tag_ranges, arg = caller_arg(tag_ranges),
                               call = caller_env()) {
-    if (!is.null(tag_ranges) && !inherits(tag_ranges, "rsahmi_tag")) {
+    if (!inherits(tag_ranges, "rsahmi_tag")) {
         cli::cli_abort("{.arg {arg}} must be created by {.fn tag}")
     }
 }
