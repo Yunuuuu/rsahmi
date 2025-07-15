@@ -135,7 +135,13 @@ fn koutput_reads_internal(
     let exclude =
         robj_to_option_str(&exclude).with_context(|| format!("Failed to parse 'exclude'"))?;
     let mut kreports = parse_kreport(kreport)?;
-    if let Some(taxonomy) = &taxonomy {
+    if kreports.is_empty() {
+        return Err(anyhow!(
+            "No entries found in kreport file: '{}'. Please ensure it is not empty or malformed.",
+            kreport
+        ));
+    }
+    if let Some(taxonomy) = taxonomy {
         // Parse taxon strings like "rank__name" into rank-name pairs
         let rank_taxon_sets = taxonomy
             .iter()
@@ -164,6 +170,12 @@ fn koutput_reads_internal(
                     .any(|(rank, taxa)| rank_taxon_sets.contains(&(rank, taxa)))
             })
             .collect();
+        if kreports.is_empty() {
+            return Err(anyhow!(
+                "No taxonomic matches found in the kreport file for {:?}.",
+                taxonomy
+            ));
+        }
     }
 
     // Build a map: taxid → set of its ancestor taxids
@@ -258,14 +270,8 @@ fn koutput_reads_internal(
     )?;
 
     if koutmap.is_empty() {
-        if let Some(taxonomy) = taxonomy {
-            return Err(anyhow!(
-                "No taxonomic matches found in the koutput file for {:?}. ",
-                taxonomy
-            ));
-        } else {
-            return Err(anyhow!("No taxonomic matches found in the koutput file. ",));
-        }
+        println!("No taxonomic matches found in the koutput file.");
+        return Ok(());
     }
 
     // For each koutput row, we calculate kmer information

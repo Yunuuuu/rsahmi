@@ -257,7 +257,7 @@ fn kractor_match_aho(
             if let Some(start) = KOUTPUT_TAXID_PREFIX_FINDER.find(taxid) {
                 let mut input = aho_corasick::Input::new(taxid);
                 input.set_start(start);
-                if include_aho.find(taxid).is_none() {
+                if include_aho.find(input).is_none() {
                     return false;
                 } else if exclude_aho.is_none() {
                     return true;

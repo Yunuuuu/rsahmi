@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use aho_corasick::AhoCorasick;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use bytes::{Bytes, BytesMut};
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::{ProgressBar, ProgressFinish};
@@ -76,7 +76,7 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                                     let mut input = aho_corasick::Input::new(field);
                                     input.set_start(start);
                                     // Skip this line if taxid is not in `include_aho`
-                                    if include_aho.find(field).is_none() {
+                                    if include_aho.find(input).is_none() {
                                         continue 'chunk_loop;
                                     };
                                     taxid = Some(field);
@@ -108,8 +108,8 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                                                 line.slice_ref(lca),
                                             ),
                                         ))
-                                        .map_err(|e| {
-                                            anyhow!("(Parser) Failed to send parsed lines to Writer thread: {}", e)
+                                        .with_context(|| {
+                                            format!("(Parser) Failed to send parsed lines to Writer thread")
                                         })?;
                                 };
                                 continue 'chunk_loop;
@@ -119,8 +119,8 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                         }
                     }
                 }
-                thread_tx.flush().map_err(|e| {
-                    anyhow!("(Parser) Failed to send parsed lines to Writer thread: {}", e)
+                thread_tx.flush().with_context(|| {
+                    format!("(Parser) Failed to flush parsed lines to Writer thread")
                 })?;
                 Ok(())
             });
@@ -136,15 +136,15 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
             let mut reader_tx = BatchSender::with_capacity(batch_size, reader_tx);
             while let Some(record) = reader
                 .read_line()
-                .map_err(|e| anyhow!("(Reader) Error while reading line: {}", e))?
+                .with_context(|| format!("(Reader) Failed to read line"))?
             {
-                reader_tx.send(record).map_err(|e| {
-                    anyhow!("(Reader) Failed to send lines to Parser thread: {}", e)
-                })?;
+                reader_tx
+                    .send(record)
+                    .with_context(|| format!("(Reader) Failed to send lines to Parser thread"))?;
             }
             reader_tx
                 .flush()
-                .map_err(|e| anyhow!("(Reader) Failed to flush lines to Parser thread: {}", e))?;
+                .with_context(|| format!("(Reader) Failed to flush lines to Parser thread"))?;
             Ok(())
         });
 
