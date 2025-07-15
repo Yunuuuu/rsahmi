@@ -20,8 +20,10 @@
 #' @param tag_ranges1,tag_ranges2 A list of sequence ranges for extracting tags
 #'   from the first/second read in single-end/paired-end data. If `NULL`, no
 #'   additional tag extraction occurs for the first/second read. These ranges
-#'   must be created by the `tag()` function. Note that the tag embedded by
-#'   [`seq_refine()`] in the description header will always be extracted.
+#'   must be created by the `tag()` function, or be a named [`seq_range()`]
+#'   object (in which case it will be automatically wrapped by `tag()`). Note
+#'   that the tag embedded by [`seq_refine()`] in the description header will
+#'   always be extracted.
 #' @param taxonomy A character vector. The set of taxonomic groups to include
 #'   (default: `c("D__Bacteria", "D__Fungi", "D__Viruses")`). This defines the
 #'   global taxa to consider. Only the descendants within these groups will be

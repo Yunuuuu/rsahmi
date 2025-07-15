@@ -45,8 +45,10 @@ files to treat the actual biological read as read1 if needed.}
 \item{tag_ranges1, tag_ranges2}{A list of sequence ranges for extracting tags
 from the first/second read in single-end/paired-end data. If \code{NULL}, no
 additional tag extraction occurs for the first/second read. These ranges
-must be created by the \code{tag()} function. Note that the tag embedded by
-\code{\link[=seq_refine]{seq_refine()}} in the description header will always be extracted.}
+must be created by the \code{tag()} function, or be a named \code{\link[=seq_range]{seq_range()}}
+object (in which case it will be automatically wrapped by \code{tag()}). Note
+that the tag embedded by \code{\link[=seq_refine]{seq_refine()}} in the description header will
+always be extracted.}
 
 \item{taxonomy}{A character vector. The set of taxonomic groups to include
 (default: \code{c("D__Bacteria", "D__Fungi", "D__Viruses")}). This defines the
