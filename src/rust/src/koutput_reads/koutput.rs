@@ -72,6 +72,10 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                                 sequence_id = Some(field);
                             } else if field_index == 2 {
                                 // Save taxid field (field 3) if it passes filtering
+                                // Note: Through the use of `kraken2 --use-names`, 
+                                // Kraken 2 will replace the taxonomy ID column 
+                                // with the scientific name and the taxonomy ID in 
+                                // parenthesis (e.g., "Bacteria (taxid 2)" instead of "2") 
                                 if let Some(start) = KOUTPUT_TAXID_PREFIX_FINDER.find(field) {
                                     if let Some(end) = memchr(KOUTPUT_TAXID_SUFFIX, &field[start ..]) {
                                         let id = &field[start + KOUTPUT_TAXID_PREFIX.len() .. end];
@@ -82,7 +86,7 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                                         taxid = Some(id);
                                     } else {
                                         continue 'chunk_loop;
-                                    }; 
+                                    };
                                 } else if include_aho.find(field).is_some() {
                                     taxid = Some(field);
                                 } else {
