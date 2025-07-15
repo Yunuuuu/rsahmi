@@ -23,13 +23,19 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
         // Parse fixed columns
         let percents = parse_f64(fields[0])
             .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
-            .with_context(|| format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line)))?;
+            .with_context(|| {
+                format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
+            })?;
         let total_reads = parse_usize(fields[1])
             .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
-            .with_context(|| format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line)))?;
+            .with_context(|| {
+                format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
+            })?;
         let reads = parse_usize(fields[2])
             .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
-            .with_context(|| format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line)))?;
+            .with_context(|| {
+                format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
+            })?;
         let minimizer_len;
         let minimizer_n_unique;
         let rank;
@@ -211,11 +217,11 @@ fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
 
         rank.push(u8_to_rstr(report.rank));
         taxid.push(u8_to_rstr(report.taxid));
-        taxa.push(u8_to_rstr(report.taxon));
+        taxon.push(u8_to_rstr(report.taxon));
 
         ranks.push(Robj::from(u8_to_list_rstr(report.ranks)));
         taxids.push(Robj::from(u8_to_list_rstr(report.taxids)));
-        taxon.push(Robj::from(u8_to_list_rstr(report.taxa)));
+        taxa.push(Robj::from(u8_to_list_rstr(report.taxa)));
 
         match (report.minimizer_len, report.minimizer_n_unique) {
             (Some(a), Some(b)) => {
@@ -228,7 +234,7 @@ fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
 
     let ranks = List::from_values(ranks);
     let taxids = List::from_values(taxids);
-    let taxon = List::from_values(taxon);
+    let taxa = List::from_values(taxa);
 
     // Create R dataframe
     let out = if minimizer_len.is_empty() {
@@ -238,10 +244,10 @@ fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
             reads = reads,
             rank = rank,
             taxid = taxid,
-            taxa = taxa,
+            taxon = taxon,
             ranks = ranks,
             taxids = taxids,
-            taxon = taxon
+            taxa = taxa
         ]
     } else {
         list![
@@ -252,10 +258,10 @@ fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
             minimizer_n_unique = minimizer_n_unique,
             rank = rank,
             taxid = taxid,
-            taxa = taxa,
+            taxon = taxon,
             ranks = ranks,
             taxids = taxids,
-            taxon = taxon
+            taxa = taxa
         ]
     };
     Ok(out)
