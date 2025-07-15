@@ -26,7 +26,7 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
     input2_path: &P,
     input2_bar: Option<ProgressBar>,
     output_path: &P,
-    output_bar: Option<ProgressBar>,
+    matching_bar: Option<ProgressBar>,
     tag_ranges1: &Option<TagRanges>,
     tag_ranges2: &Option<TagRanges>,
     batch_size: usize,
@@ -58,10 +58,7 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file
         let writer_handle = scope.spawn(move || -> Result<()> {
-            if let Some(bar) = &output_bar {
-                bar.tick();
-            }
-            let mut writer = BufWriter::with_capacity(chunk_bytes, new_writer(output, output_bar)?);
+            let mut writer = BufWriter::with_capacity(chunk_bytes, new_writer(output, None)?);
 
             // Iterate over each received batch of records
             for chunk in writer_rx {
@@ -80,6 +77,7 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
         for _ in 0 .. threads {
             let rx = reader_rx.clone();
             let tx = writer_tx.clone();
+            let pb = matching_bar.clone();
             let handle = scope.spawn(move || -> Result<()> {
                 let record_handler = PairedRecordHandle::new(tag_ranges1, tag_ranges2);
                 let mut stream = KoutreadStream::with_capacity(chunk_bytes, tx, record_handler);
@@ -98,6 +96,9 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
                             ));
                         }
                         if let Some((length, taxid, lca)) = koutmap.get(&record1.id) {
+                            if let Some(bar) = &pb {
+                                bar.inc(1);
+                            }
                             stream.process_record(taxid, lca, length, &(record1, record2))?;
                         }
                     }

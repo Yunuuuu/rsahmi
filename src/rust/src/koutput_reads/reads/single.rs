@@ -21,7 +21,7 @@ pub(crate) fn parse_single_read<P: AsRef<Path> + ?Sized>(
     input_path: &P,
     input_bar: Option<ProgressBar>,
     output_path: &P,
-    output_bar: Option<ProgressBar>,
+    matching_bar: Option<ProgressBar>,
     tag_ranges: &Option<TagRanges>,
     batch_size: usize,
     chunk_bytes: usize,
@@ -45,10 +45,7 @@ pub(crate) fn parse_single_read<P: AsRef<Path> + ?Sized>(
         // ─── Writer Thread ─────────────────────────────────────
         // Consumes batches of records and writes them to file
         let writer_handle = scope.spawn(move || -> Result<()> {
-            if let Some(bar) = &output_bar {
-                bar.tick();
-            }
-            let mut writer = BufWriter::with_capacity(chunk_bytes, new_writer(output, output_bar)?);
+            let mut writer = BufWriter::with_capacity(chunk_bytes, new_writer(output, None)?);
 
             // Iterate over each received batch of records
             for chunk in writer_rx {
@@ -67,6 +64,7 @@ pub(crate) fn parse_single_read<P: AsRef<Path> + ?Sized>(
         for _ in 0 .. threads {
             let rx = reader_rx.clone();
             let tx = writer_tx.clone();
+            let pb = matching_bar.clone();
             let handle = scope.spawn(move || -> Result<()> {
                 let record_handler = SinlgeRecordHandle::new(tag_ranges);
                 let mut stream = crate::koutput_reads::reads::stream::KoutreadStream::with_capacity(
@@ -81,6 +79,9 @@ pub(crate) fn parse_single_read<P: AsRef<Path> + ?Sized>(
                 while let Ok(records) = rx.recv() {
                     for record in records {
                         if let Some((length, taxid, lca)) = koutmap.get(&record.id) {
+                            if let Some(bar) = &pb {
+                                bar.inc(1);
+                            }
                             stream.process_record(taxid, lca, length, &record)?;
                         }
                     }

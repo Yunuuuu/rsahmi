@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bytes::Bytes;
-use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
+use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use libdeflater::CompressionLvl;
 use rustc_hash::FxHashMap as HashMap;
 
@@ -25,7 +25,6 @@ pub(super) fn parse_reads(
     threads: usize,
 ) -> Result<()> {
     let reader_style = progress_reader_style()?;
-    let writer_style = progress_writer_style()?;
     let progress = MultiProgress::new();
     let reader_pb1 = progress.add(
         ProgressBar::new(std::fs::metadata(fq1)?.len() as u64).with_finish(ProgressFinish::Abandon),
@@ -33,9 +32,12 @@ pub(super) fn parse_reads(
     reader_pb1.set_prefix("Reading fq1");
     reader_pb1.set_style(reader_style.clone());
 
-    let writer_pb = ProgressBar::no_length().with_finish(ProgressFinish::Abandon);
-    writer_pb.set_prefix("Writing");
-    writer_pb.set_style(writer_style);
+    let matching_pb = ProgressBar::no_length().with_finish(ProgressFinish::Abandon);
+    matching_pb.set_prefix("Matching");
+    matching_pb.set_message("reads");
+    matching_pb.set_style(ProgressStyle::with_template(
+        "{prefix:.bold.cyan/blue} {human_len} {msg} {spinner:.green}",
+    )?);
 
     let threads = threads.max(1); // always use at least one thread
     if let Some(fq2) = fq2 {
@@ -45,7 +47,7 @@ pub(super) fn parse_reads(
         );
         reader_pb2.set_prefix("Reading fq2");
         reader_pb2.set_style(reader_style);
-        let writer_pb = progress.add(writer_pb);
+        let matching_pb = progress.add(matching_pb);
         paired::parse_paired_read(
             koutmap,
             fq1,
@@ -53,7 +55,7 @@ pub(super) fn parse_reads(
             fq2,
             Some(reader_pb2),
             ofile,
-            Some(writer_pb),
+            Some(matching_pb),
             &tag_ranges1,
             &tag_ranges2,
             batch_size,
@@ -63,13 +65,13 @@ pub(super) fn parse_reads(
             threads,
         )
     } else {
-        let writer_pb = progress.add(writer_pb);
+        let matching_pb = progress.add(matching_pb);
         single::parse_single_read(
             koutmap,
             fq1,
             Some(reader_pb1),
             ofile,
-            Some(writer_pb),
+            Some(matching_pb),
             &tag_ranges1,
             batch_size,
             chunk_bytes,
