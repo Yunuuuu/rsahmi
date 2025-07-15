@@ -186,7 +186,7 @@ check_tag_ranges <- function(tag_ranges, arg = caller_arg(tag_ranges),
         for (i in seq_along(tag_ranges)) {
             if (is_tag(tag_ranges[[i]])) {
                 next
-            } else if (is_range(tag_ranges)) {
+            } else if (is_range(tag_ranges[[i]])) {
                 if (is.null(nms)) {
                     cli::cli_abort(
                         "Elements of {.arg {arg}} must be named if they are not already created by {.fn tag}.",
