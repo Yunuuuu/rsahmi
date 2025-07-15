@@ -48,9 +48,8 @@ koutreads <- function(kreport, koutput, reads,
                       compression_level = 4L,
                       nqueue = NULL, threads = NULL, odir = NULL) {
     rust_koutreads(
-        kreport = kreport, koutput = koutput, reads = reads,
+        kreport = kreport, koutput = koutput, reads = reads, ofile = ofile,
         tag_ranges1 = tag_ranges1, tag_ranges2 = tag_ranges2,
-        ofile = ofile,
         taxonomy = taxonomy,
         exclude = exclude,
         koutput_batch = koutput_batch,
@@ -63,8 +62,8 @@ koutreads <- function(kreport, koutput, reads,
     )
 }
 
-rust_koutreads <- function(kreport, koutput, reads,
-                           tag_ranges1 = NULL, tag_ranges2 = NULL, ofile = NULL,
+rust_koutreads <- function(kreport, koutput, reads, ofile,
+                           tag_ranges1 = NULL, tag_ranges2 = NULL,
                            taxonomy = c(
                                "d__Bacteria", "d__Fungi", "d__Viruses"
                            ),
@@ -89,7 +88,7 @@ rust_koutreads <- function(kreport, koutput, reads,
     }
     assert_tag_ranges(tag_ranges1)
     assert_tag_ranges(tag_ranges2)
-    assert_string(ofile, allow_empty = FALSE, allow_null = TRUE)
+    assert_string(ofile, allow_empty = FALSE, allow_null = FALSE)
     assert_number_whole(koutput_batch, min = 1, allow_null = TRUE)
     assert_number_whole(fastq_batch, min = 1, allow_null = TRUE)
     assert_number_whole(chunk_bytes, min = 1, allow_null = TRUE)
@@ -169,7 +168,7 @@ tag.rsahmi_seq_ranges <- function(tag, ranges) {
 
 assert_tag_ranges <- function(tag_ranges, arg = caller_arg(tag_ranges),
                               call = caller_env()) {
-    if (!inherits(tag_ranges, "rsahmi_tag")) {
+    if (!is.null(tag_ranges) && !inherits(tag_ranges, "rsahmi_tag")) {
         cli::cli_abort("{.arg {arg}} must be created by {.fn tag}")
     }
 }
