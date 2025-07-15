@@ -12,9 +12,6 @@ name = 'rsahmi'
 [dependencies]
 extendr-api = { version = "0.8.0", features = [ "result_list" ] }
 anyhow = '*'
-flate2 = { version = "*", features = ["zlib-rs"]}
-libdeflater = { version = "*" }
-isal-rs = { version = "*" }
 indicatif = '*'
 bytes = '*'
 rayon = '*'
@@ -22,6 +19,9 @@ crossbeam-channel = { version = "*" }
 memchr = { version = "*" }
 aho-corasick = { version = "*" }
 rustc-hash = { version = "*" }
+flate2 = { version = "*", optional = true, features = ["zlib-rs"]}
+isal-rs = { version = "*", optional = true }
+libdeflater = { version = "*" }
 pprof = { version = "0.14", optional = true, features = ["flamegraph"] }
 
 [dev-dependencies]
@@ -29,7 +29,11 @@ tempfile = '*'
 rand = "0.8"
 
 [features]
-bench = ["dep:pprof"]
+default = ["flate2"]
+flate2 = ["dep:flate2"]
+isal = ["dep:isal-rs"]
+bench = ["dep:pprof", "flate2"]
+bench-isal = ["dep:pprof", "isal"]
 
 [lints.clippy]
 needless_late_init = "allow"

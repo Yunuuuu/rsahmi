@@ -316,7 +316,7 @@ mod tests {
     use std::fs::File;
     use std::io::Read;
 
-    use isal::read::GzipDecoder;
+    use flate2::read::GzDecoder;
 
     use super::*;
     use crate::seq_action::{SeqAction, SubseqActions};
@@ -373,9 +373,9 @@ mod tests {
 
         // Decompress and read output
         let mut buf1 = String::new();
-        GzipDecoder::new(File::open(out1_path)?).read_to_string(&mut buf1)?;
+        GzDecoder::new(File::open(out1_path)?).read_to_string(&mut buf1)?;
         let mut buf2 = String::new();
-        GzipDecoder::new(File::open(out2_path)?).read_to_string(&mut buf2)?;
+        GzDecoder::new(File::open(out2_path)?).read_to_string(&mut buf2)?;
 
         // Check contents
         assert_eq!(

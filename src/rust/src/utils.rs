@@ -6,9 +6,12 @@ use std::path::Path;
 use anyhow::{anyhow, Context, Result};
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use extendr_api::prelude::*;
+#[cfg(feature = "flate2")]
+use flate2::bufread::GzDecoder;
 use indicatif::style::TemplateError;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
+#[cfg(feature = "isal")]
 use isal::read::GzipDecoder;
 use libdeflater::Compressor;
 use memchr::memmem::Finder;
@@ -58,6 +61,7 @@ pub(crate) fn new_writer<P: AsRef<Path> + ?Sized>(
     Ok(writer)
 }
 
+#[cfg(feature = "isal")]
 pub(crate) fn new_reader<P: AsRef<Path> + ?Sized>(
     file: &P,
     buffer_size: usize,
@@ -78,6 +82,35 @@ pub(crate) fn new_reader<P: AsRef<Path> + ?Sized>(
                 buffer_size,
                 file,
             )));
+        }
+    } else {
+        if let Some(bar) = progress_bar {
+            reader = Box::new(ProgressBarReader::new(file, bar));
+        } else {
+            reader = Box::new(file);
+        }
+    }
+    Ok(reader)
+}
+
+#[cfg(feature = "flate2")]
+pub(crate) fn new_reader<P: AsRef<Path> + ?Sized>(
+    file: &P,
+    buffer_size: usize,
+    progress_bar: Option<ProgressBar>,
+) -> Result<Box<dyn Read>> {
+    let path: &Path = file.as_ref();
+    let file =
+        File::open(path).with_context(|| format!("Failed to open file: {}", path.display()))?;
+    let reader: Box<dyn Read>;
+    if gz_compressed(path) {
+        if let Some(bar) = progress_bar {
+            reader = Box::new(GzDecoder::new(BufReader::with_capacity(
+                buffer_size,
+                ProgressBarReader::new(file, bar),
+            )));
+        } else {
+            reader = Box::new(GzDecoder::new(BufReader::with_capacity(buffer_size, file)));
         }
     } else {
         if let Some(bar) = progress_bar {
