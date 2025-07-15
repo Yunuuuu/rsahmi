@@ -86,8 +86,8 @@ rust_koutreads <- function(kreport, koutput, reads, ofile,
         fq2 <- reads[[2L]]
     }
     assert_string(ofile, allow_empty = FALSE, allow_null = FALSE)
-    if (!is.null(tag_ranges1)) assert_tag_ranges(tag_ranges1)
-    if (!is.null(tag_ranges2)) assert_tag_ranges(tag_ranges2)
+    tag_ranges1 <- check_tag_ranges(tag_ranges1)
+    tag_ranges2 <- check_tag_ranges(tag_ranges2)
     assert_number_whole(koutput_batch, min = 1, allow_null = TRUE)
     assert_number_whole(fastq_batch, min = 1, allow_null = TRUE)
     assert_number_whole(chunk_bytes, min = 1, allow_null = TRUE)
@@ -165,9 +165,53 @@ tag.rsahmi_seq_ranges <- function(tag, ranges) {
     )
 }
 
-assert_tag_ranges <- function(tag_ranges, arg = caller_arg(tag_ranges),
-                              call = caller_env()) {
-    if (!inherits(tag_ranges, "rsahmi_tag")) {
-        cli::cli_abort("{.arg {arg}} must be created by {.fn tag}")
+is_tag <- function(x) inherits(x, "rsahmi_tag")
+
+check_tag_ranges <- function(tag_ranges, arg = caller_arg(tag_ranges),
+                             call = caller_env()) {
+    if (is.null(tag_ranges)) {
+        return(tag_ranges)
     }
+    if (is_tag(tag_ranges)) {
+        tag_ranges <- list(tag_ranges)
+    } else if (is_range(tag_ranges)) {
+        cli::cli_abort("{.arg {arg}} must be created by {.fn tag}")
+    } else if (is.list(tag_ranges)) {
+        nms <- names(tag_ranges)
+        for (i in seq_along(tag_ranges)) {
+            if (is_tag(tag_ranges[[i]])) {
+                next
+            } else if (is_range(tag_ranges)) {
+                if (is.null(nms)) {
+                    cli::cli_abort(
+                        "Elements of {.arg {arg}} must be named if they are not already created by {.fn tag}.",
+                        call = call
+                    )
+                }
+                if (is.na(nms[[i]]) || nms[[i]] == "") {
+                    cli::cli_abort(
+                        "Tag name for element {i} of {.arg {arg}} cannot be empty or NA.",
+                        call = call
+                    )
+                }
+                tag_ranges[[i]] <- tag(nms[[i]], tag_ranges[[i]])
+            } else {
+                # Ensure every element in list is a valid range/action object
+                cli::cli_abort(
+                    c(
+                        "{.arg {arg}} must be a list of tag objects created by {.fn tag}.",
+                        i = "Each element must be created by {.fn tag}, or a named {.fn seq_range} that will be auto-wrapped."
+                    ),
+                    call = call
+                )
+            }
+        }
+    } else {
+        cli::cli_abort(c(
+            "{.arg {arg}} must be a list of tag objects created by {.fn tag}.",
+            i = "Each element must be created by {.fn tag}, or a named {.fn seq_range} that will be auto-wrapped."
+        ), call = call)
+    }
+    if (length(tag_ranges) == 0) tag_ranges <- NULL
+    tag_ranges
 }
