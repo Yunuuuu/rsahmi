@@ -7,6 +7,7 @@ use crossbeam_channel::{Receiver, Sender};
 use indicatif::{ProgressBar, ProgressFinish};
 use memchr::memchr;
 use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::FxHashSet as HashSet;
 
 use crate::batchsender::BatchSender;
 use crate::reader0::LineReader;
@@ -14,7 +15,7 @@ use crate::utils::*;
 
 pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
     input_path: &P,
-    include_aho: AhoCorasick,
+    include_sets: HashSet<&[u8]>,
     exclude_aho: Option<AhoCorasick>,
     batch_size: usize,
     nqueue: Option<usize>,
@@ -47,7 +48,7 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
         for _ in 0 .. threads {
             let rx = reader_rx.clone();
             let tx = koutput_tx.clone();
-            let include_aho = &include_aho;
+            let include_sets = &include_sets;
             let exclude_aho = &exclude_aho;
             let handle = scope.spawn(move || -> Result<()> {
                 let mut thread_tx = BatchSender::with_capacity(batch_size, tx);
@@ -81,14 +82,15 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                                     if let Some(end) = memchr(KOUTPUT_TAXID_SUFFIX, &field[start ..]) {
                                         let id = &field[start .. start + end];
                                         // Skip this line if taxid is not in `include_aho`
-                                        if include_aho.find(id).is_none() {
+                                        if include_sets.contains(id) {
+                                            taxid = Some(id);
+                                        } else {
                                             continue 'chunk_loop;
                                         };
-                                        taxid = Some(id);
                                     } else {
                                         continue 'chunk_loop;
                                     };
-                                } else if include_aho.find(field).is_some() {
+                                } else if include_sets.contains(field) {
                                     taxid = Some(field);
                                 } else {
                                     // Skip line if taxid doesn't contain the prefix

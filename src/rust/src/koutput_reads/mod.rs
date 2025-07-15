@@ -216,16 +216,13 @@ fn koutput_reads_internal(
         })
         .collect::<HashMap<&[u8], HashSet<&[u8]>>>();
 
-    let patterns = kreports
+    let include_sets = kreports
         .iter()
         // Always include the descendants
         .filter_map(|kr| taxid_to_descendants.get(kr.taxid.as_slice()))
         .flatten()
-        .collect::<Vec<_>>();
-
-    let include_aho = AhoCorasick::builder()
-        .kind(Some(AhoCorasickKind::DFA))
-        .build(patterns)?;
+        .copied()
+        .collect::<HashSet<&[u8]>>();
 
     // A space-delimited list indicating the LCA mapping of each
     // k-mer in the sequence(s). For example, "562:13 561:4 A:31 0:1 562:3" would indicate that:
@@ -255,7 +252,7 @@ fn koutput_reads_internal(
     // Read Kraken2 output and extract matched records
     let koutmap = koutput::parse_koutput(
         koutput,
-        include_aho,
+        include_sets,
         exclude_aho,
         koutput_batch,
         nqueue,
