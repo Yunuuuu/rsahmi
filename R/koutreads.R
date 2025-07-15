@@ -104,7 +104,7 @@ rust_koutreads <- function(kreport, koutput, reads,
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
     odir <- odir %||% getwd()
     dir_create(odir)
-    koutput_batch <- koutput_batch %||% FASTQ_BATCH
+    koutput_batch <- koutput_batch %||% KOUTPUT_BATCH
     fastq_batch <- fastq_batch %||% FASTQ_BATCH
     chunk_bytes <- chunk_bytes %||% CHUNK_BYTES
     if (is.null(pprof)) {
