@@ -18,9 +18,12 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
         let line = line.freeze();
         let fields: Vec<&[u8]> = line.split(|b| *b == b'\t').collect();
         // Parse fixed columns
-        let percents = parse_f64(fields[0])?;
-        let total_reads = parse_usize(fields[1])?;
-        let reads = parse_usize(fields[2])?;
+        let percents = parse_f64(fields[0])
+            .with_context(|| format!("Failed to parse line: {}", String::from_utf8_lossy(&line)))?;
+        let total_reads = parse_usize(fields[1])
+            .with_context(|| format!("Failed to parse line: {}", String::from_utf8_lossy(&line)))?;
+        let reads = parse_usize(fields[2])
+            .with_context(|| format!("Failed to parse line: {}", String::from_utf8_lossy(&line)))?;
         let minimizer_len;
         let minimizer_n_unique;
         let rank;
@@ -70,7 +73,9 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
                 fields.len(),
                 String::from_utf8_lossy(&line)
             ))
-            .with_context(|| format!("Failed to parse kraken report from {}", path.display()));
+            .with_context(|| {
+                format!("Failed to parse line: {}", String::from_utf8_lossy(&line))
+            })?;
         };
         let mut n = 0;
         while let Some(byte) = taxon_field.peek() {
@@ -150,17 +155,19 @@ pub(crate) struct Kreport {
 // Parse &[u8] slice to f64 assuming ASCII decimal representation
 fn parse_f64(bytes: &[u8]) -> Result<f64> {
     let s = str::from_utf8(bytes).with_context(|| format!("Invalid UTF-8: {:?}", bytes))?;
-    s.trim()
+    let trimmed = s.trim();
+    trimmed
         .parse::<f64>()
-        .with_context(|| format!("Failed to parse float '{}'", s))
+        .with_context(|| format!("Failed to parse float '{}'", trimmed))
 }
 
 // Parse &[u8] slice to usize assuming ASCII decimal representation
 fn parse_usize(bytes: &[u8]) -> Result<usize> {
     let s = str::from_utf8(bytes).with_context(|| format!("Invalid UTF-8: {:?}", bytes))?;
-    s.trim()
+    let trimmed = s.trim();
+    trimmed
         .parse::<usize>()
-        .with_context(|| format!("Failed to parse integer '{}'", s))
+        .with_context(|| format!("Failed to parse integer '{}'", trimmed))
 }
 
 fn u8_to_list_rstr(vv: Vec<Vec<u8>>) -> Vec<Rstr> {
