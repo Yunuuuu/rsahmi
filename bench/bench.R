@@ -1,5 +1,5 @@
 # we must enable the `bench` features to run following code
-Sys.setenv(RSAHMI_FEATURES = "bench") # TO use pprof
+Sys.setenv(RSAHMI_FEATURES = c("bench,isal")) # TO use pprof
 # pak::pak("Yunuuuu/rsahmi")
 pak::pak(pkgbuild::build(binary = TRUE))
 system.time(rsahmi:::rust_seq_refine(
