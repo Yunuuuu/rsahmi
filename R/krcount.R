@@ -43,8 +43,10 @@ rust_krcount <- function(koutreads, kreport,
         taxonomy <- taxonomy[!is.na(taxonomy)]
         if (length(taxonomy) == 0L) taxonomy <- NULL
     }
+    assert_number_whole(batch_size, min = 1, allow_null = TRUE)
     nqueue <- check_queue(nqueue, 3L, 1)
     assert_string(pprof, allow_empty = FALSE, allow_null = TRUE)
+    batch_size <- batch_size %||% KOUTPUT_BATCH
 
     if (is.null(pprof)) {
         rust_call(
@@ -66,5 +68,4 @@ rust_krcount <- function(koutreads, kreport,
             pprof_file = file.path(odir, pprof)
         )
     }
-    cli::cli_inform(c("v" = "Finished"))
 }
