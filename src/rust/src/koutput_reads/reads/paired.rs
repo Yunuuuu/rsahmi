@@ -14,8 +14,8 @@ use super::stream::extract_tags_from_desc;
 use super::stream::RecordHandler;
 use crate::batchsender::BatchSender;
 use crate::fastq_reader::*;
+use crate::fastq_record::{FastqParseError, FastqRecord};
 use crate::koutput_reads::reads::stream::KoutreadStream;
-use crate::fastq_record::{FastqRecord, FastqParseError};
 use crate::seq_tag::*;
 use crate::utils::*;
 
@@ -89,9 +89,12 @@ pub(crate) fn parse_paired_read<P: AsRef<Path> + ?Sized>(
                     // Initialize a thread-local batch sender for matching records
                     for (record1, record2) in zip(records1, records2) {
                         if record1.id != record2.id {
-                            return Err(
-                                anyhow!("{}", FastqParseError::FastqPairError { read1_id: String::from_utf8_lossy(&record1.id).to_string(), read2_id: String::from_utf8_lossy(&record2.id).to_string(), read1_pos: None, read2_pos: None }
-                            ));
+                            return Err(anyhow!("{}", FastqParseError::FastqPairError {
+                                read1_id: String::from_utf8_lossy(&record1.id).to_string(),
+                                read2_id: String::from_utf8_lossy(&record2.id).to_string(),
+                                read1_pos: None,
+                                read2_pos: None
+                            }));
                         }
                         if let Some((length, taxid, lca)) = koutmap.get(&record1.id) {
                             if let Some(bar) = &pb {
@@ -360,7 +363,7 @@ impl<'a> RecordHandler for PairedRecordHandle<'a> {
     fn write_seq(&self, buf: &mut Vec<u8>, record: &Self::Record) {
         if self.pair {
             buf.extend_from_slice(&record.0.seq);
-            buf.put_u8(b'\t');
+            buf.put_u8(b' ');
         }
         buf.extend_from_slice(&record.1.seq);
     }
@@ -368,7 +371,7 @@ impl<'a> RecordHandler for PairedRecordHandle<'a> {
     fn write_qual(&self, buf: &mut Vec<u8>, record: &Self::Record) {
         if self.pair {
             buf.extend_from_slice(&record.0.qual);
-            buf.put_u8(b'\t');
+            buf.put_u8(b' ');
         }
         buf.extend_from_slice(&record.1.qual);
     }

@@ -2,7 +2,9 @@ use std::{fs::File, path::Path};
 
 use anyhow::{anyhow, Context, Result};
 use extendr_api::prelude::*;
+use rustc_hash::FxHashSet as HashSet;
 
+use crate::utils::*;
 use crate::{reader::LineReader, utils::BUFFER_SIZE};
 
 pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<Kreport>> {
@@ -20,18 +22,30 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
         }
         let line = line.freeze();
         let fields: Vec<&[u8]> = line.split(|b| *b == b'\t').collect();
+        if fields.len() != 6 && fields.len() != 8 {
+            return Err(anyhow!(
+                "Invalid line with {} fields: {:?}",
+                fields.len(),
+                String::from_utf8_lossy(&line)
+            ))
+            .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
+            .with_context(|| {
+                format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
+            })?;
+        };
+
         // Parse fixed columns
-        let percents = parse_f64(fields[0])
+        let percents = parse_f64(unsafe { fields.get_unchecked(0) })
             .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
             .with_context(|| {
                 format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
             })?;
-        let total_reads = parse_usize(fields[1])
+        let total_reads = parse_usize(unsafe { fields.get_unchecked(1) })
             .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
             .with_context(|| {
                 format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
             })?;
-        let reads = parse_usize(fields[2])
+        let reads = parse_usize(unsafe { fields.get_unchecked(2) })
             .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
             .with_context(|| {
                 format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
@@ -61,34 +75,24 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
         // 8. Indented scientific name
         if fields.len() == 6 {
             // 6-column format
-            rank = fields[3];
+            rank = unsafe { fields.get_unchecked(3) };
             if rank[0] == b'U' {
                 continue;
             }
-            taxid = fields[4];
-            taxon_field = fields[5].into_iter().peekable();
+            taxid = unsafe { fields.get_unchecked(4) };
+            taxon_field = unsafe { fields.get_unchecked(5) }.into_iter().peekable();
             minimizer_len = None;
             minimizer_n_unique = None;
-        } else if fields.len() == 8 {
+        } else {
             // 8-column format
-            rank = fields[5];
+            rank = unsafe { fields.get_unchecked(5) };
             if rank[0] == b'U' {
                 continue;
             }
-            minimizer_len = Some(parse_usize(fields[3])?);
-            minimizer_n_unique = Some(parse_usize(fields[4])?);
-            taxid = fields[6];
-            taxon_field = fields[7].into_iter().peekable();
-        } else {
-            return Err(anyhow!(
-                "Invalid line with {} fields: {:?}",
-                fields.len(),
-                String::from_utf8_lossy(&line)
-            ))
-            .with_context(|| format!("Failed to parse kraken report: '{}'", path.display()))
-            .with_context(|| {
-                format!("Failed to parse line: '{}'", String::from_utf8_lossy(&line))
-            })?;
+            minimizer_len = Some(parse_usize(unsafe { fields.get_unchecked(3) })?);
+            minimizer_n_unique = Some(parse_usize(unsafe { fields.get_unchecked(4) })?);
+            taxid = unsafe { fields.get_unchecked(6) };
+            taxon_field = unsafe { fields.get_unchecked(7) }.into_iter().peekable();
         };
         let mut n = 0;
         while let Some(byte) = taxon_field.peek() {
@@ -149,6 +153,59 @@ pub(crate) fn parse_kreport<P: AsRef<Path> + ?Sized>(kreport: &P) -> Result<Vec<
     Ok(kreports)
 }
 
+pub(crate) fn taxonomy_kreport<P: AsRef<Path> + ?Sized>(
+    kreport: &P,
+    taxonomy: Robj,
+) -> Result<Vec<Kreport>> {
+    let taxonomy =
+        robj_to_option_str(&taxonomy).with_context(|| format!("Failed to parse 'taxonomy'"))?;
+    let path = kreport.as_ref();
+    let mut kreports = parse_kreport(path)?;
+    if kreports.is_empty() {
+        return Err(anyhow!(
+            "No entries found in kreport file: '{}'. Please ensure it is not empty or malformed.",
+            path.display()
+        ));
+    }
+    if let Some(taxonomy) = taxonomy {
+        // Parse taxon strings like "rank__name" into rank-name pairs
+        let rank_taxon_sets = taxonomy
+            .iter()
+            .filter_map(|t| {
+                let mut pair = t.splitn(2, "__");
+                if let (Some(rank), Some(taxa)) = (pair.next(), pair.next()) {
+                    Some((rank.as_bytes(), taxa.as_bytes()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<(&[u8], &[u8])>>();
+
+        // Fail early if no valid taxon entries
+        if !taxonomy.is_empty() && rank_taxon_sets.is_empty() {
+            return Err(anyhow!("No valid taxonomy provided. 'taxonomy' must be in the format 'rank__name', where 'rank' and 'name' are separated by '__'."));
+        }
+
+        // Parsing kraken2 report: only contain information specified by `taxonomy`
+        kreports = kreports
+            .into_iter()
+            .filter(|kr| {
+                kr.ranks
+                    .iter()
+                    .zip(kr.taxa.iter())
+                    .any(|(rank, taxa)| rank_taxon_sets.contains(&(rank, taxa)))
+            })
+            .collect();
+        if kreports.is_empty() {
+            return Err(anyhow!(
+                "No taxonomic matches found in the kreport file for {:?}.",
+                taxonomy
+            ));
+        }
+    }
+    Ok(kreports)
+}
+
 #[allow(dead_code)]
 pub(crate) struct Kreport {
     pub(crate) percents: f64,
@@ -165,34 +222,8 @@ pub(crate) struct Kreport {
     pub(crate) level: usize,
 }
 
-// Parse &[u8] slice to f64 assuming ASCII decimal representation
-fn parse_f64(bytes: &[u8]) -> Result<f64> {
-    let s = str::from_utf8(bytes).with_context(|| format!("Invalid UTF-8: '{:?}'", bytes))?;
-    let trimmed = s.trim();
-    trimmed
-        .parse::<f64>()
-        .with_context(|| format!("Failed to parse float '{}'", trimmed))
-}
-
-// Parse &[u8] slice to usize assuming ASCII decimal representation
-fn parse_usize(bytes: &[u8]) -> Result<usize> {
-    let s = str::from_utf8(bytes).with_context(|| format!("Invalid UTF-8: '{:?}'", bytes))?;
-    let trimmed = s.trim();
-    trimmed
-        .parse::<usize>()
-        .with_context(|| format!("Failed to parse integer '{}'", trimmed))
-}
-
-fn u8_to_list_rstr(vv: Vec<Vec<u8>>) -> Vec<Rstr> {
-    vv.into_iter().map(|v| u8_to_rstr(v)).collect()
-}
-
-fn u8_to_rstr(bytes: Vec<u8>) -> Rstr {
-    Rstr::from_string(&unsafe { String::from_utf8_unchecked(bytes) })
-}
-
 #[extendr]
-fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
+fn read_kreport(kreport: &str) -> std::result::Result<List, String> {
     let kreports = parse_kreport(kreport).map_err(|e| format!("{:?}", e))?;
 
     let mut percents = Vec::with_capacity(kreports.len());
@@ -269,5 +300,5 @@ fn kraken_report(kreport: &str) -> std::result::Result<List, String> {
 
 extendr_module! {
     mod kreport;
-    fn kraken_report;
+    fn read_kreport;
 }

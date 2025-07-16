@@ -8,7 +8,7 @@ use rustc_hash::FxHashSet as HashSet;
 mod koutput;
 mod reads;
 
-use crate::kreport::parse_kreport;
+use crate::kreport::taxonomy_kreport;
 use crate::seq_tag::robj_to_tag_ranges;
 use crate::utils::*;
 
@@ -130,53 +130,9 @@ fn koutput_reads_internal(
     let tag_ranges2 = robj_to_tag_ranges(&ranges2)?;
     let compression_level = CompressionLvl::new(compression_level)
         .map_err(|e| anyhow!("Invalid 'compression_level': {:?}", e))?;
-    let taxonomy =
-        robj_to_option_str(&taxonomy).with_context(|| format!("Failed to parse 'taxonomy'"))?;
     let exclude =
         robj_to_option_str(&exclude).with_context(|| format!("Failed to parse 'exclude'"))?;
-    let mut kreports = parse_kreport(kreport)?;
-    if kreports.is_empty() {
-        return Err(anyhow!(
-            "No entries found in kreport file: '{}'. Please ensure it is not empty or malformed.",
-            kreport
-        ));
-    }
-    if let Some(taxonomy) = taxonomy {
-        // Parse taxon strings like "rank__name" into rank-name pairs
-        let rank_taxon_sets = taxonomy
-            .iter()
-            .filter_map(|t| {
-                let mut pair = t.splitn(2, "__");
-                if let (Some(rank), Some(taxa)) = (pair.next(), pair.next()) {
-                    Some((rank.as_bytes(), taxa.as_bytes()))
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<(&[u8], &[u8])>>();
-
-        // Fail early if no valid taxon entries
-        if !taxonomy.is_empty() && rank_taxon_sets.is_empty() {
-            return Err(anyhow!("No valid taxonomy provided. 'taxonomy' must be in the format 'rank__name', where 'rank' and 'name' are separated by '__'."));
-        }
-
-        // Parsing kraken2 report: only contain information specified by `taxon`
-        kreports = kreports
-            .into_iter()
-            .filter(|kr| {
-                kr.ranks
-                    .iter()
-                    .zip(kr.taxa.iter())
-                    .any(|(rank, taxa)| rank_taxon_sets.contains(&(rank, taxa)))
-            })
-            .collect();
-        if kreports.is_empty() {
-            return Err(anyhow!(
-                "No taxonomic matches found in the kreport file for {:?}.",
-                taxonomy
-            ));
-        }
-    }
+    let kreports = taxonomy_kreport(kreport, taxonomy)?;
 
     // Build a map: taxid → set of its ancestor taxids
     let taxid_to_ancestors = kreports

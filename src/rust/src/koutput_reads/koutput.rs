@@ -110,14 +110,16 @@ pub(super) fn parse_koutput<P: AsRef<Path> + ?Sized>(
                                     }
                                 }
                                 if let (Some(sequence_id), Some(taxid)) = (sequence_id, taxid) {
-                                    // Just ignore the error message, it won't occur
+                                    // Although we *could* use `line.slice_ref()` to avoid extra allocations (by just increasing
+                                    // the reference count), we choose `Bytes::copy_from_slice()` to reduce memory usage, as
+                                    // the full line buffer may be larger than the selected fields we need to retain.
                                     thread_tx
                                         .send((
-                                            line.slice_ref(sequence_id),
+                                            Bytes::copy_from_slice(sequence_id),
                                             (
-                                                line.slice_ref(field), // sequence length
-                                                line.slice_ref(taxid),
-                                                line.slice_ref(lca),
+                                                Bytes::copy_from_slice(field), // sequence length
+                                                Bytes::copy_from_slice(taxid),
+                                                Bytes::copy_from_slice(lca),
                                             ),
                                         ))
                                         .with_context(|| {

@@ -30,6 +30,30 @@ pub(crate) const KOUTPUT_TAXID_SUFFIX: u8 = b')';
 pub(crate) static KOUTPUT_TAXID_PREFIX_FINDER: std::sync::LazyLock<Finder> =
     std::sync::LazyLock::new(|| Finder::new(KOUTPUT_TAXID_PREFIX));
 
+// Parse &[u8] slice to f64 assuming ASCII decimal representation
+pub(crate) fn parse_f64(bytes: &[u8]) -> Result<f64> {
+    let s = str::from_utf8(bytes.trim_ascii())
+        .with_context(|| format!("Invalid UTF-8: '{:?}'", bytes))?;
+    s.parse::<f64>()
+        .with_context(|| format!("Failed to parse float '{}'", s))
+}
+
+// Parse &[u8] slice to usize assuming ASCII decimal representation
+pub(crate) fn parse_usize(bytes: &[u8]) -> Result<usize> {
+    let s = str::from_utf8(bytes.trim_ascii())
+        .with_context(|| format!("Invalid UTF-8: '{:?}'", bytes))?;
+    s.parse::<usize>()
+        .with_context(|| format!("Failed to parse integer '{}'", s))
+}
+
+pub(crate) fn u8_to_list_rstr(vv: Vec<Vec<u8>>) -> Vec<Rstr> {
+    vv.into_iter().map(|v| u8_to_rstr(v)).collect()
+}
+
+pub(crate) fn u8_to_rstr(bytes: Vec<u8>) -> Rstr {
+    Rstr::from_string(&unsafe { String::from_utf8_unchecked(bytes) })
+}
+
 pub(crate) fn gz_compressed(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())

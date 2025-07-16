@@ -125,7 +125,10 @@ impl SubseqActions {
         }
     }
 
-    pub(in crate::seq_refine) fn transform_fastq(&self, record: &mut FastqRecord<Bytes>) -> Result<()> {
+    pub(in crate::seq_refine) fn transform_fastq(
+        &self,
+        record: &mut FastqRecord<Bytes>,
+    ) -> Result<()> {
         self.embed.embed(record)?;
         self.trim.trim(record)?;
 
@@ -141,7 +144,10 @@ pub(in crate::seq_refine) struct SubseqPairedActions {
 }
 
 impl SubseqPairedActions {
-    pub(in crate::seq_refine) fn new(actions1: Option<SubseqActions>, actions2: Option<SubseqActions>) -> Self {
+    pub(in crate::seq_refine) fn new(
+        actions1: Option<SubseqActions>,
+        actions2: Option<SubseqActions>,
+    ) -> Self {
         Self { actions1, actions2 }
     }
 
@@ -246,7 +252,11 @@ impl SubseqActionsBuilder {
 
     /// Adds a compound action to the builder.
     /// Dispatches to `embed`, `trim`, or both depending on action variant.
-    pub(in crate::seq_refine) fn add_action(&mut self, action: SeqAction, ranges: SeqRanges) -> Result<()> {
+    pub(in crate::seq_refine) fn add_action(
+        &mut self,
+        action: SeqAction,
+        ranges: SeqRanges,
+    ) -> Result<()> {
         match action {
             SeqAction::Embed(tag) => {
                 self.add_embed(tag, ranges)?;
@@ -295,7 +305,9 @@ pub(in crate::seq_refine) enum SeqAction {
 }
 
 // Create object from R
-pub(in crate::seq_refine) fn robj_to_seq_actions<'r>(ranges: &Robj) -> Result<Option<SubseqActions>> {
+pub(in crate::seq_refine) fn robj_to_seq_actions<'r>(
+    ranges: &Robj,
+) -> Result<Option<SubseqActions>> {
     if ranges.is_null() {
         return Ok(None);
     }

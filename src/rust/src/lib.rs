@@ -5,6 +5,7 @@ mod fastq_reader;
 mod fastq_record;
 mod koutput_reads;
 mod kractor;
+mod krcount;
 mod kreport;
 mod reader;
 mod seq_range;
@@ -32,5 +33,6 @@ extendr_module! {
     use kreport;
     use seq_refine;
     use koutput_reads;
+    use krcount;
     use kractor;
 }

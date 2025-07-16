@@ -5,6 +5,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressFinish};
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 
+use crate::kreport::taxonomy_kreport;
 use crate::utils::*;
 
 mod parse;
@@ -25,10 +26,6 @@ pub(crate) fn kractor_koutput(
     nqueue: Option<usize>,
     threads: usize,
 ) -> Result<()> {
-    let mut kreports = crate::kreport::parse_kreport(kreport)?;
-
-    let taxonomy =
-        robj_to_option_str(&taxonomy).with_context(|| format!("Failed to parse 'taxonomy'"))?;
     let ranks = robj_to_option_str(&ranks).with_context(|| format!("Failed to parse 'ranks'"))?;
     let taxa = robj_to_option_str(&taxa).with_context(|| format!("Failed to parse 'taxa'"))?;
     let taxids =
@@ -36,7 +33,7 @@ pub(crate) fn kractor_koutput(
     let exclude =
         robj_to_option_str(&exclude).with_context(|| format!("Failed to parse 'exclude'"))?;
 
-    if taxonomy.is_none()
+    if taxonomy.is_null()
         && ranks.is_none()
         && taxa.is_none()
         && taxids.is_none()
@@ -47,43 +44,7 @@ pub(crate) fn kractor_koutput(
         ));
     }
 
-    if let Some(taxonomy) = taxonomy {
-        // Parse taxon strings like "rank__name" into rank-name pairs
-        let rank_taxon_sets = taxonomy
-            .iter()
-            .filter_map(|t| {
-                let mut pair = t.splitn(2, "__");
-                if let (Some(rank), Some(taxa)) = (pair.next(), pair.next()) {
-                    Some((rank.as_bytes(), taxa.as_bytes()))
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<(&[u8], &[u8])>>();
-
-        // Fail early if no valid taxon entries
-        if !taxonomy.is_empty() && rank_taxon_sets.is_empty() {
-            return Err(anyhow!("No valid taxonomy provided. 'taxonomy' must be in the format 'rank__name', where 'rank' and 'name' are separated by '__'."));
-        }
-
-        // Parsing kraken2 report: only contain information specified by `taxon`
-        kreports = kreports
-            .into_iter()
-            .filter(|kr| {
-                kr.ranks
-                    .iter()
-                    .zip(kr.taxa.iter())
-                    .any(|(rank, taxa)| rank_taxon_sets.contains(&(rank, taxa)))
-            })
-            .collect();
-        if kreports.is_empty() {
-            return Err(anyhow!(
-                "No taxonomic matches found in the kreport file for {:?}.",
-                taxonomy
-            ));
-        }
-    }
-
+    let kreports = taxonomy_kreport(kreport, taxonomy)?;
     let mut targeted_taxids: Vec<&[u8]>;
     if ranks.is_some() || taxa.is_some() || taxids.is_some() {
         // Parse set of desired taxonomic ranks
