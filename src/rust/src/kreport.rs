@@ -223,8 +223,8 @@ pub(crate) struct Kreport {
 }
 
 #[extendr]
-fn read_kreport(kreport: &str) -> std::result::Result<List, String> {
-    let kreports = parse_kreport(kreport).map_err(|e| format!("{:?}", e))?;
+fn read_kreport(kreport: &str, taxonomy: Robj) -> std::result::Result<List, String> {
+    let kreports = taxonomy_kreport(kreport, taxonomy).map_err(|e| format!("{:?}", e))?;
 
     let mut percents = Vec::with_capacity(kreports.len());
     let mut total_reads = Vec::with_capacity(kreports.len());

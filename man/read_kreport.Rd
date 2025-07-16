@@ -4,10 +4,12 @@
 \alias{read_kreport}
 \title{Parse kraken report file}
 \usage{
-read_kreport(kreport)
+read_kreport(kreport, taxonomy = NULL)
 }
 \arguments{
 \item{kreport}{The path to kraken report file.}
+
+\item{taxonomy}{A character vector. The set of taxonomic groups to include.}
 }
 \value{
 A data frame.
