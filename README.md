@@ -2,9 +2,9 @@ Single-cell Analysis of Host-Microbiome Interactions
 ================
 
 > **⚠️ This package has been superseded by
-> [`scmire`](https://github.com/WangLabCSU/scmire).**  
+> [`mire`](https://github.com/WangLabCSU/mire).**  
 > While `rsahmi` remains available for archival purposes, future
-> development and improvements will be focused on `scmire`, which offers
+> development and improvements will be focused on `mire`, which offers
 > an improved design for single-cell microbiome reconstruction and
 > quantification.
 
